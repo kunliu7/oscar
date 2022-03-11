@@ -1,0 +1,134 @@
+
+import imp
+from qiskit import Aer
+import networkx as nx
+import numpy as np
+import pandas as pd
+from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, execute
+from qiskit import Aer
+import qiskit
+from qiskit.providers.aer import AerSimulator
+from functools import partial
+from pathlib import Path
+import copy
+import pytest
+from itertools import groupby
+import timeit
+import sys
+from scipy.optimize import minimize
+from sympy import beta, false
+from .qaoa import get_maxcut_qaoa_circuit
+from .utils import noisy_qaoa_maxcut_energy
+
+from qiskit.providers.aer.noise import NoiseModel
+from qiskit.providers.aer.noise.errors.standard_errors import depolarizing_error, thermal_relaxation_error
+
+
+
+def get_depolarizing_error_noise_model(p1Q: float, p2Q: float):
+    noise_model = NoiseModel()
+
+    # Depolarizing error on the gates u2, u3 and cx (assuming the u1 is virtual-Z gate and no error)
+    # p1Q = 0.002
+    # p2Q = 0.01
+
+    noise_model.add_all_qubit_quantum_error(depolarizing_error(p1Q, 1), 'u2')
+    noise_model.add_all_qubit_quantum_error(depolarizing_error(2 * p1Q, 1), 'u3')
+    noise_model.add_all_qubit_quantum_error(depolarizing_error(p2Q, 2), 'cx')
+    return noise_model
+
+
+def maxcut_obj(x, G):
+    """
+    Given a bitstring as a solution, this function returns
+    the number of edges shared between the two partitions
+    of the graph.
+    
+    Args:
+        x: str
+           solution bitstring
+           
+        G: networkx graph
+        
+    Returns:
+        obj: float
+             Objective
+    """
+    obj = 0
+    for i, j in G.edges():
+        if x[i] != x[j]:
+            obj -= 1
+            # obj += 1
+            
+    return obj
+
+
+def compute_expectation(counts, G):
+    
+    """
+    Computes expectation value based on measurement results
+    
+    Args:
+        counts: dict
+                key as bitstring, val as count
+           
+        G: networkx graph
+        
+    Returns:
+        avg: float
+             expectation value
+    """
+    
+    avg = 0
+    sum_count = 0
+    for bitstring, count in counts.items():
+        
+        obj = maxcut_obj(bitstring, G)
+        avg += obj * count
+        sum_count += count
+        
+    return avg/sum_count
+
+
+# Finally we write a function that executes the circuit on the chosen backend
+def get_expectation(G, noise_model, num_shots=512):
+    
+    """
+    Runs parametrized circuit
+    
+    Args:
+        G: networkx graph
+        p: int,
+           Number of repetitions of unitaries
+    """
+    
+    backend = Aer.get_backend('aer_simulator')
+    noise_model = get_depolarizing_error_noise_model(0.001, 0.02)
+    # backend.shots = num_shots
+    
+    def execute_circ(beta_gamma):
+        beta = beta_gamma[:len(beta_gamma) // 2]
+        gamma = beta_gamma[len(beta_gamma) // 2:]
+
+        # return noisy_qaoa_maxcut_energy(G, beta, gamma, noise_model=None)#noise_model)
+        qc = get_maxcut_qaoa_circuit(G, beta, gamma)
+        qc.measure_all()
+        counts = backend.run(
+            qc,
+            num_shots=num_shots,
+            noise_model=noise_model
+        ).result().get_counts()
+        
+        return compute_expectation(counts, G)
+    
+    return execute_circ
+
+
+def optimize_under_noise(G: nx.Graph, init_beta_gamma, noise_model, num_shots):
+    expectation = get_expectation(G, noise_model, num_shots)
+
+    rst = minimize(expectation, 
+                init_beta_gamma, 
+                method='COBYLA')
+    # print(res)
+    return rst
