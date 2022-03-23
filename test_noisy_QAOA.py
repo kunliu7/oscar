@@ -95,13 +95,14 @@ def test_vis():
         # noise_model = None
         cnt = 0
         # for n_qubits in [3, 4]:
-        for n_qubits in [7, 9]:
+        for n_qubits in [8]:
             print(f"now: p1={p1Q}, p2={p2Q}, nQubits={n_qubits}")
             p = 2
             df = full_qaoa_dataset_table.reset_index()
             # print(df["n"].max())
             # exit()
             df = df[(df["n"] == n_qubits) & (df["p_max"] == p)]
+            df = df.head(3)
             print("total # circuit", len(df))
             for _, row in df.iterrows():
                 C_noisy = noisy_qaoa_maxcut_energy(
