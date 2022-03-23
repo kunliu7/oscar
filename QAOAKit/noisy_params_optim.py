@@ -21,8 +21,20 @@ from .qaoa import get_maxcut_qaoa_circuit
 from .utils import noisy_qaoa_maxcut_energy
 
 from qiskit.providers.aer.noise import NoiseModel
-from qiskit.providers.aer.noise.errors.standard_errors import depolarizing_error, thermal_relaxation_error
+from qiskit.providers.aer.noise.errors.standard_errors import depolarizing_error, pauli_error 
 
+def get_pauli_error_noise_model(p_error: float):
+    noise_model = NoiseModel()
+    
+    bit_flip = pauli_error([('X', p_error), ('I', 1 - p_error)])
+    phase_flip = pauli_error([('Z', p_error), ('I', 1 - p_error)])
+    print(bit_flip)
+    print(phase_flip)
+    bitphase_flip = bit_flip.compose(phase_flip)
+    print(bitphase_flip)
+    noise_model.add_all_qubit_quantum_error(bitphase_flip, ['u1', 'u2', 'u3'])
+    # noise_model.add_all_qubit_quantum_error(bitphase_flip, ['cx'])
+    return noise_model
 
 
 def get_depolarizing_error_noise_model(p1Q: float, p2Q: float):

@@ -1,3 +1,4 @@
+from sqlite3 import Timestamp
 import networkx as nx
 import numpy as np
 import pandas as pd
@@ -45,6 +46,7 @@ from qiskit.quantum_info import Statevector
 
 sys.path.append('..')
 from QAOAKit.noisy_params_optim import (
+    get_pauli_error_noise_model,
     optimize_under_noise,
     get_depolarizing_error_noise_model,
 )
@@ -109,7 +111,7 @@ from qiskit.algorithms.minimum_eigen_solvers.qaoa import QAOAAnsatz
 test_utils_folder = Path(__file__).parent
 
 
-def test_vis():
+def test_vis_depolarizing():
     full_qaoa_dataset_table = get_full_qaoa_dataset_table()
 
     p1Qs = [0.001, 0.002, 0.005]
@@ -149,6 +151,57 @@ def test_vis():
                 vis_landscape_multi_p(
                     row["G"],
                     f'figs/{signature}_p1Q{p1Q}_p2Q{p2Q}/G{cnt}_nQubit{n_qubits}_{diff:.2}', 
+                    beta_to_qaoa_format(row["beta"]),
+                    gamma_to_qaoa_format(row["gamma"]),
+                    noise_model
+                )
+                # return
+                cnt += 1
+
+                # assert np.isclose(
+                #     row["C_opt"], C_noisy
+                # )
+
+
+
+def test_vis_pauli():
+    full_qaoa_dataset_table = get_full_qaoa_dataset_table()
+
+    p1s = [0.001, 0.005, 0.01]
+    timestamp = get_curr_formatted_timestamp()
+    for p1 in p1s:
+        # p1Q = 0.005
+        # p2Q = 0.02
+        noise_model = get_pauli_error_noise_model(p1)
+        # noise_model = None
+        cnt = 0
+        # for n_qubits in [3, 4]:
+        for n_qubits in [8]:
+            print(f"now: p1={p1}, nQubits={n_qubits}")
+            p = 2
+            df = full_qaoa_dataset_table.reset_index()
+            df = df[(df["n"] == n_qubits) & (df["p_max"] == p)]
+            df = df.head(3)
+            print("total # circuit", len(df))
+            signature = f"{timestamp}_pauliXZ{p1}_nQ{n_qubits}_p{p}"
+            for _, row in df.iterrows():
+                C_noisy = noisy_qaoa_maxcut_energy(
+                    row["G"],
+                    beta_to_qaoa_format(row["beta"]),
+                    gamma_to_qaoa_format(row["gamma"]),
+                    noise_model=noise_model
+                )
+                diff = abs(row["C_opt"] - C_noisy)
+                print(row["C_opt"], C_noisy, diff)
+                # vis_landscape(row["G"], "test")
+                # print(type(row["graph_id"]))
+                # vis_landscape_heatmap(row["G"], f'id{cnt}', 
+                #     beta_to_qaoa_format(row["beta"])[0],
+                #     gamma_to_qaoa_format(row["gamma"])[0])
+                
+                vis_landscape_multi_p(
+                    row["G"],
+                    f'figs/{signature}/G{cnt}_{diff:.2}', 
                     beta_to_qaoa_format(row["beta"]),
                     gamma_to_qaoa_format(row["gamma"]),
                     noise_model
