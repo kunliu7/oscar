@@ -43,3 +43,19 @@ def get_maxcut_qaoa_qiskit_circuit(G, p, qiskit_angles):
     qc = ansatz.bind_parameters(qiskit_angles)
     qc.save_state()
     return qc, C, offset
+
+
+def get_maxcut_qaoa_qiskit_circuit_unbinded_parameters(G, p):
+    """
+    Constructs a max cut QAOA circuit with Qiskit.
+
+    Returns (quantum circuit, cost operator, cut size offset).
+    On average, the circuit gives max cut size proportional to -(<C> + offset)
+    """
+    problem = get_maxcut_quadratic_problem(G)
+    C, offset = problem.to_ising()
+    ansatz = QAOAAnsatz(C, p).decompose()
+    qc = ansatz
+    # qc = ansatz.bind_parameters(qiskit_angles)
+    qc.save_state()
+    return qc, C, offset
