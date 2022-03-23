@@ -124,11 +124,12 @@ def get_expectation(G, noise_model, num_shots=512):
     return execute_circ
 
 
-def optimize_under_noise(G: nx.Graph, init_beta_gamma, noise_model, num_shots):
+def optimize_under_noise(G: nx.Graph, init_beta_gamma, noise_model, num_shots, opt_method):
     expectation = get_expectation(G, noise_model, num_shots)
 
     rst = minimize(expectation, 
                 init_beta_gamma, 
-                method='COBYLA')
+                # method='COBYLA')
+                method=opt_method)
     # print(res)
     return rst

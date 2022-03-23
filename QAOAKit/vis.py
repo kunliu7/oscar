@@ -19,7 +19,7 @@ from qiskit.providers.aer.noise import NoiseModel
 from qiskit.quantum_info import Statevector
 
 from .qaoa import get_maxcut_qaoa_circuit
-from .utils import noisy_qaoa_maxcut_energy
+from .utils import noisy_qaoa_maxcut_energy, angles_from_qiskit_format
 
 # vis
 import numpy as np
@@ -111,7 +111,8 @@ def vis_landscape_heatmap_multi_p(
         var2_idx: int,
         beta_opt: np.array, # converted
         gamma_opt: np.array, # converted
-        noise_model: NoiseModel
+        noise_model: NoiseModel,
+        params_path: list
     ):
     
     # 0 <= var1_idx < var2_idx < 2*p
@@ -157,7 +158,17 @@ def vis_landscape_heatmap_multi_p(
     # ax = plt.axes()
     # ax.plot(beta_opt, gamma_opt, "ro")
     ax.plot(*_BETA_GAMMA_OPT[_VAR_INDICE], "ro")
+    if params_path != None and len(params_path) > 0:
+        for params in params_path:
+            params = angles_from_qiskit_format(params)
+            params = np.hstack([params["beta"], params["gamma"]])
+            # direction is opposite for qiskit params
+            # details see Noise_Induced_QAOAKit/QAOAKit/utils.py, angles_to_qiskit_format(angles)
+            # tmp_p = np.hstack([params[p:2*p], params[:p]])
+            ax.plot(*params[_VAR_INDICE], "s-", color='purple')
     c = ax.pcolormesh(X, Y, Z, cmap='viridis', vmin=Z.min(), vmax=Z.max())
+    ax.set_ylabel("gamma")
+    ax.set_xlabel("beta")
     # ax.axis([X.min(), X.max(), Y.min(), Y.max()])
 
     # ax.plot(beta_opt, gamma_opt, "ro")
@@ -171,7 +182,8 @@ def vis_landscape_multi_p(
         G: nx.Graph, figdir: str,
         beta_opt: np.array, # converted
         gamma_opt: np.array, # converted
-        noise_model: NoiseModel
+        noise_model: NoiseModel,
+        params_path: list
     ):
 
     p = len(beta_opt)
@@ -189,7 +201,8 @@ def vis_landscape_multi_p(
                 var2_idx,
                 beta_opt,
                 gamma_opt,
-                noise_model
+                noise_model,
+                params_path
             )
             print(f"fig saved at {figpath}")
 
