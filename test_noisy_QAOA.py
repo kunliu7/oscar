@@ -86,15 +86,17 @@ def test_vis():
     signature = get_curr_formatted_timestamp()
     full_qaoa_dataset_table = get_full_qaoa_dataset_table()
     
-    p1Q = 0.001
-    p2Q = 0.005
+    p1Q = 0.005
+    p2Q = 0.02
     noise_model = get_depolarizing_error_noise_model(p1Q, p2Q)
     # noise_model = None
     cnt = 0
-    for n_qubits in [3, 4]:
+    # for n_qubits in [3, 4]:
+    for n_qubits in [5]:
         p = 2
         df = full_qaoa_dataset_table.reset_index()
         df = df[(df["n"] == n_qubits) & (df["p_max"] == p)]
+        print("total # circuit", len(df))
         for _, row in df.iterrows():
             C_noisy = noisy_qaoa_maxcut_energy(
                 row["G"],
@@ -112,7 +114,7 @@ def test_vis():
             
             vis_landscape_multi_p(
                 row["G"],
-                f'figs/{signature}_p1Q{p1Q}_p2Q{p2Q}/G{cnt}_{diff:.2}', 
+                f'figs/{signature}_p1Q{p1Q}_p2Q{p2Q}/G{cnt}_nQubit{n_qubits}_{diff:.2}', 
                 beta_to_qaoa_format(row["beta"]),
                 gamma_to_qaoa_format(row["gamma"]),
                 noise_model
@@ -188,6 +190,6 @@ def test_qiskit_qaoa_circuit():
 
 
 if __name__ == "__main__":
-    test_qiskit_qaoa_circuit()
+    # test_qiskit_qaoa_circuit()
     # test_noisy_qaoa_maxcut_energy()
-    # test_vis()
+    test_vis()
