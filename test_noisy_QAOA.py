@@ -83,48 +83,54 @@ test_utils_folder = Path(__file__).parent
 
 
 def test_vis():
-    signature = get_curr_formatted_timestamp()
     full_qaoa_dataset_table = get_full_qaoa_dataset_table()
-    
-    p1Q = 0.005
-    p2Q = 0.02
-    noise_model = get_depolarizing_error_noise_model(p1Q, p2Q)
-    # noise_model = None
-    cnt = 0
-    # for n_qubits in [3, 4]:
-    for n_qubits in [5]:
-        p = 2
-        df = full_qaoa_dataset_table.reset_index()
-        df = df[(df["n"] == n_qubits) & (df["p_max"] == p)]
-        print("total # circuit", len(df))
-        for _, row in df.iterrows():
-            C_noisy = noisy_qaoa_maxcut_energy(
-                row["G"],
-                beta_to_qaoa_format(row["beta"]),
-                gamma_to_qaoa_format(row["gamma"]),
-                noise_model=noise_model
-            )
-            diff = abs(row["C_opt"] - C_noisy)
-            print(row["C_opt"], C_noisy, diff)
-            # vis_landscape(row["G"], "test")
-            # print(type(row["graph_id"]))
-            # vis_landscape_heatmap(row["G"], f'id{cnt}', 
-            #     beta_to_qaoa_format(row["beta"])[0],
-            #     gamma_to_qaoa_format(row["gamma"])[0])
-            
-            vis_landscape_multi_p(
-                row["G"],
-                f'figs/{signature}_p1Q{p1Q}_p2Q{p2Q}/G{cnt}_nQubit{n_qubits}_{diff:.2}', 
-                beta_to_qaoa_format(row["beta"]),
-                gamma_to_qaoa_format(row["gamma"]),
-                noise_model
-            )
-            # return
-            cnt += 1
 
-            # assert np.isclose(
-            #     row["C_opt"], C_noisy
-            # )
+    p1Qs = [0.001, 0.002, 0.005]
+    p2Qs = [0.005, 0.01, 0.02]
+    for p1Q, p2Q in zip(p1Qs, p2Qs):
+        signature = get_curr_formatted_timestamp()
+        # p1Q = 0.005
+        # p2Q = 0.02
+        noise_model = get_depolarizing_error_noise_model(p1Q, p2Q)
+        # noise_model = None
+        cnt = 0
+        # for n_qubits in [3, 4]:
+        for n_qubits in [7, 9]:
+            print(f"now: p1={p1Q}, p2={p2Q}, nQubits={n_qubits}")
+            p = 2
+            df = full_qaoa_dataset_table.reset_index()
+            # print(df["n"].max())
+            # exit()
+            df = df[(df["n"] == n_qubits) & (df["p_max"] == p)]
+            print("total # circuit", len(df))
+            for _, row in df.iterrows():
+                C_noisy = noisy_qaoa_maxcut_energy(
+                    row["G"],
+                    beta_to_qaoa_format(row["beta"]),
+                    gamma_to_qaoa_format(row["gamma"]),
+                    noise_model=noise_model
+                )
+                diff = abs(row["C_opt"] - C_noisy)
+                print(row["C_opt"], C_noisy, diff)
+                # vis_landscape(row["G"], "test")
+                # print(type(row["graph_id"]))
+                # vis_landscape_heatmap(row["G"], f'id{cnt}', 
+                #     beta_to_qaoa_format(row["beta"])[0],
+                #     gamma_to_qaoa_format(row["gamma"])[0])
+                
+                vis_landscape_multi_p(
+                    row["G"],
+                    f'figs/{signature}_p1Q{p1Q}_p2Q{p2Q}/G{cnt}_nQubit{n_qubits}_{diff:.2}', 
+                    beta_to_qaoa_format(row["beta"]),
+                    gamma_to_qaoa_format(row["gamma"]),
+                    noise_model
+                )
+                # return
+                cnt += 1
+
+                # assert np.isclose(
+                #     row["C_opt"], C_noisy
+                # )
 
     
 def test_noisy_qaoa_maxcut_energy():
