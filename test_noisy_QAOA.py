@@ -1,4 +1,3 @@
-from sqlite3 import Timestamp
 import networkx as nx
 import numpy as np
 import pandas as pd
@@ -22,6 +21,7 @@ from qiskit.algorithms.optimizers import (
     SciPyOptimizer
 )
 from qiskit.algorithms import VQE, NumPyMinimumEigensolver, QAOA
+from qiskit.utils import QuantumInstance, algorithm_globals
 from qiskit_optimization.algorithms import (
     MinimumEigenOptimizer,
     RecursiveMinimumEigenOptimizer,
@@ -279,16 +279,17 @@ def test_qiskit_qaoa_circuit_optimization():
     signature = get_curr_formatted_timestamp()
     cnt = 0
     
-    for n_qubits in [3, 4]:
-        p = 1
+    for n_qubits in [8]:
+        p = 2
         df = full_qaoa_dataset_table.reset_index()
         df = df[(df["n"] == n_qubits) & (df["p_max"] == p)]
+        df = df.head(3)
         for _, row in df.iterrows():
             print("============================")
             angles1 = opt_angles_for_graph(row["G"], row["p_max"])
             G = row["G"]
             qc1, C, offset = get_maxcut_qaoa_qiskit_circuit_unbinded_parameters(
-                G, p, angles_to_qiskit_format(angles1)
+                G, p
             )
             backend = AerSimulator(method="statevector")
             # sv1 = Statevector(backend.run(qc1).result().get_statevector())
@@ -333,48 +334,83 @@ def test_qiskit_qaoa_circuit_optimization():
                 values.append(mean)
                 params.append(parameters)
 
-            qaoa = QAOA(
-                optimizer,
-                reps=p,
-                initial_point=[1.0 for _ in range(2*p)],
-                quantum_instance=backend,
-                callback=cb_store_intermediate_result)
-            result = qaoa.compute_minimum_eigenvalue(C)
-            print("QAOA energy:", result.eigenvalue)
-            print("QAOA energy, + offset:", - (result.eigenvalue + offset))
+            if False:
+                p_error = 0.01
+                noise_model = get_pauli_error_noise_model(p_error)
+                noise_type = f'pauli_p{p_error}'
+            else:
+                # p1 = 0.01
+                # p2 = 0.005
+                p1 = 0.001
+                p2 = 0.005
+                noise_model = get_depolarizing_error_noise_model(p1, p2)
+                noise_type = f'depolar_p1e{p1}_p2e{p2}'
 
-            # vqe_optimizer = MinimumEigenOptimizer(vqe)
-            # result = vqe_optimizer.solve(C)
-            # print(qc1.parameters)
-            # vqe = VQE(qc1,
-            #     optimizer=optimizer,
-            #     # initial_point=angles_to_qiskit_format(angles1),
-            #     initial_point=[0.0 for _ in range(2*p)],
-            #     callback=cb_store_intermediate_result,
-            #     quantum_instance=backend
-            # )
-            # result = vqe.compute_minimum_eigenvalue(C)
-            # print(values)
-            print(params)
-            # result = NumPyMinimumEigensolver(Heisenberg_op).run()
-            # result = vqe.get_optimal_cost()
-            # print('VQE energy:', result.eigenvalue.real)
-            # print('VQE energy, + offset:', -(result.eigenvalue.real + offset))
+            if True:
+            # if False:
+                counts = []
+                values = []
+                params = []
+                qaoa = QAOA(
+                    optimizer,
+                    reps=p,
+                    # initial_point=angles_to_qiskit_format(angles1),
+                    initial_point=[1.0 for _ in range(2*p)],
+                    quantum_instance=backend,
+                    callback=cb_store_intermediate_result)
+                result = qaoa.compute_minimum_eigenvalue(C)
+                print("QAOA energy         :", result.eigenvalue)
+                print("QAOA energy + offset:", - (result.eigenvalue + offset))
 
-            vis_landscape_multi_p(
+                vis_landscape_multi_p(
                     row["G"],
-                    f'figs/test_opt_method/{signature}_nQ{n_qubits}_p{p}/G{cnt}', 
+                    f'figs/test_opt_method/{signature}_nQ{n_qubits}_p{p}_{noise_type}/G{cnt}',
                     beta_to_qaoa_format(row["beta"]),
                     gamma_to_qaoa_format(row["gamma"]),
                     None,
                     params
                 )
-            # qaoa_mes = QAOA(quantum_instance=quantum_instance, initial_point=[0.0, 1.0])
-            # ws_qaoa = WarmStartQAOAOptimizer(
-            #     pre_solver=CplexOptimizer(), relax_for_pre_solver=True, qaoa=qaoa_mes, epsilon=0.0
-            # )
+
+            if False:
+                counts = []
+                values = []
+                params = []   
+                # vqe_optimizer = MinimumEigenOptimizer(vqe)
+                # result = vqe_optimizer.solve(C)
+                # print(qc1.parameters)
+                # noise_model = get_depolarizing_error_noise_model()
+                # if True:
+                
+
+                qinst = QuantumInstance(
+                    backend=backend,
+                    noise_model=noise_model
+                )
+                vqe = VQE(qc1,
+                    optimizer=optimizer,
+                    # initial_point=angles_to_qiskit_format(angles1),
+                    initial_point=[1.0 for _ in range(2*p)],
+                    callback=cb_store_intermediate_result,
+                    quantum_instance=qinst
+                )
+                result = vqe.compute_minimum_eigenvalue(C)
+                # print(values)
+                # print(params)
+                print('VQE energy         :', result.eigenvalue.real)
+                print('VQE energy + offset:', -(result.eigenvalue.real + offset))
+
+                vis_landscape_multi_p(
+                        row["G"],
+                        f'figs/test_opt_method/{signature}_nQ{n_qubits}_p{p}_{noise_type}/G{cnt}', 
+                        beta_to_qaoa_format(row["beta"]),
+                        gamma_to_qaoa_format(row["gamma"]),
+                        None,
+                        params
+                    )
+            
             # assert sv1.equiv(sv2)
             cnt += 1
+
 
 if __name__ == "__main__":
     # test_qiskit_qaoa_circuit()
