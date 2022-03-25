@@ -1,3 +1,4 @@
+from cProfile import label
 from typing import List
 import networkx as nx
 import numpy as np
@@ -130,6 +131,7 @@ def vis_landscape_heatmap_multi_p(
     
     # qaoa format, i.e. \pi not included
     _BETA_RANGE = np.linspace(-np.pi, np.pi, 30)
+    # _BETA_RANGE = angles
     _GAMMA_RANGE = np.linspace(-np.pi/2, np.pi/2, 30)
     
     var1_range = _BETA_RANGE if var1_idx < p else _GAMMA_RANGE
@@ -157,18 +159,22 @@ def vis_landscape_heatmap_multi_p(
     # plt.plot()
     # ax = plt.axes()
     # ax.plot(beta_opt, gamma_opt, "ro")
-    ax.plot(*_BETA_GAMMA_OPT[_VAR_INDICE], "ro")
+    ax.plot(*_BETA_GAMMA_OPT[_VAR_INDICE], marker="o", color='red', markersize=6)
     if params_path != None and len(params_path) > 0:
+        xs = []
+        ys = []
         for params in params_path:
-            params = angles_from_qiskit_format(params)
-            params = np.hstack([params["beta"], params["gamma"]])
-            # direction is opposite for qiskit params
-            # details see Noise_Induced_QAOAKit/QAOAKit/utils.py, angles_to_qiskit_format(angles)
-            # tmp_p = np.hstack([params[p:2*p], params[:p]])
-            ax.plot(*params[_VAR_INDICE], "s-", color='purple')
+            tmp_params = np.hstack([params["beta"], params["gamma"]])
+            xs.append(tmp_params[_VAR_INDICE[0]])
+            ys.append(tmp_params[_VAR_INDICE[1]])
+
+        ax.plot(xs, ys, marker="o", color='purple', markersize=5, label="path")
+        ax.plot(xs[0], ys[0], marker="+", color='gray', markersize=6, label="initial point")
+        ax.plot(xs[-1], ys[-1], marker="s", color='black', markersize=6, label="last point")
+    
     c = ax.pcolormesh(X, Y, Z, cmap='viridis', vmin=Z.min(), vmax=Z.max())
-    ax.set_ylabel("gamma")
-    ax.set_xlabel("beta")
+    # ax.set_ylabel("gamma")
+    # ax.set_xlabel("beta")
     # ax.axis([X.min(), X.max(), Y.min(), Y.max()])
 
     # ax.plot(beta_opt, gamma_opt, "ro")
