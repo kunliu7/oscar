@@ -280,8 +280,8 @@ def test_qiskit_qaoa_circuit_optimization():
     cnt = 0
 
     # noise_model_type = ''
-    noise_model_type = 'DEPOLAR'
-    # noise_model_type = 'PAULI'
+    # noise_model_type = 'DEPOLAR'
+    noise_model_type = 'PAULI'
     
     for n_qubits in [8]:
         p = 2
@@ -387,7 +387,7 @@ def test_qiskit_qaoa_circuit_optimization():
                 #     f'figs/test_opt_method/{signature}_nQ{n_qubits}_p{p}_{noise_sign}/G{cnt}',
                 #     beta_to_qaoa_format(row["beta"]),
                 #     gamma_to_qaoa_format(row["gamma"]),
-                #     None,
+                #     noise_model,
                 #     # params
                 #     # angles_to_qaoa_format(angles1)
                 #     # [params[-1]]
