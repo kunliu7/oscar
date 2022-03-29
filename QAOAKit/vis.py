@@ -1,4 +1,5 @@
 from cProfile import label
+from re import A
 from typing import List
 import networkx as nx
 import numpy as np
@@ -140,6 +141,8 @@ def vis_landscape_heatmap_multi_p(
     var2_range = var2_range.copy()
 
     _BETA_GAMMA_OPT = np.hstack([beta_opt, gamma_opt])
+    _X_Y_LABELS = [f'gamma{i}' for i in range(p)]
+    _X_Y_LABELS.extend([f'beta{i}' for i in range(p)])
 
     Z = []
     for v1 in var1_range:
@@ -159,7 +162,7 @@ def vis_landscape_heatmap_multi_p(
     # plt.plot()
     # ax = plt.axes()
     # ax.plot(beta_opt, gamma_opt, "ro")
-    ax.plot(*_BETA_GAMMA_OPT[_VAR_INDICE], marker="o", color='red', markersize=6)
+    ax.plot(*_BETA_GAMMA_OPT[_VAR_INDICE], marker="o", color='red', markersize=5, label='optimal point')
     if params_path != None and len(params_path) > 0:
         xs = []
         ys = []
@@ -168,14 +171,16 @@ def vis_landscape_heatmap_multi_p(
             xs.append(tmp_params[_VAR_INDICE[0]])
             ys.append(tmp_params[_VAR_INDICE[1]])
 
-        ax.plot(xs, ys, marker="o", color='purple', markersize=5, label="path")
-        ax.plot(xs[0], ys[0], marker="+", color='gray', markersize=6, label="initial point")
-        ax.plot(xs[-1], ys[-1], marker="s", color='black', markersize=6, label="last point")
+        ax.plot(xs, ys, marker="o", color='purple', markersize=5, label="optimization path")
+        ax.plot(xs[0], ys[0], marker="+", color='gray', markersize=7, label="initial point")
+        ax.plot(xs[-1], ys[-1], marker="s", color='black', markersize=5, label="last point")
     
     c = ax.pcolormesh(X, Y, Z, cmap='viridis', vmin=Z.min(), vmax=Z.max())
-    # ax.set_ylabel("gamma")
-    # ax.set_xlabel("beta")
+    ax.set_ylabel(_X_Y_LABELS[var1_idx])
+    ax.set_xlabel(_X_Y_LABELS[var2_idx])
     # ax.axis([X.min(), X.max(), Y.min(), Y.max()])
+    ax.legend()
+    ax.set_title('QAOA energy')
 
     # ax.plot(beta_opt, gamma_opt, "ro")
     fig.colorbar(c, ax=ax)
