@@ -272,7 +272,9 @@ def vis_landscape_heatmap_multi_p_and_count_optima(
 
             if p >= 3:
                 # p>=3, fixed angles, they are approximately good optima
-                if energy > C_opt + 0.02:
+                # if energy > C_opt - 0.02: # and np.isclose(energy, C_opt, 0.03):
+                #     cnt_opt += 1
+                if np.isclose(energy, C_opt, 0.03):
                     cnt_opt += 1
             else:
                 # p=1,2
