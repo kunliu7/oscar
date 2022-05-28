@@ -798,3 +798,19 @@ def get_curr_formatted_timestamp(format :str=None):
         s = time.strftime(format, time.localtime())
 
     return s 
+
+
+def save_partial_qaoa_dataset_table(df: pd.DataFrame, n_qubits: int):
+    df.to_pickle(
+        Path(utils_folder, f"../data/lookup_tables/partial_qaoa_dataset_table_nQubits{n_qubits}.p")
+    )
+
+    return
+
+
+def load_partial_qaoa_dataset_table(n_qubits: int):
+    df = pd.read_pickle(
+            Path(utils_folder, f"../data/lookup_tables/partial_qaoa_dataset_table_nQubits{n_qubits}.p")
+        )
+
+    return df
