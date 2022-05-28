@@ -211,15 +211,15 @@ def count_optima_of_fixed_angles_3reg_graphs():
     These approximation ratios are well-bounded, so we take them as results.
     """
 
-    df = get_3_reg_dataset_table().sample(n=10).reset_index()
+    # df = get_3_reg_dataset_table().sample(n=10).reset_index()
 
-    for _, row in df.iterrows():
-        angles = angles_to_qaoa_format(get_fixed_angles(3, row["p_max"]))
-        assert np.isclose(
-            qaoa_maxcut_energy(row["G"], angles["beta"], angles["gamma"]),
-            row["C_fixed"],
-            rtol=1e-4,
-        )
+    # for _, row in df.iterrows():
+    #     angles = angles_to_qaoa_format(get_fixed_angles(3, row["p_max"]))
+    #     assert np.isclose(
+    #         qaoa_maxcut_energy(row["G"], angles["beta"], angles["gamma"]),
+    #         row["C_fixed"],
+    #         rtol=1e-4,
+    #     )
 
     MAX_NUM_GRAPHS_PER_NUM_QUBITS = 10
     count_rst_df = pd.DataFrame(
@@ -238,6 +238,7 @@ def count_optima_of_fixed_angles_3reg_graphs():
             
             print(f"n_qubits={n_qubits}")
             print(f"num of graphs: {len(df)}")
+            print(f"p={p}")
             for row_id, row in df.iterrows():
                 cert = row_id
                 print(f"handling {cert}")
