@@ -1,4 +1,6 @@
+from cProfile import label
 import networkx as nx
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, execute
@@ -83,6 +85,7 @@ from QAOAKit.utils import (
     beta_shift_sector,
     gamma_shift_sector,
     get_curr_formatted_timestamp,
+    load_partial_qaoa_dataset_table,
     obj_from_statevector,
     precompute_energies,
     maxcut_obj,
@@ -92,7 +95,8 @@ from QAOAKit.utils import (
     get_adjacency_matrix,
     brute_force,
     get_pynauty_certificate,
-    get_full_weighted_qaoa_dataset_table
+    get_full_weighted_qaoa_dataset_table,
+    save_partial_qaoa_dataset_table
 )
 
 from QAOAKit.classical import thompson_parekh_marwaha
@@ -279,9 +283,9 @@ def test_qiskit_qaoa_circuit_optimization():
     signature = get_curr_formatted_timestamp()
     cnt = 0
 
-    # noise_model_type = ''
+    noise_model_type = ''
     # noise_model_type = 'DEPOLAR'
-    noise_model_type = 'PAULI'
+    # noise_model_type = 'PAULI'
     
     for n_qubits in [8]:
         p = 2
@@ -471,8 +475,260 @@ def test_qiskit_qaoa_circuit_optimization():
             cnt += 1
 
 
+def test_removing_edges():
+    """Remove edges of graph, to see if there is any change of symmetry
+    
+    Will the landscape be more sparse, or will it lost symmetry?
+    """
+    full_qaoa_dataset_table = get_full_qaoa_dataset_table()
+    signature = get_curr_formatted_timestamp()
+    cnt = 0
+
+    noise_model_type = ''
+    # noise_model_type = 'DEPOLAR'
+    # noise_model_type = 'PAULI'
+    graph_id = 9
+    
+    for n_qubits in [9]:
+        p = 2
+        df = full_qaoa_dataset_table.reset_index()
+        # df = load_partial_qaoa_dataset_table(n_qubits)
+        df = df[(df["n"] == n_qubits) & (df["p_max"] == p)]
+        print(f"# of graphs: {len(df)}")
+        df = df.loc[[297427, 297439, 297440, 297441, 297443]]
+        edges = [(7, 8), (7, 8), (3, 8), (7, 8), (7, 8)]
+        # df = df.loc[[297440, 297441, 297443]]
+        # edges = [(3, 8), (7, 8), (7, 8)]
+        # df = df.iloc[graph_id:graph_id] # TODO for test, one only
+        # save_partial_qaoa_dataset_table(df, n_qubits)
+        # exit()
+        cnt = -1
+        for row_idx, row in df.iterrows():
+            cnt += 1
+            print(f"============ {row_idx} ================")
+            angles1 = opt_angles_for_graph(row["G"], row["p_max"])
+            original_G = row["G"]
+            print("before remove edges: ", original_G.edges)
+            fig_path = f"figs/remove_edge/{signature}_id{row_idx}_nQ{n_qubits}_p{p}"
+            # vis_landscape_multi_p(
+            #     original_G,
+            #     f'{fig_path}/origin',
+            #     beta_to_qaoa_format(row["beta"]),
+            #     gamma_to_qaoa_format(row["gamma"]),
+            #     None,
+            #     []
+            # )
+            # nx.draw(original_G)
+            # nx.draw_networkx(original_G, nx.spring_layout(original_G))
+            nx.draw_networkx(original_G)
+            # nx.draw_networkx_nodes(original_G, nx.spring_layout(original_G))
+            # nx.draw_networkx_edge_labels(original_G, pos=nx.spring_layout(original_G))
+            # plt.savefig(f"id{row_idx}_tobecut_{edge}.png")
+            # exit()
+            # print(G.edges)
+            # edge = G.edges.data()[0]
+            edge = edges[cnt]
+            plt.title(f"id{row_idx}_tobecut{edge}.png")
+            plt.savefig(f"id{row_idx}_tobecut_{edge}.png")
+            plt.cla()
+            # for edge_idx, edge in enumerate(original_G.edges):
+            G = original_G.copy()
+                # print(edge)
+            G.remove_edge(*edge)
+            print(f"remove edges: {edge}")
+            # print("after remove edges: ", G.edges)
+
+            # vis_landscape_multi_p(
+            #     G,
+            #     f'{fig_path}/remove_{edge}', 
+            #     beta_to_qaoa_format(row["beta"]),
+            #     gamma_to_qaoa_format(row["gamma"]),
+            #     None,
+            #     []
+            # )
+            continue
+                
+            qc1, C, offset = get_maxcut_qaoa_qiskit_circuit_unbinded_parameters(
+                G, p
+            )
+            backend = AerSimulator(method="statevector")
+            # sv1 = Statevector(backend.run(qc1).result().get_statevector())
+            # angles2 = angles_to_qaoa_format(
+            #     opt_angles_for_graph(row["G"], row["p_max"])
+            # )
+            # qc2 = get_maxcut_qaoa_circuit(row["G"], angles2["beta"], angles2["gamma"])
+            # sv2 = Statevector(backend.run(qc2).result().get_statevector())
+
+            # optimizer = GradientDescent()
+            optimizer = L_BFGS_B()
+            # optimizer = ADAM()
+            # optimizer = SPSA()
+            # optimizer = AQGD()
+            # opts = [ADAM,
+            # AQGD,
+            # CG,
+            # COBYLA,
+            # L_BFGS_B,
+            # GSLS,
+            # GradientDescent,
+            # NELDER_MEAD,
+            # NFT,
+            # P_BFGS,
+            # POWELL,
+            # SLSQP,
+            # SPSA,
+            # QNSPSA,
+            # TNC,
+            # SciPyOptimizer]
+
+            # obj_val = -(sv1.expectation_value(C) + offset)
+            opt_cut = row["C_opt"]
+            # print('obj_val', obj_val)
+            
+            counts = []
+            values = []
+            params = []
+            def cb_store_intermediate_result(eval_count, parameters, mean, std):
+                counts.append(eval_count)
+                values.append(mean)
+                params.append(parameters)
+
+            if noise_model_type == 'PAULI':
+                p_error = 0.01
+                noise_model = get_pauli_error_noise_model(p_error)
+                noise_sign = f'pauli_p{p_error}'
+            elif noise_model_type == 'DEPOLAR':
+                # p1 = 0.01
+                # p2 = 0.005
+                p1 = 0.001
+                p2 = 0.005
+                noise_model = get_depolarizing_error_noise_model(p1, p2)
+                noise_sign = f'depolar_p1e{p1}_p2e{p2}'
+            else:
+                noise_model = None
+                noise_sign = 'noiseless'
+
+            print('noise:', noise_sign)
+            # initial_point = np.hstack([[1.0 for _ in range(p)], [-1.0 for _ in range(p)]])
+            initial_point = [1.0 for _ in range(2*p)]
+            if False:
+            # if False:
+                counts = []
+                values = []
+                params = []
+                qaoa = QAOA(
+                    optimizer,
+                    reps=p,
+                    # initial_point=angles_to_qiskit_format(angles1),
+                    initial_point=initial_point,
+                    quantum_instance=backend,
+                    callback=cb_store_intermediate_result)
+                result = qaoa.compute_minimum_eigenvalue(C)
+                print(qaoa.optimal_params)
+                print("opt_cut             :", opt_cut)
+                print("QAOA energy         :", result.eigenvalue)
+                print("QAOA energy + offset:", - (result.eigenvalue + offset))
+
+                opt_point = params[-1].copy()
+                params = [
+                    _params
+                    # angles_to_qaoa_format(angles_from_qiskit_format(_params))
+                    for _params in params
+                ]
+                params.insert(0, angles_to_qaoa_format(angles_from_qiskit_format(initial_point)))
+                params.insert(0, angles_to_qaoa_format(angles_from_qiskit_format(qaoa.optimal_params)))
+                # vis_landscape_multi_p(
+                #     row["G"],
+                #     f'figs/test_opt_method/{signature}_nQ{n_qubits}_p{p}_{noise_sign}/G{cnt}',
+                #     beta_to_qaoa_format(row["beta"]),
+                #     gamma_to_qaoa_format(row["gamma"]),
+                #     noise_model,
+                #     # params
+                #     # angles_to_qaoa_format(angles1)
+                #     # [params[-1]]
+                #     params
+                # )
+
+                print(angles_to_qaoa_format(angles_from_qiskit_format(opt_point)))
+                print(angles_to_qaoa_format(angles1))
+                print(angles_to_qaoa_format(angles_from_qiskit_format(qaoa.optimal_params)))
+
+                # qc2, C, offset = get_maxcut_qaoa_qiskit_circuit(
+                #     G, p, qaoa.optimal_params
+                # )
+
+                # backend = AerSimulator(method="statevector")
+                # sv = Statevector(backend.run(qc2).result().get_statevector())
+                # obj_val = -(sv.expectation_value(C) + offset)
+                # print(obj_val)
+
+
+
+            if True:
+                counts = []
+                values = []
+                params = []   
+                # vqe_optimizer = MinimumEigenOptimizer(vqe)
+                # result = vqe_optimizer.solve(C)
+                # print(qc1.parameters)
+                # noise_model = get_depolarizing_error_noise_model()
+                # if True:
+                
+                qc2 = qc1.copy()
+
+                qinst = QuantumInstance(
+                    backend=backend,
+                    noise_model=noise_model
+                )
+                vqe = VQE(qc1,
+                    optimizer=optimizer,
+                    # initial_point=[a + 1.0 for a in angles_to_qiskit_format(angles1)],
+                    initial_point=[1.0 for _ in range(2*p)],
+                    callback=cb_store_intermediate_result,
+                    quantum_instance=qinst
+                )
+                result = vqe.compute_minimum_eigenvalue(C)
+                exp_cut = -(result.eigenvalue.real + offset)
+                
+                print("opt_cut            :", opt_cut)
+                print('VQE energy         :', result.eigenvalue.real)
+                print('VQE energy + offset:', exp_cut)
+
+                diff = abs(exp_cut - opt_cut)
+
+                params = [
+                    # _params
+                    angles_to_qaoa_format(angles_from_qiskit_format(_params))
+                    for _params in params
+                ]
+
+                
+                vis_landscape_multi_p(
+                        row["G"],
+                        f'figs/test_opt_method/{signature}_nQ{n_qubits}_p{p}_{noise_sign}/G{cnt}_diff{diff:.2}', 
+                        beta_to_qaoa_format(row["beta"]),
+                        gamma_to_qaoa_format(row["gamma"]),
+                        noise_model,
+                        params
+                )
+
+                # print(vqe.optimal_params)
+                # print(qc2.parameters)
+                # qc2.bind_parameters()
+
+                # sv = Statevector(backend.run(qc2).result().get_statevector())
+                # obj_val = -(sv.expectation_value(C) + offset)
+                # print(obj_val)
+
+
+            
+            # assert sv1.equiv(sv2)
+            cnt += 1
+
+
 if __name__ == "__main__":
     # test_qiskit_qaoa_circuit()
     # test_noisy_qaoa_maxcut_energy()
     # test_optimization_method()
-    test_qiskit_qaoa_circuit_optimization()
+    # test_qiskit_qaoa_circuit_optimization()
+    test_removing_edges()
