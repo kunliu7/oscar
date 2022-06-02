@@ -308,6 +308,9 @@ def count_optima_of_specific_3reg_graph(nQ_range, p_range):
     assert nQ_range[0] % 2 == 0
 
     df_path = "count_optima_for_one_graph_df"
+    if not os.path.exists(df_path):
+        os.makedirs(df_path)
+        
     
     count_rst_df = pd.DataFrame(
         columns=['row_id', 'G', 'n_qubits', 'p', 'n_optima_list', 'has_opt']
@@ -1018,6 +1021,6 @@ if __name__ == "__main__":
     # test_removing_edges()
     # count_optimals()
     # count_optima_of_fixed_angles_3reg_graphs()
-    count_optima_of_specific_3reg_graph(nQ_range=[4,5], p_range=[2,4])
-    # count_optima_of_specific_3reg_graph(nQ_range=[4,7], p_range=[2,7])
-    # count_optima_of_specific_3reg_graph(nQ_range=[4,7], p_range=[2,7])
+    count_optima_of_specific_3reg_graph(nQ_range=[4,17], p_range=[2,5]) # p=2,3,4
+    # count_optima_of_specific_3reg_graph(nQ_range=[4,17], p_range=[5,6]) # p=5
+    # count_optima_of_specific_3reg_graph(nQ_range=[4,17], p_range=[6,7]) # p=6
