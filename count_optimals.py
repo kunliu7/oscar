@@ -303,6 +303,9 @@ def count_optima_of_specific_3reg_graph(nQ_range, p_range):
     use fixed angles to solve 3 regular graphs.
     These approximation ratios are well-bounded, so we take them as results.
     """
+    
+    assert len(nQ_range) == 2 and len(p_range) == 2
+    assert nQ_range[0] % 2 == 0
 
     df_path = "count_optima_for_one_graph_df"
     
@@ -319,11 +322,14 @@ def count_optima_of_specific_3reg_graph(nQ_range, p_range):
     print("p range: ", p_range)
     print("timestamp: ", signature)
 
-    for n_qubits in range(*nQ_range):
+    for n_qubits in range(*nQ_range, 2):
         reg3 = reg3_dataset_table.reset_index()
         print(" ================= ")
         print(f"handling nQ={n_qubits}")
         df = reg3[(reg3["n"] == n_qubits)]
+
+        if len(df) == 0:
+            continue
         
         # randomly choose one of the graph with given node
         _row = df.sample(n=1).iloc[0]
