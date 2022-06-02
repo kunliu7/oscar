@@ -3,6 +3,8 @@ import networkx as nx
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import parser
+import pynauty
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, execute
 from qiskit.algorithms.optimizers import (
     ADAM,
@@ -230,8 +232,8 @@ def count_optima_of_fixed_angles_3reg_graphs():
     print("read 3 reg dataset OK")
     print("use fixed angles to calculate n_optima")
     signature = get_curr_formatted_timestamp()
-    for n_qubits in range(4, 17): # [1, 16]
-        for p in range(3, 4): # [1, 11]
+    for n_qubits in range(14, 15): # [1, 16]
+        for p in range(5, 7): # [1, 11]
             df = reg3_dataset_table.reset_index()
             df = df[(df["n"] == n_qubits) & (df["p_max"] == p)]
             df = df.iloc[:MAX_NUM_GRAPHS_PER_NUM_QUBITS]
@@ -288,6 +290,104 @@ def count_optima_of_fixed_angles_3reg_graphs():
                 # print(count_rst_df)
                 count_rst_df.to_pickle(f"{signature}_count_optima_fixed_angles.p")
                 print(" ================ ")
+
+    return
+
+
+def count_optima_of_specific_3reg_graph(nQ_range, p_range):
+    """Count optima for specific regular 3 graph.
+
+    When graph is fixed, we could vary p and analyze n_optima_list.
+
+    In QAOAKit (or more specifically, https://github.com/danlkv/fixed-angle-QAOA),
+    use fixed angles to solve 3 regular graphs.
+    These approximation ratios are well-bounded, so we take them as results.
+    """
+
+    df_path = "count_optima_for_one_graph_df"
+    
+    count_rst_df = pd.DataFrame(
+        columns=['row_id', 'G', 'n_qubits', 'p', 'n_optima_list', 'has_opt']
+    )
+    
+    reg3_dataset_table = get_3_reg_dataset_table()
+    signature = get_curr_formatted_timestamp()
+    
+    print("read 3 reg dataset OK")
+    # print("use fixed angles to calculate n_optima")
+    print("n qubits range: ", nQ_range)
+    print("p range: ", p_range)
+    print("timestamp: ", signature)
+
+    for n_qubits in range(*nQ_range):
+        reg3 = reg3_dataset_table.reset_index()
+        print(" ================= ")
+        print(f"handling nQ={n_qubits}")
+        df = reg3[(reg3["n"] == n_qubits)]
+        
+        # randomly choose one of the graph with given node
+        _row = df.sample(n=1).iloc[0]
+        G = _row["G"]
+        
+        for p in range(*p_range):    
+            print("--------")
+            row = get_3_reg_dataset_table_row(G, p)
+            cert = get_pynauty_certificate(G)
+
+            # print(f"num of graphs: {len(df)}")
+            print(f"p={p}")
+
+            if p in [1, 2]:
+                angles = {
+                    "beta": beta_to_qaoa_format(row["beta"]),
+                    "gamma": gamma_to_qaoa_format(row["gamma"]),
+                }
+                C_opt = row["C_opt"]
+            else:
+                angles = angles_to_qaoa_format(get_fixed_angles(d=3, p=p))
+                C_opt = row["C_fixed"]
+
+            # print(row["beta"])
+            # print(row["gamma"])
+            # print(row["p_max"])
+            # print(row["C_opt"], row["C_{true opt}"], row["C_fixed"])
+
+            print("C_opt", C_opt)
+            
+            figdir = f'figs/count_optima_of_one_graph/{signature}/nQ{n_qubits}_p{p}'
+            
+            if not os.path.exists(figdir):
+                os.makedirs(figdir)
+
+            nx.draw_networkx(G)
+            plt.title(f"")
+            plt.savefig(f"{figdir}/G.png")
+            plt.cla()
+
+            n_optima_list = vis_landscape_multi_p_and_and_count_optima(
+                G=G,
+                p=p,
+                figdir=figdir, 
+                # beta_opt=beta_to_qaoa_format(angles["beta"]),
+                # gamma_opt=gamma_to_qaoa_format(angles["gamma"]),
+                beta_opt=angles["beta"],
+                gamma_opt=angles["gamma"],
+                noise_model=None,
+                params_path=[],
+                C_opt=C_opt
+            )
+
+            count_rst_df = count_rst_df.append({
+                'row_id': cert,
+                'n_qubits': n_qubits,
+                'p': p,
+                'n_optima_list': n_optima_list,
+                'has_opt': False,
+            }, ignore_index=True)
+
+            # print(count_rst_df)
+            count_rst_df.to_pickle(f"{df_path}/{signature}_count_optima_for_one_graph.p")
+            print(" ================ ")
 
     return
 
@@ -911,4 +1011,7 @@ if __name__ == "__main__":
     # test_qiskit_qaoa_circuit_optimization()
     # test_removing_edges()
     # count_optimals()
-    count_optima_of_fixed_angles_3reg_graphs()
+    # count_optima_of_fixed_angles_3reg_graphs()
+    count_optima_of_specific_3reg_graph(nQ_range=[4,5], p_range=[2,4])
+    # count_optima_of_specific_3reg_graph(nQ_range=[4,7], p_range=[2,7])
+    # count_optima_of_specific_3reg_graph(nQ_range=[4,7], p_range=[2,7])
