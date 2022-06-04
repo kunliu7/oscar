@@ -294,7 +294,7 @@ def count_optima_of_fixed_angles_3reg_graphs():
     return
 
 
-def count_optima_of_specific_3reg_graph(nQ_range, p_range):
+def count_optima_of_specific_3reg_graph(nQ_range):
     """Count optima for specific regular 3 graph.
 
     When graph is fixed, we could vary p and analyze n_optima_list.
@@ -304,7 +304,7 @@ def count_optima_of_specific_3reg_graph(nQ_range, p_range):
     These approximation ratios are well-bounded, so we take them as results.
     """
     
-    assert len(nQ_range) == 2 and len(p_range) == 2
+    assert len(nQ_range) == 2
     assert nQ_range[0] % 2 == 0
 
     df_path = "count_optima_for_one_graph_df"
@@ -322,26 +322,38 @@ def count_optima_of_specific_3reg_graph(nQ_range, p_range):
     print("read 3 reg dataset OK")
     # print("use fixed angles to calculate n_optima")
     print("n qubits range: ", nQ_range)
-    print("p range: ", p_range)
+    # print("p range: ", p_range)
     print("timestamp: ", signature)
 
     for n_qubits in range(*nQ_range, 2):
         reg3 = reg3_dataset_table.reset_index()
         print(" ================= ")
         print(f"handling nQ={n_qubits}")
+
+        # ! what to use existing cert
+        # df = pd.read_pickle("count_optima_for_one_graph_df/2022-06-01_21:12:14_count_optima_for_one_graph.p")
+        # df = df[df['n_qubits'] == n_qubits]
         df = reg3[(reg3["n"] == n_qubits)]
 
         if len(df) == 0:
+            print(f"no qualified graph for nQ={n_qubits}")
+            # assert False
             continue
         
         # randomly choose one of the graph with given node
         _row = df.sample(n=1).iloc[0]
         G = _row["G"]
+        # _row = df.iloc[0]
+        # cert = _row["row_id"]
         
-        for p in range(*p_range):    
+        for p in range(2, 7):    
             print("--------")
             row = get_3_reg_dataset_table_row(G, p)
             cert = get_pynauty_certificate(G)
+
+            # ! what to use existing cert
+            # row = reg3_dataset_table.loc[(cert, p)]
+            # G = row['G']
 
             # print(f"num of graphs: {len(df)}")
             print(f"p={p}")
@@ -1021,6 +1033,4 @@ if __name__ == "__main__":
     # test_removing_edges()
     # count_optimals()
     # count_optima_of_fixed_angles_3reg_graphs()
-    count_optima_of_specific_3reg_graph(nQ_range=[4,17], p_range=[2,5]) # p=2,3,4
-    # count_optima_of_specific_3reg_graph(nQ_range=[4,17], p_range=[5,6]) # p=5
-    # count_optima_of_specific_3reg_graph(nQ_range=[4,17], p_range=[6,7]) # p=6
+    count_optima_of_specific_3reg_graph(nQ_range=[4,17])
