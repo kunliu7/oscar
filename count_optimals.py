@@ -61,7 +61,8 @@ from QAOAKit.vis import(
     vis_landscape_heatmap,
     vis_landscape_heatmap_multi_p,
     vis_landscape_multi_p,
-    vis_landscape_multi_p_and_and_count_optima
+    vis_landscape_multi_p_and_and_count_optima,
+    vis_landscape_multi_p_and_and_count_optima_MP
 )
 
 from QAOAKit import (
@@ -225,15 +226,16 @@ def count_optima_of_fixed_angles_3reg_graphs():
 
     MAX_NUM_GRAPHS_PER_NUM_QUBITS = 10
     count_rst_df = pd.DataFrame(
-        columns=['row_id', 'G', 'n_qubits', 'p', 'n_optima_list', 'has_opt']
+        columns=['row_id', 'G', 'pynauty_cert', 'n_qubits', 'p', 'n_optima_list', 'has_opt']
     )
     
     reg3_dataset_table = get_3_reg_dataset_table()
     print("read 3 reg dataset OK")
     print("use fixed angles to calculate n_optima")
     signature = get_curr_formatted_timestamp()
-    for n_qubits in range(14, 15): # [1, 16]
-        for p in range(5, 7): # [1, 11]
+    for n_qubits in range(16, 17): # [1, 16]
+    # for n_qubits in range(4, 5): # [1, 16]
+        for p in range(4, 7): # [1, 11]
             df = reg3_dataset_table.reset_index()
             df = df[(df["n"] == n_qubits) & (df["p_max"] == p)]
             df = df.iloc[:MAX_NUM_GRAPHS_PER_NUM_QUBITS]
@@ -242,8 +244,8 @@ def count_optima_of_fixed_angles_3reg_graphs():
             print(f"num of graphs: {len(df)}")
             print(f"p={p}")
             for row_id, row in df.iterrows():
-                cert = row_id
-                print(f"handling {cert}")
+                
+                print(f"handling {row_id}")
                 angles = angles_to_qaoa_format(get_fixed_angles(d=3, p=p))
 
                 # print(row["beta"])
@@ -256,17 +258,18 @@ def count_optima_of_fixed_angles_3reg_graphs():
                 G = row["G"]
                 
                 # p = len(row["beta"])
-                figdir = f'figs/count_optima/{signature}/G{cert}_nQ{n_qubits}_p{p}'
+                figdir = f'figs/count_optima/{signature}/G{row_id}_nQ{n_qubits}_p{p}'
                 
                 if not os.path.exists(figdir):
                     os.makedirs(figdir)
 
                 nx.draw_networkx(G)
                 plt.title(f"")
-                plt.savefig(f"{figdir}/G{cert}.png")
+                plt.savefig(f"{figdir}/G{row_id}.png")
                 plt.cla()
 
-                n_optima_list = vis_landscape_multi_p_and_and_count_optima(
+                # n_optima_list = vis_landscape_multi_p_and_and_count_optima(
+                n_optima_list = vis_landscape_multi_p_and_and_count_optima_MP(
                     G=G,
                     p=p,
                     figdir=figdir, 
@@ -279,8 +282,12 @@ def count_optima_of_fixed_angles_3reg_graphs():
                     C_opt=C_opt
                 )
 
+                print('n_optima_list', n_optima_list)
+
                 count_rst_df = count_rst_df.append({
-                    'row_id': cert,
+                    'row_id': row_id,
+                    'G': G,
+                    'pynauty_cert': row['pynauty_cert'],
                     'n_qubits': n_qubits,
                     'p': p,
                     'n_optima_list': n_optima_list,
@@ -288,7 +295,7 @@ def count_optima_of_fixed_angles_3reg_graphs():
                 }, ignore_index=True)
 
                 # print(count_rst_df)
-                count_rst_df.to_pickle(f"{signature}_count_optima_fixed_angles.p")
+                count_rst_df.to_pickle(f"count_optima_dataframe/{signature}_count_optima_fixed_angles.p")
                 print(" ================ ")
 
     return
@@ -1032,5 +1039,5 @@ if __name__ == "__main__":
     # test_qiskit_qaoa_circuit_optimization()
     # test_removing_edges()
     # count_optimals()
-    # count_optima_of_fixed_angles_3reg_graphs()
-    count_optima_of_specific_3reg_graph(nQ_range=[4,17])
+    count_optima_of_fixed_angles_3reg_graphs()
+    # count_optima_of_specific_3reg_graph(nQ_range=[4,17])

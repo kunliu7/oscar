@@ -18,6 +18,7 @@ import timeit
 import sys, os
 from scipy.optimize import minimize
 from qiskit.providers.aer.noise import NoiseModel
+import concurrent.futures
 
 from qiskit.quantum_info import Statevector
 
@@ -187,7 +188,57 @@ def vis_landscape_heatmap_multi_p(
     fig.colorbar(c, ax=ax)
     fig.savefig(figpath)
     plt.close(fig)
+    return True
     # plt.clf()
+
+
+def vis_landscape_multi_p_multiprocessing(
+        G: nx.Graph, figdir: str,
+        beta_opt: np.array, # converted
+        gamma_opt: np.array, # converted
+        noise_model: NoiseModel,
+        params_path: list
+    ):
+
+    p = len(beta_opt)
+
+    if not os.path.exists(figdir):
+        os.makedirs(figdir)
+
+    params = []
+    for var1_idx in range(2*p - 1):
+        for var2_idx in range(var1_idx+1, 2*p):
+            figpath = f'{figdir}/var_indice={var1_idx},{var2_idx}.png'
+
+            params.append((
+                G,
+                figpath,
+                var1_idx,
+                var2_idx,
+                beta_opt,
+                gamma_opt,
+                noise_model,
+                params_path
+            ))
+
+            vis_landscape_heatmap_multi_p(
+                G,
+                figpath,
+                var1_idx,
+                var2_idx,
+                beta_opt,
+                gamma_opt,
+                noise_model,
+                params_path
+            )
+            print(f"fig saved at {figpath}")
+    
+    with concurrent.futures.ProcessPoolExecutor(max_workers=5) as executor:
+        futures = [executor.submit(vis_landscape_heatmap_multi_p, param) for param in params]
+        for future in concurrent.futures.as_completed(futures):
+            print(future.result())
+
+    return
 
 
 def vis_landscape_multi_p(
@@ -270,16 +321,17 @@ def vis_landscape_heatmap_multi_p_and_count_optima(
             energy = noisy_qaoa_maxcut_energy(G, tmp_vars[:p], tmp_vars[p:], noise_model=noise_model)
             z.append(energy)
 
-            if p >= 3:
+            # if p >= 3:
                 # p>=3, fixed angles, they are approximately good optima
                 # if energy > C_opt - 0.02: # and np.isclose(energy, C_opt, 0.03):
                 #     cnt_opt += 1
-                if np.isclose(energy, C_opt, 0.03):
-                    cnt_opt += 1
-            else:
+                # if np.isclose(energy, C_opt, 0.03):
+                #     cnt_opt += 1
+            # else:
                 # p=1,2
-                if np.isclose(energy, C_opt, 0.03):
-                    cnt_opt += 1
+            if energy > C_opt * (1 - 0.03):
+            # if np.isclose(energy, C_opt, 0.03):
+                cnt_opt += 1
             
         Z.append(z.copy())
     X, Y = np.meshgrid(var1_range, var2_range) # , indexing='ij')
@@ -357,5 +409,58 @@ def vis_landscape_multi_p_and_and_count_optima(
             )
             n_optima_list.append(n_optima)
             # print(f"fig saved at {figpath}")
+
+    return n_optima_list
+
+
+def vis_landscape_multi_p_and_and_count_optima_MP(
+        G: nx.Graph, 
+        p: int,
+        figdir: str,
+        beta_opt: np.array, # converted
+        gamma_opt: np.array, # converted
+        noise_model: NoiseModel,
+        params_path: list,
+        C_opt: float
+    ):
+
+    if not os.path.exists(figdir):
+        os.makedirs(figdir)
+
+    n_optima_list = []
+
+    params = []
+    for var1_idx in range(2*p - 1):
+        for var2_idx in range(var1_idx+1, 2*p):
+            # figpath = f'{figdir}/var_indice={var1_idx},{var2_idx}.png'
+            # n_optima = vis_landscape_heatmap_multi_p_and_count_optima(
+            # vis_landscape_heatmap_multi_p(
+            params.append((
+                G.copy(),
+                p,
+                figdir,
+                var1_idx,
+                var2_idx,
+                beta_opt.copy(),
+                gamma_opt.copy(),
+                noise_model.copy() if noise_model else None,
+                params_path.copy(),
+                C_opt
+            ))
+            # n_optima_list.append(n_optima)
+            # print(f"fig saved at {figpath}")
+
+    print('start MP')
+    with concurrent.futures.ProcessPoolExecutor() as executor:
+        # n_optima_list = executor.map(
+        #     lambda x: vis_landscape_heatmap_multi_p_and_count_optima(*x), params, chunksize=16)
+        futures = [executor.submit(vis_landscape_heatmap_multi_p_and_count_optima, *param) for param in params]
+        concurrent.futures.wait(futures)
+        # for future in concurrent.futures.as_completed(futures):
+        #     print(future.result())
+
+    # print(futures)
+    n_optima_list = [f.result() for f in futures]
+    # print(n_optima_list)
 
     return n_optima_list
