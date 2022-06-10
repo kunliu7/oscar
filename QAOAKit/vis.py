@@ -192,55 +192,6 @@ def vis_landscape_heatmap_multi_p(
     # plt.clf()
 
 
-def vis_landscape_multi_p_multiprocessing(
-        G: nx.Graph, figdir: str,
-        beta_opt: np.array, # converted
-        gamma_opt: np.array, # converted
-        noise_model: NoiseModel,
-        params_path: list
-    ):
-
-    p = len(beta_opt)
-
-    if not os.path.exists(figdir):
-        os.makedirs(figdir)
-
-    params = []
-    for var1_idx in range(2*p - 1):
-        for var2_idx in range(var1_idx+1, 2*p):
-            figpath = f'{figdir}/var_indice={var1_idx},{var2_idx}.png'
-
-            params.append((
-                G,
-                figpath,
-                var1_idx,
-                var2_idx,
-                beta_opt,
-                gamma_opt,
-                noise_model,
-                params_path
-            ))
-
-            vis_landscape_heatmap_multi_p(
-                G,
-                figpath,
-                var1_idx,
-                var2_idx,
-                beta_opt,
-                gamma_opt,
-                noise_model,
-                params_path
-            )
-            print(f"fig saved at {figpath}")
-    
-    with concurrent.futures.ProcessPoolExecutor(max_workers=5) as executor:
-        futures = [executor.submit(vis_landscape_heatmap_multi_p, param) for param in params]
-        for future in concurrent.futures.as_completed(futures):
-            print(future.result())
-
-    return
-
-
 def vis_landscape_multi_p(
         G: nx.Graph, figdir: str,
         beta_opt: np.array, # converted
@@ -329,8 +280,8 @@ def vis_landscape_heatmap_multi_p_and_count_optima(
                 #     cnt_opt += 1
             # else:
                 # p=1,2
-            if energy > C_opt * (1 - 0.03):
-            # if np.isclose(energy, C_opt, 0.03):
+            # if energy > C_opt * (1 - 0.03):
+            if np.isclose(energy, C_opt, 0.03):
                 cnt_opt += 1
             
         Z.append(z.copy())
