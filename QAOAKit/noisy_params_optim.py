@@ -11,14 +11,16 @@ from qiskit.providers.aer import AerSimulator
 from functools import partial
 from pathlib import Path
 import copy
-import pytest
 from itertools import groupby
 import timeit
 import sys
 from scipy.optimize import minimize
 from sympy import beta, false
 from .qaoa import get_maxcut_qaoa_circuit
-from .utils import noisy_qaoa_maxcut_energy
+from .utils import (
+    noisy_qaoa_maxcut_energy,
+    obj_from_statevector
+)
 
 from qiskit.providers.aer.noise import NoiseModel
 from qiskit.providers.aer.noise.errors.standard_errors import depolarizing_error, pauli_error 
