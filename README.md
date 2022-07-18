@@ -3,6 +3,42 @@
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 ![Tests](https://github.com/QAOAKit/QAOAKit/actions/workflows/python-package-conda.yml/badge.svg)
 
+### RUN THE PROGRAM WITHOUT INSTALLING QAOA, by Kun
+
+Author: Kun Liu
+
+We want to modify and add our own local methods.
+
+DO NOT `pip install QAOAKit`.
+
+`git clone` this repo, and `cd` into the top folder of this repo,
+then
+```
+conda create -n qaoa python=3.8
+conda activate qaoa
+python -m QAOAKit.build_tables
+```
+
+python=3.8 works for my Linux and Mac M1 system.
+
+Then all the `from QAOAKit` in this repo is importing from local folder `QAOAKit/`.
+
+Try:
+```
+python n_optima_and_mitiq.py
+```
+
+It should require a lot of package to install. You could install one by one according to
+error message.
+
+Another easy way out is using my requirements.txt:
+```
+pip install -r Mac_M1_requirements.txt
+```
+
+However, it works on Mac M1 and Linux. It might not be working on Windows.
+
+
 ### Installation
 
 Recommended: create an Anaconda environment
