@@ -558,6 +558,150 @@ def vis_one_landscape_and_count_optima_and_mitiq(
     plt.close(fig)
     return miti_cnt_opt, unmiti_cnt_opt
 
+
+def vis_one_landscape_and_count_optima_and_mitiq_and_one_variable(
+        G: nx.Graph,
+        p: int,
+        figdir: str,
+        var_idx: int, # p==2, 0-3 -> beta0, beta1, gamma0, gamma1
+        beta_opt: np.array, # converted
+        gamma_opt: np.array, # converted
+        noise_model: NoiseModel,
+        params_path: list,
+        C_opt: float
+    ):
+
+
+    # ! executor that mitiq wants. only QuantumCircuit is needed
+    # ! get_statevector() needs qc.save_state(),
+    # and thus qc.qasm() could not be called
+    # and thus could not be transformed to mitiq.circuit
+
+    # obj = partial(maxcut_obj, w=get_adjacency_matrix(G))
+    # def mitiq_executor_of_qaoa_maxcut_energy(qc) -> float:
+    #     backend = AerSimulator(method="statevector")
+    #     noise_model = get_depolarizing_error_noise_model(p1Q=0.001, p2Q=0.005) # ! base noise model
+    #     sv = backend.run(
+    #         qc,
+    #         noise_model=noise_model
+    #     ).result().get_statevector()
+    #     return obj_from_statevector(sv, obj, precomputed_energies=None)
+
+    def mitiq_executor_of_qaoa_maxcut_energy(qc) -> float:
+        backend = AerSimulator()
+        qc.measure_all()
+        # backend = 
+        # backend = Aer.get_backend('aer_simulator')
+        noise_model = get_depolarizing_error_noise_model(p1Q=0.001, p2Q=0.005) # ! base noise model
+        # noise_model = None
+        counts = backend.run(
+            qc,
+            shots=2048,
+            noise_model=noise_model
+        ).result().get_counts()
+        
+        expval = compute_expectation(counts, G)
+        return -expval
+
+    # for edge in G.edges:
+    #     obs = Observable(PauliString("I" * n)) #, PauliString("X", coeff=-1.75))
+    # obs = Observable(PauliString("I"), PauliString("X", coeff=-1.75))
+
+    # n = G.number_of_nodes()
+    # def mitiq_executor_of_qaoa_maxcut_energy(qc) -> float:
+    #     noise_model = get_depolarizing_error_noise_model(p1Q=0.001, p2Q=0.005) # ! base noise model 
+    #     return execute_with_shots_and_noise(qc, obs.matrix(), noise_model, shots=1024)
+        
+    assert var_idx >= 0 and var_idx < 2*p
+
+    _N_SAMPLES = 30
+    
+    # qaoa format, i.e. \pi not included
+    _BETA_RANGE = np.linspace(-np.pi, np.pi, _N_SAMPLES)
+    # _BETA_RANGE = angles
+    _GAMMA_RANGE = np.linspace(-np.pi/2, np.pi/2, _N_SAMPLES)
+    
+    var_range = _BETA_RANGE if var_idx < p else _GAMMA_RANGE
+    var_range = var_range.copy()
+
+    _BETA_GAMMA_OPT = np.hstack([beta_opt, gamma_opt])
+    _X_Y_LABELS = [f'beta{i}' for i in range(p)]
+    _X_Y_LABELS.extend([f'gamma{i}' for i in range(p)])
+
+    miti_cnt_opt = 0
+    unmiti_cnt_opt = 0
+
+    miti_z = []
+    unmiti_z = []
+
+    ymax = float('-inf')
+    ymin = float('inf')
+
+    for v in var_range:
+        tmp_vars = _BETA_GAMMA_OPT.copy()
+        tmp_vars[var_idx] = v
+
+        circuit = get_maxcut_qaoa_circuit(
+            G, beta=tmp_vars[:p], gamma=tmp_vars[p:],
+            transpile_to_basis=True, save_state=False)
+
+        unmiti = mitiq_executor_of_qaoa_maxcut_energy(circuit.copy())
+        miti = zne.execute_with_zne(
+            circuit=circuit.copy(),
+            executor=mitiq_executor_of_qaoa_maxcut_energy,
+        )
+
+        miti_z.append(miti)
+        unmiti_z.append(unmiti)
+
+        ymax = max(ymax, miti, unmiti)
+        ymin = min(ymin, miti, unmiti)
+            
+        if np.isclose(miti, C_opt, 0.03):
+            miti_cnt_opt += 1
+
+        if np.isclose(unmiti, C_opt, 0.03):
+            unmiti_cnt_opt += 1
+
+    np.savez_compressed(f"{figdir}/data",
+        mitis=miti_z, unmitis=unmiti_z,
+        miti_cnt_opt=miti_cnt_opt, unmiti_cnt_opt=unmiti_cnt_opt)
+    
+    # =============== vis ===============
+    fig, ax = plt.subplots()
+    # fig = plt.figure(figsize=[10, 10])
+    # plt.plot()
+    # ax = plt.axes()
+    # ax.plot(beta_opt, gamma_opt, "ro")
+    # print optimal points
+    # ax.vlines(x=_BETA_GAMMA_OPT[var_idx], ymin=ymin, ymax=ymax, colors=('r'), label="optimal point")
+    ax.plot(_BETA_GAMMA_OPT[var_idx], C_opt, marker="o", color='red', markersize=5, label='optimal point')
+    if params_path != None and len(params_path) > 0:
+        pass
+        # xs = []
+        # ys = []
+        # for params in params_path:
+        #     tmp_params = np.hstack([params["beta"], params["gamma"]])
+        #     xs.append(tmp_params[var_idx])
+        #     ys.append(tmp_params[var_idx])
+
+        # ax.plot(xs, ys, marker="o", color='purple', markersize=5, label="optimization path")
+        # ax.plot(xs[0], ys[0], marker="+", color='gray', markersize=7, label="initial point")
+        # ax.plot(xs[-1], ys[-1], marker="s", color='black', markersize=5, label="last point")
+    
+    ax.plot(var_range, unmiti_z, marker="o", label="unmitigated")
+    ax.plot(var_range, miti_z, marker="o", label="mitigated")
+    
+    ax.set_ylabel('# optima')
+    ax.set_xlabel(_X_Y_LABELS[var_idx])
+    ax.set_title('QAOA energy, before and after mitigation')
+    ax.legend()
+
+    fig.savefig(f'{figdir}/miti_varIndex={var_idx}_nOpt_unmiti{unmiti_cnt_opt}_miti{miti_cnt_opt}.png')
+    plt.close(fig)
+
+    return miti_cnt_opt, unmiti_cnt_opt
+
 # ================================= top function ===========================
 
 def vis_landscape_multi_p_and_and_count_optima(
@@ -695,6 +839,63 @@ def vis_multi_landscape_and_count_optima_and_mitiq_MP(
         # n_optima_list = executor.map(
         #     lambda x: vis_landscape_heatmap_multi_p_and_count_optima(*x), params, chunksize=16)
         futures = [executor.submit(vis_one_landscape_and_count_optima_and_mitiq, *param) for param in params]
+        concurrent.futures.wait(futures)
+        # for future in concurrent.futures.as_completed(futures):
+        #     print(future.result())
+
+    # print(futures)
+    miti_n_opt_list = []
+    unmiti_n_opt_list = []
+    for f in futures:
+        miti_n_opt_list.append(f.result()[0])
+        unmiti_n_opt_list.append(f.result()[1])
+    # print(n_optima_list)
+
+    return miti_n_opt_list, unmiti_n_opt_list
+
+
+def vis_multi_landscapes_and_count_optima_and_mitiq_MP_and_one_variable(
+        G: nx.Graph, 
+        p: int,
+        figdir: str,
+        beta_opt: np.array, # converted
+        gamma_opt: np.array, # converted
+        noise_model: NoiseModel,
+        params_path: list,
+        C_opt: float
+    ):
+
+    if not os.path.exists(figdir):
+        os.makedirs(figdir)
+
+    params = []
+            # figpath = f'{figdir}/var_indice={var1_idx},{var2_idx}.png'
+            # n_optima = vis_landscape_heatmap_multi_p_and_count_optima(
+            # vis_landscape_heatmap_multi_p(
+    for i in range(2*p):
+        params.append((
+            G.copy(),
+            p,
+            figdir,
+            i,
+            beta_opt.copy(),
+            gamma_opt.copy(),
+            noise_model.copy() if noise_model else None,
+            params_path.copy(),
+            C_opt
+        ))
+            # n_optima_list.append(n_optima)
+            # print(f"fig saved at {figpath}")
+    
+    # params = sample(params, min(10, len(params)))
+
+    print('choose 10 randomly:', len(params))
+
+    print('start MP')
+    with concurrent.futures.ProcessPoolExecutor() as executor:
+        # n_optima_list = executor.map(
+        #     lambda x: vis_landscape_heatmap_multi_p_and_count_optima(*x), params, chunksize=16)
+        futures = [executor.submit(vis_one_landscape_and_count_optima_and_mitiq_and_one_variable, *param) for param in params]
         concurrent.futures.wait(futures)
         # for future in concurrent.futures.as_completed(futures):
         #     print(future.result())
