@@ -14,12 +14,12 @@ DO NOT `pip install QAOAKit`.
 `git clone` this repo, and `cd` into the top folder of this repo,
 then
 ```
-conda create -n qaoa python=3.8
+conda create -n qaoa python=3.9
 conda activate qaoa
 python -m QAOAKit.build_tables
 ```
 
-python=3.8 works for my Linux and Mac M1 system.
+python=3.9 works for my Linux and Mac M1 system.
 
 Then all the `from QAOAKit` in this repo is importing from local folder `QAOAKit/`.
 
@@ -37,6 +37,24 @@ pip install -r Mac_M1_requirements.txt
 ```
 
 However, it works on Mac M1 and Linux. It might not be working on Windows.
+
+
+---
+
+If you still fail, here are some information that might help.
+
+`mitiq` does not compatible well with latest Python, NumPy and Qiskit.
+They are still upgrading `mitiq` according to this [issue](https://github.com/unitaryfund/mitiq/issues/1385).
+
+Here are my available version I tried and found (Mac M1)
+
+For Python==3.9,
+```
+conda install numpy==1.20.3
+pip install qiskit==0.36.2
+```
+
+Install NumPy by pip does not work.
 
 
 ### Installation
