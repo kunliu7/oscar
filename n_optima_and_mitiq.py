@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import time
+import concurrent.futures
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, execute
 from qiskit.algorithms.optimizers import (
     ADAM,
@@ -230,7 +231,8 @@ def count_optima_of_fixed_angles_3reg_graphs_one_variable():
             'n_qubits', 'p',
             'miti_n_opt_list',
             'unmiti_n_opt_list',
-            'has_opt'
+            'has_opt',
+            'C_opt'
         ]
     )
     
@@ -238,80 +240,83 @@ def count_optima_of_fixed_angles_3reg_graphs_one_variable():
     print("read 3 reg dataset OK")
     print("use fixed angles to calculate n_optima")
     signature = get_curr_formatted_timestamp()
-    for n_qubits in range(8, 17, 2): # [1, 16]
-    # for n_qubits in range(4, 5): # [1, 16]
-        for p in range(2, 3): # [1, 11]
-            start_time = time.time()
-            df = reg3_dataset_table.reset_index()
-            df = df[(df["n"] == n_qubits) & (df["p_max"] == p)]
-            df = df.iloc[0: MAX_NUM_GRAPHS_PER_NUM_QUBITS]
-            # df = df.iloc[MAX_NUM_GRAPHS_PER_NUM_QUBITS:2*MAX_NUM_GRAPHS_PER_NUM_QUBITS]
-            
-            print(f"n_qubits={n_qubits}")
-            print(f"num of graphs: {len(df)}")
-            print(f"p={p}")
-            for row_id, row in df.iterrows():
+    with concurrent.futures.ProcessPoolExecutor() as executor:
+        for n_qubits in range(8, 17, 2): # [1, 16]
+        # for n_qubits in range(4, 5): # [1, 16]
+            for p in range(2, 3): # [1, 11]
+                start_time = time.time()
+                df = reg3_dataset_table.reset_index()
+                df = df[(df["n"] == n_qubits) & (df["p_max"] == p)]
+                df = df.iloc[0: MAX_NUM_GRAPHS_PER_NUM_QUBITS]
+                # df = df.iloc[MAX_NUM_GRAPHS_PER_NUM_QUBITS:2*MAX_NUM_GRAPHS_PER_NUM_QUBITS]
                 
-                print(f"handling {row_id}")
-                angles = angles_to_qaoa_format(get_fixed_angles(d=3, p=p))
+                print(f"n_qubits={n_qubits}")
+                print(f"num of graphs: {len(df)}")
+                print(f"p={p}")
+                for row_id, row in df.iterrows():
+                    
+                    print(f"handling {row_id}")
+                    angles = angles_to_qaoa_format(get_fixed_angles(d=3, p=p))
 
-                # print(row["beta"])
-                # print(row["gamma"])
-                # print(row["p_max"])
-                # print(row["C_opt"], row["C_{true opt}"], row["C_fixed"])
+                    # print(row["beta"])
+                    # print(row["gamma"])
+                    # print(angles)
+                    # print(row["p_max"])
+                    # print(row["C_opt"], row["C_{true opt}"], row["C_fixed"])
 
-                C_opt = row["C_fixed"]
-                print("C_fixed", C_opt)
-                G = row["G"]
-                
-                # p = len(row["beta"])
-                figdir = f'figs/cnt_opt_miti/{signature}/G{row_id}_nQ{n_qubits}_p{p}'
-                
-                if not os.path.exists(figdir):
-                    os.makedirs(figdir)
+                    C_opt = row["C_fixed"]
+                    print("C_fixed", C_opt)
+                    G = row["G"]
 
-                nx.draw_networkx(G)
-                plt.title(f"")
-                plt.savefig(f"{figdir}/G{row_id}.png")
-                plt.cla()
+                    figdir = f'figs/cnt_opt_miti/{signature}/G{row_id}_nQ{n_qubits}_p{p}'
+                    
+                    if not os.path.exists(figdir):
+                        os.makedirs(figdir)
 
-                # n_optima_list = vis_landscape_multi_p_and_and_count_optima(
-                miti_n_opt_list, unmiti_n_opt_list = vis_multi_landscapes_and_count_optima_and_mitiq_MP_and_one_variable(
-                    G=G,
-                    p=p,
-                    figdir=figdir, 
-                    # beta_opt=beta_to_qaoa_format(angles["beta"]),
-                    # gamma_opt=gamma_to_qaoa_format(angles["gamma"]),
-                    beta_opt=angles["beta"],
-                    gamma_opt=angles["gamma"],
-                    noise_model=None,
-                    params_path=[],
-                    C_opt=C_opt
-                )
+                    nx.draw_networkx(G)
+                    plt.title(f"")
+                    plt.savefig(f"{figdir}/G{row_id}.png")
+                    plt.cla()
 
-                print('miti_n_opt_list', miti_n_opt_list)
-                print('unmiti_n_opt_list', unmiti_n_opt_list)
+                    # n_optima_list = vis_landscape_multi_p_and_and_count_optima(
+                    miti_n_opt_list, unmiti_n_opt_list = vis_multi_landscapes_and_count_optima_and_mitiq_MP_and_one_variable(
+                            G=G,
+                            p=p,
+                            figdir=figdir, 
+                            # beta_opt=beta_to_qaoa_format(angles["beta"]),
+                            # gamma_opt=gamma_to_qaoa_format(angles["gamma"]),
+                            beta_opt=angles["beta"],
+                            gamma_opt=angles["gamma"],
+                            noise_model=None,
+                            params_path=[],
+                            C_opt=C_opt,
+                            executor=executor
+                    )
 
-                count_rst_df = count_rst_df.append({
-                    'row_id': row_id,
-                    'G': G,
-                    'pynauty_cert': row['pynauty_cert'],
-                    'n_qubits': n_qubits,
-                    'p': p,
-                    'miti_n_opt_list': miti_n_opt_list,
-                    'unmiti_n_opt_list': unmiti_n_opt_list,
-                    'has_opt': False,
-                }, ignore_index=True)
+                    print('miti_n_opt_list', miti_n_opt_list)
+                    print('unmiti_n_opt_list', unmiti_n_opt_list)
 
-                # print(count_rst_df)
-                count_rst_df.to_pickle(f"cnt_opt_miti_df/{signature}_cnt_opt_fixed_angles.p")
-                print(" ================ ")
+                    count_rst_df = count_rst_df.append({
+                        'row_id': row_id,
+                        'G': G,
+                        'pynauty_cert': row['pynauty_cert'],
+                        'n_qubits': n_qubits,
+                        'p': p,
+                        'miti_n_opt_list': miti_n_opt_list,
+                        'unmiti_n_opt_list': unmiti_n_opt_list,
+                        'has_opt': False,
+                        'C_opt': C_opt,
+                    }, ignore_index=True)
 
-            end_time = time.time()
-            print(f"for p={p}, nQ={n_qubits}, it takes {end_time-start_time} s")
+                    # print(count_rst_df)
+                    count_rst_df.to_pickle(f"cnt_opt_miti_df/{signature}_cnt_opt_fixed_angles.p")
+                    print(" ================ ")
 
-            # 4h for nQ=16, p=6
-            # 100 min for nQ=12, p=6
+                end_time = time.time()
+                print(f"for p={p}, nQ={n_qubits}, it takes {end_time-start_time} s")
+
+                # 4h for nQ=16, p=6
+                # 100 min for nQ=12, p=6
 
     return
 

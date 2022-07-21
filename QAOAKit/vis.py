@@ -614,12 +614,15 @@ def vis_one_landscape_and_count_optima_and_mitiq_and_one_variable(
         
     assert var_idx >= 0 and var_idx < 2*p
 
-    _N_SAMPLES = 30
+    _BETA_N_SAMPLES = 20
+    _GAMMA_N_SAMPLES = 80
     
     # qaoa format, i.e. \pi not included
-    _BETA_RANGE = np.linspace(-np.pi, np.pi, _N_SAMPLES)
+    # _BETA_RANGE = np.linspace(-np.pi, np.pi, _N_SAMPLES)
+    _BETA_RANGE = np.linspace(-np.pi/4, np.pi/4, _BETA_N_SAMPLES)
     # _BETA_RANGE = angles
-    _GAMMA_RANGE = np.linspace(-np.pi/2, np.pi/2, _N_SAMPLES)
+    # _GAMMA_RANGE = np.linspace(-np.pi/2, np.pi/2, _N_SAMPLES)
+    _GAMMA_RANGE = np.linspace(-np.pi, np.pi, _GAMMA_N_SAMPLES)
     
     var_range = _BETA_RANGE if var_idx < p else _GAMMA_RANGE
     var_range = var_range.copy()
@@ -636,6 +639,8 @@ def vis_one_landscape_and_count_optima_and_mitiq_and_one_variable(
 
     ymax = float('-inf')
     ymin = float('inf')
+
+    threshold = 0.03
 
     for v in var_range:
         tmp_vars = _BETA_GAMMA_OPT.copy()
@@ -657,13 +662,13 @@ def vis_one_landscape_and_count_optima_and_mitiq_and_one_variable(
         ymax = max(ymax, miti, unmiti)
         ymin = min(ymin, miti, unmiti)
             
-        if np.isclose(miti, C_opt, 0.03):
+        if np.isclose(miti, C_opt, threshold):
             miti_cnt_opt += 1
 
-        if np.isclose(unmiti, C_opt, 0.03):
+        if np.isclose(unmiti, C_opt, threshold):
             unmiti_cnt_opt += 1
 
-    np.savez_compressed(f"{figdir}/data",
+    np.savez_compressed(f"{figdir}/data_threshold{threshold}_varIdx{var_idx}",
         mitis=miti_z, unmitis=unmiti_z,
         miti_cnt_opt=miti_cnt_opt, unmiti_cnt_opt=unmiti_cnt_opt)
     
@@ -694,10 +699,10 @@ def vis_one_landscape_and_count_optima_and_mitiq_and_one_variable(
     
     ax.set_ylabel('# optima')
     ax.set_xlabel(_X_Y_LABELS[var_idx])
-    ax.set_title('QAOA energy, before and after mitigation')
+    ax.set_title(f'QAOA energy, nQ{G.number_of_nodes()}, before and after mitigation')
     ax.legend()
 
-    fig.savefig(f'{figdir}/miti_varIndex={var_idx}_nOpt_unmiti{unmiti_cnt_opt}_miti{miti_cnt_opt}.png')
+    fig.savefig(f'{figdir}/zne_varIdx={var_idx}_nOpt_unmiti{unmiti_cnt_opt}_miti{miti_cnt_opt}.png')
     plt.close(fig)
 
     return miti_cnt_opt, unmiti_cnt_opt
@@ -862,7 +867,8 @@ def vis_multi_landscapes_and_count_optima_and_mitiq_MP_and_one_variable(
         gamma_opt: np.array, # converted
         noise_model: NoiseModel,
         params_path: list,
-        C_opt: float
+        C_opt: float,
+        executor: concurrent.futures.ProcessPoolExecutor
     ):
 
     if not os.path.exists(figdir):
@@ -892,20 +898,28 @@ def vis_multi_landscapes_and_count_optima_and_mitiq_MP_and_one_variable(
     print('choose 10 randomly:', len(params))
 
     print('start MP')
-    with concurrent.futures.ProcessPoolExecutor() as executor:
+    # with concurrent.futures.ProcessPoolExecutor() as executor:
         # n_optima_list = executor.map(
         #     lambda x: vis_landscape_heatmap_multi_p_and_count_optima(*x), params, chunksize=16)
-        futures = [executor.submit(vis_one_landscape_and_count_optima_and_mitiq_and_one_variable, *param) for param in params]
-        concurrent.futures.wait(futures)
+    for param in params:
+        executor.submit(
+            vis_one_landscape_and_count_optima_and_mitiq_and_one_variable,
+            *param
+        )
+        # print(future.result())
+        
+    # futures = [executor.submit(vis_one_landscape_and_count_optima_and_mitiq_and_one_variable, *param) for param in params]
+    # concurrent.futures.wait(futures)
         # for future in concurrent.futures.as_completed(futures):
         #     print(future.result())
 
     # print(futures)
-    miti_n_opt_list = []
-    unmiti_n_opt_list = []
-    for f in futures:
-        miti_n_opt_list.append(f.result()[0])
-        unmiti_n_opt_list.append(f.result()[1])
+    # miti_n_opt_list = []
+    # unmiti_n_opt_list = []
+    # for f in futures:
+    #     miti_n_opt_list.append(f.result()[0])
+    #     unmiti_n_opt_list.append(f.result()[1])
     # print(n_optima_list)
 
-    return miti_n_opt_list, unmiti_n_opt_list
+    # return miti_n_opt_list, unmiti_n_opt_list
+    return [], []
