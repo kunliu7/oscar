@@ -99,9 +99,9 @@ def solve_by_l1_norm(Theta, y):
     s = res.x
     return s
 
-def recon_by_Lasso(Theta, y):
+def recon_by_Lasso(Theta, y, alpha):
     n = Theta.shape[1]
-    lasso = linear_model.Lasso(alpha=0.1)# here, we use lasso to minimize the L1 norm
+    lasso = linear_model.Lasso(alpha=alpha)# here, we use lasso to minimize the L1 norm
     # lasso.fit(Theta, y.reshape((M,)))
     lasso.fit(Theta, y)
     # Plotting the reconstructed coefficients and the signal
@@ -654,6 +654,7 @@ def _vis_one_D_p1_recon(
     fig.savefig(save_path)
     plt.close('all')
 
+
 def _one_D_CS_p1_recon_for_one_point(
     G,
     beta,
@@ -693,6 +694,7 @@ def _mitiq_executor_of_qaoa_maxcut_energy(qc, G, is_noisy, shots) -> float:
 def _one_D_CS_p1_recon_for_one_point_mapper(param):
     return _one_D_CS_p1_recon_for_one_point(*param)
 
+
 def one_D_CS_p1_recon_task(
         G: nx.Graph,
         p: int,
@@ -705,40 +707,13 @@ def one_D_CS_p1_recon_task(
         sampling_frac: float
     ):
     # ! Convention: First beta, Last gamma
-
-    # def mitiq_executor_of_qaoa_maxcut_energy(qc, is_noisy) -> float:
-    #     backend = AerSimulator()
-    #     qc.measure_all()
-    #     # backend = Aer.get_backend('aer_simulator')
-    #     # noise_model = get_depolarizing_error_noise_model(p1Q=0.001, p2Q=0.005) # ! base noise model
-    #     noise_model = None
-    #     counts = backend.run(
-    #         qc,
-    #         shots=1,
-    #         noise_model=noise_model if is_noisy else None
-    #     ).result().get_counts()
-        
-    #     expval = compute_expectation(counts, G)
-    #     return -expval
-
-    n_shots = 2048
+    
     # hyper parameters
+    alpha = 0.1
+    n_shots = 2048
     n_pts_per_unit = 36     # num. of original points per unit == 4096, i.e. resolution rate = 1 / n
-    # sparsity = 4 # n_samples // 4       # K-sparse of s per unit
-    # n_samples = int(n_pts * sampling_frac) # 12  # num. of random samples per unit
-    # window = np.array([1024, 1280]) / n_pts
-
-    # extend by bound_len
-    # n_pts = np.floor(n_pts_per_unit * bound_len).astype(int)
-    # n_samples = np.floor(sparsity * np.log(n_pts / sparsity)).astype(int)
-    # n_samples = np.ceil(n_pts_per_unit * bound_len * sampling_frac).astype(int)
-    # sparsity = np.floor(sparsity * bound_len).astype(int)
-    # window = np.floor(window * bound_len).astype(int)
-
-    # print(f'n_pts={n_pts}, n_samples={n_samples}')
     
     # beta first, gamma later
-    # b_or_g = 'beta' if var_idx < p else 'gamma'
     bounds = {'beta': [-np.pi/4, np.pi/4],
               'gamma': [-np.pi, np.pi]}
 
@@ -749,24 +724,16 @@ def one_D_CS_p1_recon_task(
         n_pts[label] = np.floor(n_pts_per_unit * bound_len).astype(int)
         n_samples[label] = np.ceil(n_pts_per_unit * bound_len * sampling_frac).astype(int)
     
-    print(bounds)
-    print(n_pts)
-    print(n_samples)
+    print('bounds: ', bounds)
+    print('n_pts: ', n_pts)
+    print('n_samples: ', n_samples)
+    print('alpha: ', alpha)
+    print('n_pts_per_unit: ', n_pts_per_unit)
     # sample P points from N randomly
-    # perm = np.floor(np.random.rand(n_samples) * n_pts).astype(int)
 
-    # full_range = np.linspace(bound[0], bound[1], n_pts)
-    # full_range = np.linspace(0, 1, n_pts)
-    # var_range = full_range[perm]
-
-    # labels
-    # _BETA_GAMMA_OPT = np.hstack([beta_opt, gamma_opt])
-    # _X_Y_LABELS = [f'beta{i}' for i in range(p)]
-    # _X_Y_LABELS.extend([f'gamma{i}' for i in range(p)])
-
-    mitis = []
-    unmitis = []
-    ideals = []
+    # mitis = []
+    # unmitis = []
+    # ideals = []
 
     _LABELS = ['mitis', 'unmitis', 'ideals']
     origin = {label: [] for label in _LABELS}
@@ -779,9 +746,9 @@ def one_D_CS_p1_recon_task(
     
     params = []
     for gamma in full_range['gamma']:
-        mitis = []
-        unmitis = []
-        ideals = []
+        # mitis = []
+        # unmitis = []
+        # ideals = []
 
         for beta in full_range['beta']:
             param = (
@@ -852,7 +819,6 @@ def one_D_CS_p1_recon_task(
 
     print(f"full landscape time usage: {end_time - start_time} s")
 
-    # print(futures.to_list)
     for f in futures:
         origin['ideals'].append(f[0])
         origin['unmitis'].append(f[1])
@@ -862,33 +828,18 @@ def one_D_CS_p1_recon_task(
         origin[label] = np.array(arr).reshape(n_pts['gamma'], n_pts['beta'])
         print(origin[label].shape)
         
-
-    # return
-
-    # for label in _LABELS:
-    #     origin[label] = np.array(origin[label])
-        # print(origin[label].shape)
-            
     # x = np.cos(2 * 97 * np.pi * full_range) + np.cos(2 * 777 * np.pi * full_range)
     # x = np.cos(2 * np.pi * full_range) # + np.cos(2 * np.pi * full_range)
-    # mitis = x[perm]
-    # unmitis = x[perm]
-    # mitis = np.array(mitis)
-    # unmitis = np.array(unmitis)
-    # ideals = np.array(ideals)
-
-    # Psi = dct(np.identity(n_pts)) # Build Psi
     
-    # print('start: solve l1 norm')
+    print('start: solve l1 norm')
     recon = {label: [] for label in _LABELS}
     for idx_gamma, _ in enumerate(full_range['gamma']):
         Psi = dct(np.identity(n_pts['beta']))
         perm = np.floor(np.random.rand(n_samples['beta']) * n_pts['beta']).astype(int)
-        # print(perm)
 
-        ideals_recon = recon_by_Lasso(Psi[perm, :], origin['ideals'][idx_gamma, perm])
-        unmitis_recon = recon_by_Lasso(Psi[perm, :], origin['unmitis'][idx_gamma, perm])
-        mitis_recon = recon_by_Lasso(Psi[perm, :], origin['mitis'][idx_gamma, perm])
+        ideals_recon = recon_by_Lasso(Psi[perm, :], origin['ideals'][idx_gamma, perm], alpha)
+        unmitis_recon = recon_by_Lasso(Psi[perm, :], origin['unmitis'][idx_gamma, perm], alpha)
+        mitis_recon = recon_by_Lasso(Psi[perm, :], origin['mitis'][idx_gamma, perm], alpha)
 
         recon['ideals'].append(ideals_recon.copy())
         recon['unmitis'].append(unmitis_recon.copy())
@@ -919,8 +870,7 @@ def one_D_CS_p1_recon_task(
         # improved_n_optima_recon=improved_n_optima_recon,
         C_opt=C_opt)
 
-            
-    # print('end: solve l1 norm')
+    print('end: solve l1 norm')
     
     # ----- count optima
 
