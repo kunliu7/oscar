@@ -1,4 +1,4 @@
-from typing import List
+import time
 import networkx as nx
 import numpy as np
 import pandas as pd
@@ -101,7 +101,7 @@ def solve_by_l1_norm(Theta, y):
 
 def recon_by_Lasso(Theta, y):
     n = Theta.shape[1]
-    lasso = linear_model.Lasso(alpha=0.001)# here, we use lasso to minimize the L1 norm
+    lasso = linear_model.Lasso(alpha=0.1)# here, we use lasso to minimize the L1 norm
     # lasso.fit(Theta, y.reshape((M,)))
     lasso.fit(Theta, y)
     # Plotting the reconstructed coefficients and the signal
@@ -398,7 +398,7 @@ def CS_and_one_landscape_and_cnt_optima_and_mitiq_and_one_variable_and_sampling_
         noise_model = get_depolarizing_error_noise_model(p1Q=0.001, p2Q=0.005) # ! base noise model
         counts = backend.run(
             qc,
-            shots=128,
+            shots=2048,
             noise_model=noise_model if is_noisy else None
         ).result().get_counts()
         
@@ -607,6 +607,449 @@ def multi_landscapes_and_cnt_optima_and_mitiq_and_MP_and_one_variable_and_CS(
             CS_and_one_landscape_and_cnt_optima_and_mitiq_and_one_variable_and_sampling_frac,
             *param
         )
-        print(future.result())
+        # print(future.result())
         
     return [], []
+
+
+# ================== one dimensional CS p==1 ==================
+
+def _vis_one_D_p1_recon(
+        origin_dict,
+        recon_dict,
+        # gamma_range,
+        # beta_range,
+        # C_opt, bound, var_opt,
+        # full_range,
+        # mitis_recon,
+        # unmitis_recon,
+        # ideal_recon,
+        # xlabel, 
+        title,
+        save_path
+    ):
+
+    # plt.figure
+    plt.rc('font', size=28)
+    fig, axs = plt.subplots(nrows=2, ncols=3, figsize=(30, 30))
+    axs = axs.reshape(-1)
+
+    idx = 0
+    for label, origin in origin_dict.items():
+        recon = recon_dict[label]
+        # axs[idx]
+        # X, Y = np.meshgrid(var1_range, var2_range) # , indexing='ij')
+        # Z = np.array(Z).T
+        # c = axs[idx].pcolormesh(X, Y, Z, cmap='viridis', vmin=Z.min(), vmax=Z.max())
+        
+        im = axs[idx].imshow(origin)
+        axs[idx].set_title(f"origin, {label}", )
+
+        im = axs[idx + 3].imshow(recon)
+        axs[idx + 3].set_title(f"recon, {label}")
+        idx += 1
+
+    fig.colorbar(im, ax=[axs[i] for i in range(6)])
+    # plt.subtitle(title)
+    fig.savefig(save_path)
+    plt.close('all')
+
+def _one_D_CS_p1_recon_for_one_point(
+    G,
+    beta,
+    gamma,
+    shots
+):
+    circuit = get_maxcut_qaoa_circuit(
+        G, beta=[beta], gamma=[gamma],
+        transpile_to_basis=True, save_state=False)
+
+    ideal = _mitiq_executor_of_qaoa_maxcut_energy(circuit.copy(), G, is_noisy=False, shots=shots)
+    unmiti = _mitiq_executor_of_qaoa_maxcut_energy(circuit.copy(), G, is_noisy=True, shots=shots)
+    miti = zne.execute_with_zne(
+        circuit=circuit.copy(),
+        executor=partial(_mitiq_executor_of_qaoa_maxcut_energy, G=G, is_noisy=True, shots=shots),
+    )
+
+    return ideal, unmiti, miti
+
+
+def _mitiq_executor_of_qaoa_maxcut_energy(qc, G, is_noisy, shots) -> float:
+    backend = AerSimulator()
+    qc.measure_all()
+    # backend = Aer.get_backend('aer_simulator')
+    noise_model = get_depolarizing_error_noise_model(p1Q=0.001, p2Q=0.005) # ! base noise model
+    # noise_model = None
+    counts = backend.run(
+        qc,
+        shots=shots,
+        noise_model=noise_model if is_noisy else None
+    ).result().get_counts()
+    
+    expval = compute_expectation(counts, G)
+    return -expval
+
+
+def _one_D_CS_p1_recon_for_one_point_mapper(param):
+    return _one_D_CS_p1_recon_for_one_point(*param)
+
+def one_D_CS_p1_recon_task(
+        G: nx.Graph,
+        p: int,
+        figdir: str,
+        beta_opt: np.array, # converted
+        gamma_opt: np.array, # converted
+        noise_model: NoiseModel,
+        params_path: list,
+        C_opt: float,
+        sampling_frac: float
+    ):
+    # ! Convention: First beta, Last gamma
+
+    # def mitiq_executor_of_qaoa_maxcut_energy(qc, is_noisy) -> float:
+    #     backend = AerSimulator()
+    #     qc.measure_all()
+    #     # backend = Aer.get_backend('aer_simulator')
+    #     # noise_model = get_depolarizing_error_noise_model(p1Q=0.001, p2Q=0.005) # ! base noise model
+    #     noise_model = None
+    #     counts = backend.run(
+    #         qc,
+    #         shots=1,
+    #         noise_model=noise_model if is_noisy else None
+    #     ).result().get_counts()
+        
+    #     expval = compute_expectation(counts, G)
+    #     return -expval
+
+    n_shots = 2048
+    # hyper parameters
+    n_pts_per_unit = 36     # num. of original points per unit == 4096, i.e. resolution rate = 1 / n
+    # sparsity = 4 # n_samples // 4       # K-sparse of s per unit
+    # n_samples = int(n_pts * sampling_frac) # 12  # num. of random samples per unit
+    # window = np.array([1024, 1280]) / n_pts
+
+    # extend by bound_len
+    # n_pts = np.floor(n_pts_per_unit * bound_len).astype(int)
+    # n_samples = np.floor(sparsity * np.log(n_pts / sparsity)).astype(int)
+    # n_samples = np.ceil(n_pts_per_unit * bound_len * sampling_frac).astype(int)
+    # sparsity = np.floor(sparsity * bound_len).astype(int)
+    # window = np.floor(window * bound_len).astype(int)
+
+    # print(f'n_pts={n_pts}, n_samples={n_samples}')
+    
+    # beta first, gamma later
+    # b_or_g = 'beta' if var_idx < p else 'gamma'
+    bounds = {'beta': [-np.pi/4, np.pi/4],
+              'gamma': [-np.pi, np.pi]}
+
+    n_pts = {}
+    n_samples = {}
+    for label, bound in bounds.items():
+        bound_len = bound[1] - bound[0]
+        n_pts[label] = np.floor(n_pts_per_unit * bound_len).astype(int)
+        n_samples[label] = np.ceil(n_pts_per_unit * bound_len * sampling_frac).astype(int)
+    
+    print(bounds)
+    print(n_pts)
+    print(n_samples)
+    # sample P points from N randomly
+    # perm = np.floor(np.random.rand(n_samples) * n_pts).astype(int)
+
+    # full_range = np.linspace(bound[0], bound[1], n_pts)
+    # full_range = np.linspace(0, 1, n_pts)
+    # var_range = full_range[perm]
+
+    # labels
+    # _BETA_GAMMA_OPT = np.hstack([beta_opt, gamma_opt])
+    # _X_Y_LABELS = [f'beta{i}' for i in range(p)]
+    # _X_Y_LABELS.extend([f'gamma{i}' for i in range(p)])
+
+    mitis = []
+    unmitis = []
+    ideals = []
+
+    _LABELS = ['mitis', 'unmitis', 'ideals']
+    origin = {label: [] for label in _LABELS}
+
+    full_range = {
+        'gamma': np.linspace(bounds['gamma'][0], bounds['gamma'][1], n_pts['gamma']),
+        'beta': np.linspace(bounds['beta'][0], bounds['beta'][1], n_pts['beta'])
+    }
+
+    
+    params = []
+    for gamma in full_range['gamma']:
+        mitis = []
+        unmitis = []
+        ideals = []
+
+        for beta in full_range['beta']:
+            param = (
+                G.copy(),
+                beta,
+                gamma,
+                n_shots
+            )
+            params.append(param)
+            # circuit = get_maxcut_qaoa_circuit(
+            #     G, beta=[beta], gamma=[gamma],
+            #     transpile_to_basis=True, save_state=False)
+            
+            # ideal_f = executor.submit(
+            #     _mitiq_executor_of_qaoa_maxcut_energy,
+            #     circuit.copy(),
+            #     G,
+            #     False,
+            #     n_shots
+            # )
+
+            # unmiti_f = executor.submit(
+            #     _mitiq_executor_of_qaoa_maxcut_energy,
+            #     circuit.copy(),
+            #     G,
+            #     True,
+            #     n_shots
+            # )
+
+            # miti_f = executor.submit(
+            #     zne.execute_with_zne,
+            #     circuit.copy(),
+            #     partial(_mitiq_executor_of_qaoa_maxcut_energy, is_noisy=True, G=G, shots=n_shots),
+            # )
+            
+            # mitis.append(miti_f.result())
+            # unmitis.append(unmiti_f.result())
+            # ideals.append(ideal_f.result())
+
+            # ideal = mitiq_executor_of_qaoa_maxcut_energy(circuit.copy(), is_noisy=False)
+            # unmiti = mitiq_executor_of_qaoa_maxcut_energy(circuit.copy(), is_noisy=True)
+            # miti = zne.execute_with_zne(
+            #     circuit=circuit.copy(),
+            #     executor=partial(mitiq_executor_of_qaoa_maxcut_energy, is_noisy=True),
+            # )
+            # mitis.append(miti)
+            # unmitis.append(unmiti)
+            # ideals.append(ideal)
+
+        # origin['mitis'].append(mitis.copy())
+        # origin['unmitis'].append(unmitis.copy())
+        # origin['ideals'].append(ideals.copy())
+
+    print(len(params))
+
+    start_time = time.time()
+    with concurrent.futures.ProcessPoolExecutor() as executor:
+        # future = executor.submit(
+        #     _one_D_CS_p1_recon_for_one_point,
+        #     *params[0]
+        # )
+        futures = executor.map(
+            _one_D_CS_p1_recon_for_one_point_mapper, params
+        )
+    end_time = time.time()
+
+    print(f"full landscape time usage: {end_time - start_time} s")
+
+    # print(futures.to_list)
+    for f in futures:
+        origin['ideals'].append(f[0])
+        origin['unmitis'].append(f[1])
+        origin['mitis'].append(f[2])
+
+    for label, arr in origin.items():
+        origin[label] = np.array(arr).reshape(n_pts['gamma'], n_pts['beta'])
+        print(origin[label].shape)
+        
+
+    # return
+
+    # for label in _LABELS:
+    #     origin[label] = np.array(origin[label])
+        # print(origin[label].shape)
+            
+    # x = np.cos(2 * 97 * np.pi * full_range) + np.cos(2 * 777 * np.pi * full_range)
+    # x = np.cos(2 * np.pi * full_range) # + np.cos(2 * np.pi * full_range)
+    # mitis = x[perm]
+    # unmitis = x[perm]
+    # mitis = np.array(mitis)
+    # unmitis = np.array(unmitis)
+    # ideals = np.array(ideals)
+
+    # Psi = dct(np.identity(n_pts)) # Build Psi
+    
+    # print('start: solve l1 norm')
+    recon = {label: [] for label in _LABELS}
+    for idx_gamma, _ in enumerate(full_range['gamma']):
+        Psi = dct(np.identity(n_pts['beta']))
+        perm = np.floor(np.random.rand(n_samples['beta']) * n_pts['beta']).astype(int)
+        # print(perm)
+
+        ideals_recon = recon_by_Lasso(Psi[perm, :], origin['ideals'][idx_gamma, perm])
+        unmitis_recon = recon_by_Lasso(Psi[perm, :], origin['unmitis'][idx_gamma, perm])
+        mitis_recon = recon_by_Lasso(Psi[perm, :], origin['mitis'][idx_gamma, perm])
+
+        recon['ideals'].append(ideals_recon.copy())
+        recon['unmitis'].append(unmitis_recon.copy())
+        recon['mitis'].append(mitis_recon.copy())
+
+    _vis_one_D_p1_recon(
+        origin_dict=origin,
+        recon_dict=recon,
+        title='test',
+        save_path=f'{figdir}/origin_recon.png'
+    )
+
+    np.savez_compressed(f"{figdir}/data",
+
+        # reconstruct
+        origin=origin,
+        recon=recon,
+        # mitis=mitis, unmitis=unmitis, ideals=ideals,
+        # unmitis_recon=unmitis_recon, mitis_recon=mitis_recon, ideals_recon=ideals_recon,
+
+        # parameters
+        n_pts=n_pts, n_samples=n_samples, sampling_frac=sampling_frac,
+        # perm=perm,
+        full_range=full_range,
+
+        # n_optima
+        # improved_n_optima=improved_n_optima,
+        # improved_n_optima_recon=improved_n_optima_recon,
+        C_opt=C_opt)
+
+            
+    # print('end: solve l1 norm')
+    
+    # ----- count optima
+
+    # max_unmiti = unmitis.max()
+    # improved_n_optima = np.sum(
+    #     # np.isclose(unmitis_recon, C_opt, atol=C_opt-max_miti) == True
+    #     mitis > max_unmiti
+    # )
+    
+    # max_unmiti_recon = unmitis_recon.max()
+    # improved_n_optima_recon = np.sum(
+    #     # np.isclose(mitis_recon, C_opt, atol=abs(C_opt-max_unmiti_recon)) == True
+    #     mitis_recon > max_unmiti_recon
+    # )
+
+    # print('improved_n_optima, recon', improved_n_optima, improved_n_optima_recon)
+
+    # =============== vis unmiti ===============
+
+    # _vis_y_and_x_recon(
+    #     C_opt=C_opt, bound=bound, var_opt=_BETA_GAMMA_OPT[var_idx],
+
+    #     recon_range=full_range, x_recon=mitis_recon,
+    #     sample_range=full_range[perm], x_sample=mitis[perm],
+    #     full_range=full_range, x_full=mitis,
+
+    #     xlabel=_X_Y_LABELS[var_idx],
+    #     title=f'QAOA energy, nQ{G.number_of_nodes()}, recon miti',
+    #     save_path=f'{figdir}/zne_varIdx={var_idx}_mitis_recon.png'
+    # )
+    
+    # _vis_y_and_x_recon(
+    #     C_opt=C_opt, bound=bound, var_opt=_BETA_GAMMA_OPT[var_idx],
+        
+    #     recon_range=full_range, x_recon=unmitis_recon,
+    #     sample_range=full_range[perm], x_sample=unmitis[perm],
+    #     full_range=full_range, x_full=unmitis,
+
+    #     xlabel=_X_Y_LABELS[var_idx],
+    #     title=f'QAOA energy, nQ{G.number_of_nodes()}, recon unmiti',
+    #     save_path=f'{figdir}/zne_varIdx={var_idx}_unmitis_recon.png'
+    # )
+    
+    # _vis_y_and_x_recon(
+    #     C_opt=C_opt, bound=bound, var_opt=_BETA_GAMMA_OPT[var_idx],
+
+    #     recon_range=full_range, x_recon=ideals_recon,
+    #     sample_range=full_range[perm], x_sample=ideals[perm],
+    #     full_range=full_range, x_full=ideals,
+
+    #     xlabel=_X_Y_LABELS[var_idx],
+    #     title=f'QAOA energy, nQ{G.number_of_nodes()}, recon ideal',
+    #     save_path=f'{figdir}/zne_varIdx={var_idx}_ideal.png'
+    # )
+
+    # _vis_miti_and_unmiti_recon(
+    #     C_opt=C_opt, bound=bound, var_opt=_BETA_GAMMA_OPT[var_idx],
+    #     full_range=full_range,
+    #     mitis_recon=mitis_recon,
+    #     unmitis_recon=unmitis_recon,
+    #     ideal_recon=ideals_recon,
+    #     xlabel=_X_Y_LABELS[var_idx],
+    #     title=f'QAOA energy, nQ{G.number_of_nodes()}, reconstructed unmiti and miti',
+    #     save_path=f'{figdir}/zne_varIdx={var_idx}_unmitis_recon_and_mitis_recon.png'
+    # )
+
+    # ======== save ==========
+
+    # np.savez_compressed(f"{figdir}/varIdx{var_idx}",
+
+    #     # reconstruct
+    #     mitis=mitis, unmitis=unmitis, ideals=ideals,
+    #     unmitis_recon=unmitis_recon, mitis_recon=mitis_recon, ideals_recon=ideals_recon,
+
+    #     # parameters
+    #     n_pts=n_pts, n_samples=n_samples, sampling_frac=sampling_frac,
+    #     perm=perm, full_range=full_range,
+
+    #     # n_optima
+    #     improved_n_optima=improved_n_optima,
+    #     improved_n_optima_recon=improved_n_optima_recon,
+    #     C_opt=C_opt)
+
+    return
+
+
+def one_D_CS_p1_recon(
+        G: nx.Graph, 
+        p: int,
+        figdir: str,
+        beta_opt: np.ndarray, # converted
+        gamma_opt: np.ndarray, # converted
+        noise_model: NoiseModel,
+        params_path: list,
+        C_opt: float,
+        executor: concurrent.futures.ProcessPoolExecutor,
+        sampling_frac: float
+    ):
+
+    if not os.path.exists(figdir):
+        os.makedirs(figdir)
+
+    params = []
+    params.append((
+        G.copy(),
+        p,
+        figdir,
+        beta_opt.copy(),
+        gamma_opt.copy(),
+        noise_model.copy() if noise_model else None,
+        params_path.copy(),
+        C_opt,
+        sampling_frac
+    ))
+    
+    print('choose 10 randomly:', len(params))
+
+    print('start MP')
+    # with concurrent.futures.ProcessPoolExecutor() as executor:
+        # n_optima_list = executor.map(
+        #     lambda x: vis_landscape_heatmap_multi_p_and_count_optima(*x), params, chunksize=16)
+    # for param in params:
+    #     future = executor.submit(
+    #         # CS_and_one_landscape_and_cnt_optima_and_mitiq_and_one_variable,
+    #         # CS_and_one_landscape_and_cnt_optima_and_mitiq_and_one_variable_and_sampling_frac,
+    #         one_D_CS_p1_recon_task,
+    #         *param
+    #     )
+    #     print(future.result())
+
+    one_D_CS_p1_recon_task(*params[0])
+        
+    return [], []
+

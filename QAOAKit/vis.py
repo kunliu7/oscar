@@ -875,9 +875,6 @@ def vis_multi_landscapes_and_count_optima_and_mitiq_MP_and_one_variable(
         os.makedirs(figdir)
 
     params = []
-            # figpath = f'{figdir}/var_indice={var1_idx},{var2_idx}.png'
-            # n_optima = vis_landscape_heatmap_multi_p_and_count_optima(
-            # vis_landscape_heatmap_multi_p(
     for i in range(2*p):
         params.append((
             G.copy(),
@@ -890,11 +887,7 @@ def vis_multi_landscapes_and_count_optima_and_mitiq_MP_and_one_variable(
             params_path.copy(),
             C_opt
         ))
-            # n_optima_list.append(n_optima)
-            # print(f"fig saved at {figpath}")
     
-    # params = sample(params, min(10, len(params)))
-
     print('choose 10 randomly:', len(params))
 
     print('start MP')
@@ -908,18 +901,5 @@ def vis_multi_landscapes_and_count_optima_and_mitiq_MP_and_one_variable(
         )
         # print(future.result())
         
-    # futures = [executor.submit(vis_one_landscape_and_count_optima_and_mitiq_and_one_variable, *param) for param in params]
-    # concurrent.futures.wait(futures)
-        # for future in concurrent.futures.as_completed(futures):
-        #     print(future.result())
-
-    # print(futures)
-    # miti_n_opt_list = []
-    # unmiti_n_opt_list = []
-    # for f in futures:
-    #     miti_n_opt_list.append(f.result()[0])
-    #     unmiti_n_opt_list.append(f.result()[1])
-    # print(n_optima_list)
-
-    # return miti_n_opt_list, unmiti_n_opt_list
     return [], []
+
