@@ -187,7 +187,7 @@ def _vis_miti_and_unmiti_recon(
     fig.savefig(save_path)
     plt.close('all')
 
-    
+
 
 
 def CS_and_one_landscape_and_cnt_optima_and_mitiq_and_one_variable(
@@ -838,6 +838,7 @@ def one_D_CS_p1_recon_task(
     print(len(params))
 
     start_time = time.time()
+    print("start time: ", time.localtime())
     with concurrent.futures.ProcessPoolExecutor() as executor:
         # future = executor.submit(
         #     _one_D_CS_p1_recon_for_one_point,
@@ -846,6 +847,7 @@ def one_D_CS_p1_recon_task(
         futures = executor.map(
             _one_D_CS_p1_recon_for_one_point_mapper, params
         )
+    print("end time: ", time.localtime())
     end_time = time.time()
 
     print(f"full landscape time usage: {end_time - start_time} s")
