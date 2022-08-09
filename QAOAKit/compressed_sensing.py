@@ -31,6 +31,7 @@ from sympy import beta, per
 
 from .qaoa import get_maxcut_qaoa_circuit
 from .utils import (
+    get_curr_formatted_timestamp,
     noisy_qaoa_maxcut_energy,
     angles_from_qiskit_format,
     maxcut_obj,
@@ -650,6 +651,7 @@ def _vis_one_D_p1_recon(
         idx += 1
 
     fig.colorbar(im, ax=[axs[i] for i in range(6)])
+    # plt.title(title)
     # plt.subtitle(title)
     fig.savefig(save_path)
     plt.close('all')
@@ -695,7 +697,82 @@ def _one_D_CS_p1_recon_for_one_point_mapper(param):
     return _one_D_CS_p1_recon_for_one_point(*param)
 
 
-def one_D_CS_p1_recon_task(
+def one_D_CS_p1_recon_with_given_landscapes_and_varing_sampling_frac(
+        figdir: str,
+        origin: dict,
+        # bounds: dict,
+        full_range: dict,
+        n_pts: dict,
+        # n_samples: dict,
+        # beta_opt: np.array, # converted
+        # gamma_opt: np.array, # converted
+        # noise_model: NoiseModel,
+        # params_path: list,
+        # C_opt: float,
+        sampling_frac: float,
+        alpha: float
+    ):
+    # ! Convention: First beta, Last gamma
+    
+    # hyper parameters
+    # alpha = 0.1
+    # n_pts_per_unit = 36     # num. of original points per unit == 4096, i.e. resolution rate = 1 / n
+    
+    # beta first, gamma later
+    # bounds = {'beta': [-np.pi/4, np.pi/4],
+    #           'gamma': [-np.pi, np.pi]}
+
+    n_samples = {}
+    for label, _ in n_pts.items():
+        n_samples[label] = np.ceil(n_pts[label] * sampling_frac).astype(int)
+    
+    # print('bounds: ', bounds)
+    print('n_pts: ', n_pts)
+    print('n_samples: ', n_samples)
+    print('alpha: ', alpha)
+    # print('n_pts_per_unit: ', n_pts_per_unit)
+    # sample P points from N randomly
+
+    # mitis = []
+    # unmitis = []
+    # ideals = []
+
+    _LABELS = ['mitis', 'unmitis', 'ideals']
+
+    # x = np.cos(2 * 97 * np.pi * full_range) + np.cos(2 * 777 * np.pi * full_range)
+    # x = np.cos(2 * np.pi * full_range) # + np.cos(2 * np.pi * full_range)
+    
+    print('start: solve l1 norm')
+    recon = {label: [] for label in _LABELS}
+    for idx_gamma, _ in enumerate(full_range['gamma']):
+        Psi = dct(np.identity(n_pts['beta']))
+        perm = np.floor(np.random.rand(n_samples['beta']) * n_pts['beta']).astype(int)
+
+        ideals_recon = recon_by_Lasso(Psi[perm, :], origin['ideals'][idx_gamma, perm], alpha)
+        unmitis_recon = recon_by_Lasso(Psi[perm, :], origin['unmitis'][idx_gamma, perm], alpha)
+        mitis_recon = recon_by_Lasso(Psi[perm, :], origin['mitis'][idx_gamma, perm], alpha)
+
+        recon['ideals'].append(ideals_recon.copy())
+        recon['unmitis'].append(unmitis_recon.copy())
+        recon['mitis'].append(mitis_recon.copy())
+
+
+    for label, arr in recon.items():
+        recon[label] = np.array(arr)
+
+    if figdir:
+        _vis_one_D_p1_recon(
+            origin_dict=origin,
+            recon_dict=recon,
+            title='test',
+            save_path=f'{figdir}/origin_and_recon_sf{sampling_frac:.3f}_alpha{alpha:.3f}.png'
+        )
+
+    print('end: solve l1 norm')
+    return recon
+
+
+def one_D_CS_p1_generate_landscape_task(
         G: nx.Graph,
         p: int,
         figdir: str,
@@ -703,31 +780,30 @@ def one_D_CS_p1_recon_task(
         gamma_opt: np.array, # converted
         noise_model: NoiseModel,
         params_path: list,
-        C_opt: float,
-        sampling_frac: float
+        C_opt: float
     ):
     # ! Convention: First beta, Last gamma
     
     # hyper parameters
-    alpha = 0.1
-    n_shots = 2048
-    n_pts_per_unit = 36     # num. of original points per unit == 4096, i.e. resolution rate = 1 / n
+    # alpha = 0.1
+    n_shots = 1
+    n_pts_per_unit = 8     # num. of original points per unit == 4096, i.e. resolution rate = 1 / n
     
     # beta first, gamma later
     bounds = {'beta': [-np.pi/4, np.pi/4],
               'gamma': [-np.pi, np.pi]}
 
     n_pts = {}
-    n_samples = {}
+    # n_samples = {}
     for label, bound in bounds.items():
         bound_len = bound[1] - bound[0]
         n_pts[label] = np.floor(n_pts_per_unit * bound_len).astype(int)
-        n_samples[label] = np.ceil(n_pts_per_unit * bound_len * sampling_frac).astype(int)
+        # n_samples[label] = np.ceil(n_pts_per_unit * bound_len * sampling_frac).astype(int)
     
     print('bounds: ', bounds)
     print('n_pts: ', n_pts)
-    print('n_samples: ', n_samples)
-    print('alpha: ', alpha)
+    # print('n_samples: ', n_samples)
+    # print('alpha: ', alpha)
     print('n_pts_per_unit: ', n_pts_per_unit)
     # sample P points from N randomly
 
@@ -805,7 +881,7 @@ def one_D_CS_p1_recon_task(
     print(len(params))
 
     start_time = time.time()
-    print("start time: ", time.localtime())
+    print("start time: ", get_curr_formatted_timestamp())
     with concurrent.futures.ProcessPoolExecutor() as executor:
         # future = executor.submit(
         #     _one_D_CS_p1_recon_for_one_point,
@@ -814,7 +890,7 @@ def one_D_CS_p1_recon_task(
         futures = executor.map(
             _one_D_CS_p1_recon_for_one_point_mapper, params
         )
-    print("end time: ", time.localtime())
+    print("end time: ", get_curr_formatted_timestamp())
     end_time = time.time()
 
     print(f"full landscape time usage: {end_time - start_time} s")
@@ -831,39 +907,43 @@ def one_D_CS_p1_recon_task(
     # x = np.cos(2 * 97 * np.pi * full_range) + np.cos(2 * 777 * np.pi * full_range)
     # x = np.cos(2 * np.pi * full_range) # + np.cos(2 * np.pi * full_range)
     
-    print('start: solve l1 norm')
-    recon = {label: [] for label in _LABELS}
-    for idx_gamma, _ in enumerate(full_range['gamma']):
-        Psi = dct(np.identity(n_pts['beta']))
-        perm = np.floor(np.random.rand(n_samples['beta']) * n_pts['beta']).astype(int)
+    # print('start: solve l1 norm')
+    # recon = {label: [] for label in _LABELS}
+    # for idx_gamma, _ in enumerate(full_range['gamma']):
+    #     Psi = dct(np.identity(n_pts['beta']))
+    #     perm = np.floor(np.random.rand(n_samples['beta']) * n_pts['beta']).astype(int)
 
-        ideals_recon = recon_by_Lasso(Psi[perm, :], origin['ideals'][idx_gamma, perm], alpha)
-        unmitis_recon = recon_by_Lasso(Psi[perm, :], origin['unmitis'][idx_gamma, perm], alpha)
-        mitis_recon = recon_by_Lasso(Psi[perm, :], origin['mitis'][idx_gamma, perm], alpha)
+    #     ideals_recon = recon_by_Lasso(Psi[perm, :], origin['ideals'][idx_gamma, perm], alpha)
+    #     unmitis_recon = recon_by_Lasso(Psi[perm, :], origin['unmitis'][idx_gamma, perm], alpha)
+    #     mitis_recon = recon_by_Lasso(Psi[perm, :], origin['mitis'][idx_gamma, perm], alpha)
 
-        recon['ideals'].append(ideals_recon.copy())
-        recon['unmitis'].append(unmitis_recon.copy())
-        recon['mitis'].append(mitis_recon.copy())
+    #     recon['ideals'].append(ideals_recon.copy())
+    #     recon['unmitis'].append(unmitis_recon.copy())
+    #     recon['mitis'].append(mitis_recon.copy())
 
-    _vis_one_D_p1_recon(
-        origin_dict=origin,
-        recon_dict=recon,
-        title='test',
-        save_path=f'{figdir}/origin_recon.png'
-    )
+    # _vis_one_D_p1_recon(
+    #     origin_dict=origin,
+    #     recon_dict=recon,
+    #     title='test',
+    #     save_path=f'{figdir}/origin_recon.png'
+    # )
 
     np.savez_compressed(f"{figdir}/data",
 
         # reconstruct
         origin=origin,
-        recon=recon,
+        # recon=recon,
         # mitis=mitis, unmitis=unmitis, ideals=ideals,
         # unmitis_recon=unmitis_recon, mitis_recon=mitis_recon, ideals_recon=ideals_recon,
 
         # parameters
-        n_pts=n_pts, n_samples=n_samples, sampling_frac=sampling_frac,
+        n_pts=n_pts,
+        # n_samples=n_samples, sampling_frac=sampling_frac,
         # perm=perm,
         full_range=full_range,
+        bounds=bounds,
+        n_shots=n_shots,
+        n_pts_per_unit=n_pts_per_unit,
 
         # n_optima
         # improved_n_optima=improved_n_optima,
@@ -957,7 +1037,7 @@ def one_D_CS_p1_recon_task(
     return
 
 
-def one_D_CS_p1_recon(
+def one_D_CS_p1_generate_landscape(
         G: nx.Graph, 
         p: int,
         figdir: str,
@@ -965,9 +1045,7 @@ def one_D_CS_p1_recon(
         gamma_opt: np.ndarray, # converted
         noise_model: NoiseModel,
         params_path: list,
-        C_opt: float,
-        executor: concurrent.futures.ProcessPoolExecutor,
-        sampling_frac: float
+        C_opt: float
     ):
 
     if not os.path.exists(figdir):
@@ -982,13 +1060,12 @@ def one_D_CS_p1_recon(
         gamma_opt.copy(),
         noise_model.copy() if noise_model else None,
         params_path.copy(),
-        C_opt,
-        sampling_frac
+        C_opt
     ))
     
-    print('choose 10 randomly:', len(params))
+    # print('choose 10 randomly:', len(params))
 
-    print('start MP')
+    # print('start MP')
     # with concurrent.futures.ProcessPoolExecutor() as executor:
         # n_optima_list = executor.map(
         #     lambda x: vis_landscape_heatmap_multi_p_and_count_optima(*x), params, chunksize=16)
@@ -1001,7 +1078,16 @@ def one_D_CS_p1_recon(
     #     )
     #     print(future.result())
 
-    one_D_CS_p1_recon_task(*params[0])
+    one_D_CS_p1_generate_landscape_task(*params[0])
         
     return [], []
 
+
+# ============================ two D CS ====================
+
+
+
+def two_D_CS_p1_recon_with_given_landscapes(
+
+):
+    pass

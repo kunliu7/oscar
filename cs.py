@@ -116,7 +116,8 @@ from QAOAKit.parameter_optimization import get_median_pre_trained_kde
 from QAOAKit.compressed_sensing import (
     CS_and_one_landscape_and_cnt_optima_and_mitiq_and_one_variable,
     multi_landscapes_and_cnt_optima_and_mitiq_and_MP_and_one_variable_and_CS,
-    one_D_CS_p1_recon
+    one_D_CS_p1_generate_landscape,
+    one_D_CS_p1_recon_with_given_landscapes_and_varing_sampling_frac
 )
 
 
@@ -126,7 +127,7 @@ from qiskit.algorithms.minimum_eigen_solvers.qaoa import QAOAAnsatz
 test_utils_folder = Path(__file__).parent
 
 
-def one_D_CS_p1_recon_top():
+def one_D_CS_p1_generate_landscapes():
     """Count optima for regular 3 graphs with p>=3.
 
     In QAOAKit (or more specifically, https://github.com/danlkv/fixed-angle-QAOA),
@@ -151,86 +152,82 @@ def one_D_CS_p1_recon_top():
     print("use fixed angles to calculate n_optima")
     signature = get_curr_formatted_timestamp()
     # with concurrent.futures.ProcessPoolExecutor() as executor:
-    for sf in np.arange(0.05, 0.3, 0.03):
-        for n_qubits in range(8, 9, 2): # [1, 16]
-        # for n_qubits in range(4, 5): # [1, 16]
-            for p in range(1, 2): # [1, 11]
-                start_time = time.time()
-                df = reg3_dataset_table.reset_index()
-                df = df[(df["n"] == n_qubits) & (df["p_max"] == p)]
-                df = df.iloc[0: 1]
-                # df = df.iloc[0: MAX_NUM_GRAPHS_PER_NUM_QUBITS]
-                # df = df.iloc[MAX_NUM_GRAPHS_PER_NUM_QUBITS:2*MAX_NUM_GRAPHS_PER_NUM_QUBITS]
+    for n_qubits in range(8, 9, 2): # [1, 16]
+    # for n_qubits in range(4, 5): # [1, 16]
+        for p in range(1, 2): # [1, 11]
+            start_time = time.time()
+            df = reg3_dataset_table.reset_index()
+            df = df[(df["n"] == n_qubits) & (df["p_max"] == p)]
+            df = df.iloc[0: 1]
+            # df = df.iloc[0: MAX_NUM_GRAPHS_PER_NUM_QUBITS]
+            # df = df.iloc[MAX_NUM_GRAPHS_PER_NUM_QUBITS:2*MAX_NUM_GRAPHS_PER_NUM_QUBITS]
+            
+            print(f"n_qubits={n_qubits}")
+            print(f"num of graphs: {len(df)}")
+            print(f"p={p}")
+            for row_id, row in df.iterrows():
                 
-                print(f"n_qubits={n_qubits}")
-                print(f"num of graphs: {len(df)}")
-                print(f"p={p}")
-                print(f"sampling frac={sf}")
-                for row_id, row in df.iterrows():
-                    
-                    print(f"handling {row_id}")
-                    angles = angles_to_qaoa_format(get_fixed_angles(d=3, p=p))
+                print(f"handling {row_id}")
+                angles = angles_to_qaoa_format(get_fixed_angles(d=3, p=p))
 
-                    # print(row["beta"])
-                    # print(row["gamma"])
-                    # print(angles)
-                    # print(row["p_max"])
-                    # print(row["C_opt"], row["C_{true opt}"], row["C_fixed"])
+                # print(row["beta"])
+                # print(row["gamma"])
+                # print(angles)
+                # print(row["p_max"])
+                # print(row["C_opt"], row["C_{true opt}"], row["C_fixed"])
 
-                    C_opt = row["C_fixed"]
-                    print("C_fixed", C_opt)
-                    G = row["G"]
+                C_opt = row["C_fixed"]
+                print("C_fixed", C_opt)
+                G = row["G"]
 
-                    figdir = f'figs/cnt_opt_miti/{signature}/G{row_id}_nQ{n_qubits}_p{p}_sf{sf:.3f}'
-                    
-                    if not os.path.exists(figdir):
-                        os.makedirs(figdir)
+                figdir = f'figs/cnt_opt_miti/{signature}/G{row_id}_nQ{n_qubits}_p{p}'
+                
+                if not os.path.exists(figdir):
+                    os.makedirs(figdir)
 
-                    nx.draw_networkx(G)
-                    plt.title(f"")
-                    plt.savefig(f"{figdir}/G{row_id}.png")
-                    plt.cla()
+                nx.draw_networkx(G)
+                plt.title(f"")
+                plt.savefig(f"{figdir}/G{row_id}.png")
+                plt.cla()
 
-                    # n_optima_list = vis_landscape_multi_p_and_and_count_optima(
-                    miti_n_opt_list, unmiti_n_opt_list = \
-                        one_D_CS_p1_recon(
-                        # multi_landscapes_and_cnt_optima_and_mitiq_and_MP_and_one_variable_and_CS(
-                    # miti_n_opt_list, unmiti_n_opt_list = vis_multi_landscapes_and_count_optima_and_mitiq_MP_and_one_variable(
-                            G=G,
-                            p=p,
-                            figdir=figdir, 
-                            # beta_opt=beta_to_qaoa_format(angles["beta"]),
-                            # gamma_opt=gamma_to_qaoa_format(angles["gamma"]),
-                            beta_opt=angles["beta"],
-                            gamma_opt=angles["gamma"],
-                            noise_model=None,
-                            params_path=[],
-                            C_opt=C_opt,
-                            executor=None,
-                            sampling_frac=sf
-                    )
+                # n_optima_list = vis_landscape_multi_p_and_and_count_optima(
+                miti_n_opt_list, unmiti_n_opt_list = \
+                    one_D_CS_p1_generate_landscape(
+                    # multi_landscapes_and_cnt_optima_and_mitiq_and_MP_and_one_variable_and_CS(
+                # miti_n_opt_list, unmiti_n_opt_list = vis_multi_landscapes_and_count_optima_and_mitiq_MP_and_one_variable(
+                        G=G,
+                        p=p,
+                        figdir=figdir, 
+                        # beta_opt=beta_to_qaoa_format(angles["beta"]),
+                        # gamma_opt=gamma_to_qaoa_format(angles["gamma"]),
+                        beta_opt=angles["beta"],
+                        gamma_opt=angles["gamma"],
+                        noise_model=None,
+                        params_path=[],
+                        C_opt=C_opt
+                )
 
-                    print('miti_n_opt_list', miti_n_opt_list)
-                    print('unmiti_n_opt_list', unmiti_n_opt_list)
+                print('miti_n_opt_list', miti_n_opt_list)
+                print('unmiti_n_opt_list', unmiti_n_opt_list)
 
-                    # count_rst_df = count_rst_df.append({
-                    #     'row_id': row_id,
-                    #     'G': G,
-                    #     'pynauty_cert': row['pynauty_cert'],
-                    #     'n_qubits': n_qubits,
-                    #     'p': p,
-                    #     'miti_n_opt_list': miti_n_opt_list,
-                    #     'unmiti_n_opt_list': unmiti_n_opt_list,
-                    #     'has_opt': False,
-                    #     'C_opt': C_opt,
-                    # }, ignore_index=True)
+                # count_rst_df = count_rst_df.append({
+                #     'row_id': row_id,
+                #     'G': G,
+                #     'pynauty_cert': row['pynauty_cert'],
+                #     'n_qubits': n_qubits,
+                #     'p': p,
+                #     'miti_n_opt_list': miti_n_opt_list,
+                #     'unmiti_n_opt_list': unmiti_n_opt_list,
+                #     'has_opt': False,
+                #     'C_opt': C_opt,
+                # }, ignore_index=True)
 
-                    # print(count_rst_df)
-                    # count_rst_df.to_pickle(f"cnt_opt_miti_df/{signature}_cnt_opt_fixed_angles.p")
-                    print(" ================ ")
+                # print(count_rst_df)
+                # count_rst_df.to_pickle(f"cnt_opt_miti_df/{signature}_cnt_opt_fixed_angles.p")
+                print(" ================ ")
 
-                end_time = time.time()
-                print(f"for p={p}, nQ={n_qubits}, it takes {end_time-start_time} s")
+            end_time = time.time()
+            print(f"for p={p}, nQ={n_qubits}, it takes {end_time-start_time} s")
 
     return
 
@@ -447,6 +444,21 @@ def count_optima_of_fixed_angles_3reg_graphs_one_variable_CS():
     return
 
 
+def one_D_CS_p1_recon_with_given_landscapes():
+    data_dir = "figs/cnt_opt_miti/2022-08-08_19:48:31"
+    data = np.load(f"{data_dir}/data.npz", allow_pickle=True)
+
+    for sf in np.arange(0.05, 0.5, 0.03):
+        recon = one_D_CS_p1_recon_with_given_landscapes_and_varing_sampling_frac(
+            figdir=data_dir,
+            origin=data['origin'].tolist(),
+            full_range=data['full_range'].tolist(),
+            n_pts=data['n_pts'].tolist(),
+            sampling_frac=sf,
+            alpha=0.1
+        )
+
+
 if __name__ == "__main__":
     # test_qiskit_qaoa_circuit()
     # test_noisy_qaoa_maxcut_energy()
@@ -460,4 +472,5 @@ if __name__ == "__main__":
     # count_optima_of_fixed_angles_3reg_graphs()
     # count_optima_of_fixed_angles_3reg_graphs_one_variable_CS()
     # count_optima_of_fixed_angles_3reg_graphs_one_variable_CS_sampling_frac()
-    one_D_CS_p1_recon_top()
+    one_D_CS_p1_generate_landscapes()
+    # one_D_CS_p1_recon_with_given_landscapes()
