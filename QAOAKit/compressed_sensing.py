@@ -1,6 +1,8 @@
+from re import L
 import time
 import networkx as nx
 import numpy as np
+import cvxpy as cvx
 import pandas as pd
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, execute
 from qiskit import Aer
@@ -47,6 +49,11 @@ from .noisy_params_optim import (
 import numpy as np
 import matplotlib.pyplot as plt
 from random import sample
+
+# qiskit Landscape optimizer
+from qiskit.algorithms.optimizers import (
+    Optimizer, OptimizerResult
+)
 
 
 def cosamp(phi, u, s, epsilon=1e-10, max_iter=1000):
@@ -109,6 +116,17 @@ def recon_by_Lasso(Theta, y, alpha):
     # Creates the fourier transform that will most minimize l1 norm 
     recons = idct(lasso.coef_.reshape((n, 1)), axis=0)
     return recons + lasso.intercept_
+
+
+def recon_1D_by_cvxpy(A, b):
+    vx = cvx.Variable(A.shape[1])
+    objective = cvx.Minimize(cvx.norm(vx, 1))
+    constraints = [A*vx == b]
+    prob = cvx.Problem(objective, constraints)
+    result = prob.solve(verbose=True)
+    Xat = np.array(vx.value).squeeze()
+    Xa = idct(Xat)
+    return Xa
 
 
 def recon_by_CoSaMP(y, Psi, perm, sparsity):
@@ -748,9 +766,13 @@ def one_D_CS_p1_recon_with_given_landscapes_and_varing_sampling_frac(
         Psi = dct(np.identity(n_pts['beta']))
         perm = np.floor(np.random.rand(n_samples['beta']) * n_pts['beta']).astype(int)
 
-        ideals_recon = recon_by_Lasso(Psi[perm, :], origin['ideals'][idx_gamma, perm], alpha)
-        unmitis_recon = recon_by_Lasso(Psi[perm, :], origin['unmitis'][idx_gamma, perm], alpha)
-        mitis_recon = recon_by_Lasso(Psi[perm, :], origin['mitis'][idx_gamma, perm], alpha)
+        # ideals_recon = recon_by_Lasso(Psi[perm, :], origin['ideals'][idx_gamma, perm], alpha)
+        # unmitis_recon = recon_by_Lasso(Psi[perm, :], origin['unmitis'][idx_gamma, perm], alpha)
+        # mitis_recon = recon_by_Lasso(Psi[perm, :], origin['mitis'][idx_gamma, perm], alpha)
+        
+        ideals_recon = recon_1D_by_cvxpy(Psi[perm, :], origin['ideals'][idx_gamma, perm])
+        unmitis_recon = recon_1D_by_cvxpy(Psi[perm, :], origin['unmitis'][idx_gamma, perm])
+        mitis_recon = recon_1D_by_cvxpy(Psi[perm, :], origin['mitis'][idx_gamma, perm])
 
         recon['ideals'].append(ideals_recon.copy())
         recon['unmitis'].append(unmitis_recon.copy())
@@ -786,8 +808,8 @@ def one_D_CS_p1_generate_landscape_task(
     
     # hyper parameters
     # alpha = 0.1
-    n_shots = 1
-    n_pts_per_unit = 8     # num. of original points per unit == 4096, i.e. resolution rate = 1 / n
+    n_shots = 2048
+    n_pts_per_unit = 36     # num. of original points per unit == 4096, i.e. resolution rate = 1 / n
     
     # beta first, gamma later
     bounds = {'beta': [-np.pi/4, np.pi/4],
@@ -1084,10 +1106,225 @@ def one_D_CS_p1_generate_landscape(
 
 
 # ============================ two D CS ====================
+# tutorial: http://www.pyrunner.com/weblog/2016/05/26/compressed-sensing-python/
 
+def dct2(x):
+    return dct(dct(x.T, norm='ortho', axis=0).T, norm='ortho', axis=0)
+
+def idct2(x):
+    return idct(idct(x.T, norm='ortho', axis=0).T, norm='ortho', axis=0)
+
+
+def recon_2D_by_cvxpy(nx, ny, A, b):
+    # do L1 optimization
+    vx = cvx.Variable(nx * ny)
+    objective = cvx.Minimize(cvx.norm(vx, 1))
+    # b = b.reshape(-1)
+    constraints = [A*vx == b]
+    prob = cvx.Problem(objective, constraints)
+    result = prob.solve(verbose=True)
+    Xat2 = np.array(vx.value).squeeze()
+
+    # reconstruct signal
+    Xat = Xat2.reshape(nx, ny).T # stack columns
+    Xa = idct2(Xat)
+
+    # # confirm solution
+    # if not np.allclose(X.T.flat[ri], Xa.T.flat[ri]):
+    #     print('Warning: values at sample indices don\'t match original.')
+
+    # # create images of mask (for visualization)
+
+    # X_max = np.max(X)
+    # mask = np.zeros(X.shape)
+    # mask.T.flat[ri] = X_max
+    # Xm = X_max * np.ones(X.shape)
+    # Xm.T.flat[ri] = X.T.flat[ri]
+
+    # if fig_dir:
+    #     # plt.rc('font', size=20)
+    #     fig, axs = plt.subplots(nrows=1, ncols=3, figsize=(10, 8))
+    #     # fig, axs = plt.subplots(1, 4)
+    #     axs = axs.reshape(-1)
+    #     axs[0].imshow(X.T)
+    #     # axs[1].imshow(mask.T)
+    #     axs[1].imshow(Xa.T)
+    #     im = axs[2].imshow(Xm.T)
+
+    #     fig.colorbar(im, ax=[axs[i] for i in range(3)])
+    #     plt.show()
+
+    return Xa
+
+
+def recon_2D_by_cvxpy_bak(X, sampling_frac: float, fig_dir: str):
+    assert len(X.shape) == 2
+    ny, nx = X.shape
+
+    # extract small sample of signal
+    k = round(nx * ny * sampling_frac)
+    ri = np.random.choice(nx * ny, k, replace=False) # random sample of indices
+    b = X.T.flat[ri]
+    # b = np.expand_dims(b, axis=1)
+
+    # create dct matrix operator using kron (memory errors for large ny*nx)
+    A = np.kron(
+        idct(np.identity(nx), norm='ortho', axis=0),
+        idct(np.identity(ny), norm='ortho', axis=0)
+        )
+    A = A[ri,:] # same as phi times kron
+
+    # vx = recon_by_Lasso(A, b, 0.1)
+    # Xat2 = vx
+
+    # do L1 optimization
+    vx = cvx.Variable(nx * ny)
+    objective = cvx.Minimize(cvx.norm(vx, 1))
+    # b = b.reshape(-1)
+    constraints = [A*vx == b]
+    prob = cvx.Problem(objective, constraints)
+    result = prob.solve(verbose=True)
+    Xat2 = np.array(vx.value).squeeze()
+
+    # reconstruct signal
+    Xat = Xat2.reshape(nx, ny).T # stack columns
+    Xa = idct2(Xat)
+
+    # confirm solution
+    if not np.allclose(X.T.flat[ri], Xa.T.flat[ri]):
+        print('Warning: values at sample indices don\'t match original.')
+
+    # create images of mask (for visualization)
+
+    X_max = np.max(X)
+    mask = np.zeros(X.shape)
+    mask.T.flat[ri] = X_max
+    Xm = X_max * np.ones(X.shape)
+    Xm.T.flat[ri] = X.T.flat[ri]
+
+    if fig_dir:
+        # plt.rc('font', size=20)
+        fig, axs = plt.subplots(nrows=1, ncols=3, figsize=(10, 8))
+        # fig, axs = plt.subplots(1, 4)
+        axs = axs.reshape(-1)
+        axs[0].imshow(X.T)
+        # axs[1].imshow(mask.T)
+        axs[1].imshow(Xa.T)
+        im = axs[2].imshow(Xm.T)
+
+        fig.colorbar(im, ax=[axs[i] for i in range(3)])
+        plt.show()
+
+    return Xa
+
+
+class LandscapeOptimizer(Optimizer):
+    def __init__(self) -> None:
+        pass
+        
+
+    def step(self, ):
+        pass
+
+
+def p1_optimize_on_stored_landscape(x):
+    params_path = []
+
+
+    pass
 
 
 def two_D_CS_p1_recon_with_given_landscapes(
-
+    figdir: str,
+    origin: dict,
+    # full_range: dict,
+    # n_pts: dict,
+    sampling_frac: float
 ):
-    pass
+    # ! Convention: First beta, Last gamma
+    
+    # hyper parameters
+    # alpha = 0.1
+    # n_pts_per_unit = 36     # num. of original points per unit == 4096, i.e. resolution rate = 1 / n
+    
+    # beta first, gamma later
+    # bounds = {'beta': [-np.pi/4, np.pi/4],
+    #           'gamma': [-np.pi, np.pi]}
+
+    # n_samples = {}
+    # for label, _ in n_pts.items():
+    #     n_samples[label] = np.ceil(n_pts[label] * sampling_frac).astype(int)
+    
+    # print('bounds: ', bounds)
+    # print('n_pts: ', n_pts)
+    # print('n_samples: ', n_samples)
+    # print('alpha: ', alpha)
+    # print('n_pts_per_unit: ', n_pts_per_unit)
+    # sample P points from N randomly
+
+    # mitis = []
+    # unmitis = []
+    # ideals = []
+
+    _LABELS = ['mitis', 'unmitis', 'ideals']
+
+    # x = np.cos(2 * 97 * np.pi * full_range) + np.cos(2 * 777 * np.pi * full_range)
+    # x = np.cos(2 * np.pi * full_range) # + np.cos(2 * np.pi * full_range)
+    
+    print('start: solve l1 norm')
+    recon = {label: [] for label in _LABELS}
+    
+    # for idx_gamma, _ in enumerate(full_range['gamma']):
+    #     Psi = dct(np.identity(n_pts['beta']))
+    #     perm = np.floor(np.random.rand(n_samples['beta']) * n_pts['beta']).astype(int)
+
+    #     ideals_recon = recon_by_Lasso(Psi[perm, :], origin['ideals'][idx_gamma, perm], alpha)
+    #     unmitis_recon = recon_by_Lasso(Psi[perm, :], origin['unmitis'][idx_gamma, perm], alpha)
+    #     mitis_recon = recon_by_Lasso(Psi[perm, :], origin['mitis'][idx_gamma, perm], alpha)
+
+    #     recon['ideals'].append(ideals_recon.copy())
+    #     recon['unmitis'].append(unmitis_recon.copy())
+    #     recon['mitis'].append(mitis_recon.copy())
+
+    # for label, arr in recon.items():
+    #     recon[label] = np.array(arr)
+    
+    # for label in _LABELS:
+        # X = origin[label]
+    ny, nx = origin['ideals'].shape
+
+    # extract small sample of signal
+    k = round(nx * ny * sampling_frac)
+    ri = np.random.choice(nx * ny, k, replace=False) # random sample of indices
+    # b = np.expand_dims(b, axis=1)
+
+    # create dct matrix operator using kron (memory errors for large ny*nx)
+    A = np.kron(
+        idct(np.identity(nx), norm='ortho', axis=0),
+        idct(np.identity(ny), norm='ortho', axis=0)
+        )
+    A = A[ri,:] # same as phi times kron
+
+    # b = X.T.flat[ri]
+    for label in _LABELS:
+        recon[label] = recon_2D_by_cvxpy(nx, ny, A, origin[label].T.flat[ri])
+        # recon[label] = recon_by_Lasso()
+
+    # ideals_recon = recon_2D_by_cvxpy(nx, ny, A, origin['ideals'].T.flat[ri])
+    # unmitis_recon = recon_2D_by_cvxpy(nx, ny, A, origin['unmitis'].T.flat[ri])
+    # mitis_recon = recon_2D_by_cvxpy(nx, ny, A, origin['mitis'].T.flat[ri])
+
+    # recon['ideals'] = ideals_recon
+    # recon['unmitis'] = unmitis_recon
+    # recon['mitis'] = mitis_recon
+
+    if figdir:
+        _vis_one_D_p1_recon(
+            origin_dict=origin,
+            recon_dict=recon,
+            title='test',
+            save_path=f'{figdir}/origin_and_2D_recon_sf{sampling_frac:.3f}.png'
+        )
+
+    print('end: solve l1 norm')
+    return recon
