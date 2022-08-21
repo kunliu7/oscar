@@ -1,6 +1,7 @@
 from re import L
 import re
 import time
+from turtle import left, right
 from typing import Callable, List, Optional, Tuple
 import networkx as nx
 import numpy as np
@@ -644,7 +645,9 @@ def _vis_one_D_p1_recon(
         # gamma_range,
         # beta_range,
         # C_opt, bound, var_opt,
-        # full_range,
+        bounds,
+        full_range,
+        true_optima,
         # mitis_recon,
         # unmitis_recon,
         # ideal_recon,
@@ -660,20 +663,45 @@ def _vis_one_D_p1_recon(
     fig, axs = plt.subplots(nrows=2, ncols=3, figsize=(30, 30))
     axs = axs.reshape(-1)
 
+    # TODO Check ij and xy
+    X, Y = np.meshgrid(full_range['beta'], full_range['gamma'])
+
+    # c = ax.pcolormesh(X, Y, Z, cmap='viridis', vmin=Z.min(), vmax=Z.max())
     idx = 0
     for label, origin in origin_dict.items():
         recon = recon_dict[label]
         # axs[idx]
-        # X, Y = np.meshgrid(var1_range, var2_range) # , indexing='ij')
         # Z = np.array(Z).T
         # c = axs[idx].pcolormesh(X, Y, Z, cmap='viridis', vmin=Z.min(), vmax=Z.max())
         
-        im = axs[idx].imshow(origin)
-        axs[idx].set_title(f"origin, {label}", )
+        # im = axs[idx].imshow(origin)
+        im = axs[idx].pcolormesh(X, Y, origin) #, cmap='viridis', vmin=origin.min(), vmax=origin.max())
+        axs[idx].set_title(f"origin, {label}")
+        axs[idx].plot(true_optima[1], true_optima[0], marker="o", color='red', markersize=7, label="true optima")
+        # axs[idx].set_xlim(bottom=full_range['beta'][0], top=full_range['beta'][-1])
+        # axs[idx].set_xlim(left=bounds['beta'][0], right=bounds['beta'][1])
+        # axs[idx].set_ylim(bottom=bounds['gamma'][0], top=bounds['gamma'][1])
 
-        im = axs[idx + 3].imshow(recon)
+        # im = axs[idx + 3].imshow(recon)
+        im = axs[idx + 3].pcolormesh(X, Y, recon)
         axs[idx + 3].set_title(f"recon, {label}")
+        axs[idx + 3].plot(true_optima[1], true_optima[0], marker="o", color='red', markersize=7, label="true optima")
+        # axs[idx + 3].set_xlim(left=bounds['beta'][0], right=bounds['beta'][1])
+        # axs[idx + 3].set_ylim(bottom=bounds['gamma'][0], top=bounds['gamma'][1])
 
+        # origin
+        if origin_params_path_dict and label in origin_params_path_dict:
+            xs = [] # beta
+            ys = [] # gamma
+            for param in origin_params_path_dict[label]:
+                xs.append(param[1])
+                ys.append(param[0])
+
+            axs[idx].plot(xs, ys, marker="o", color='purple', markersize=5, label="optimization path")
+            axs[idx].plot(xs[0], ys[0], marker="o", color='white', markersize=9, label="initial point")
+            axs[idx].plot(xs[-1], ys[-1], marker="s", color='white', markersize=7, label="last point")
+            
+        # recon
         if recon_params_path_dict and label in recon_params_path_dict:
             xs = [] # beta
             ys = [] # gamma
@@ -682,11 +710,12 @@ def _vis_one_D_p1_recon(
                 ys.append(param[0])
 
             axs[idx + 3].plot(xs, ys, marker="o", color='purple', markersize=5, label="optimization path")
-            axs[idx + 3].plot(xs[0], ys[0], marker="+", color='gray', markersize=7, label="initial point")
-            axs[idx + 3].plot(xs[-1], ys[-1], marker="s", color='black', markersize=5, label="last point")
+            axs[idx + 3].plot(xs[0], ys[0], marker="o", color='white', markersize=9, label="initial point")
+            axs[idx + 3].plot(xs[-1], ys[-1], marker="s", color='white', markersize=7, label="last point")
+        
         
         idx += 1
-
+    plt.legend()
     fig.colorbar(im, ax=[axs[i] for i in range(6)])
     # plt.title(title)
     # plt.subtitle(title)
@@ -1304,7 +1333,7 @@ def wrap_qiskit_optimizer_to_landscape_optimizer(QiskitOptimizer):
                 approximate_point = self.landscape[tuple(normalized_indices)]
 
                 # print(approximate_point)
-                self.params_path.append(x)
+                self.params_path.append(x) # Qiskit format
                 return approximate_point
                 
             # print(self.callback)

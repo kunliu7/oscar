@@ -1,3 +1,5 @@
+from cmath import isclose
+from locale import normalize
 import pickle
 import copy
 import pynauty
@@ -298,6 +300,13 @@ def angles_to_qaoa_format(angles):
     res = copy.deepcopy(angles)
     res["beta"] = beta_to_qaoa_format(res["beta"])
     res["gamma"] = gamma_to_qaoa_format(res["gamma"])
+    return res
+
+
+def angles_from_qaoa_format(gamma, beta):
+    res = {}
+    res["beta"] = beta / np.pi
+    res["gamma"] = gamma / np.pi
     return res
 
 
@@ -787,6 +796,30 @@ def shift_sector(values: np.ndarray, left: float, period: float):
                 b += period
         
         shifted[i] = b
+    return shifted
+
+
+def shift_parameters(x: np.ndarray, bounds: np.ndarray):
+    assert x.shape[0] == bounds.shape[0]
+
+    _x = x - bounds[:, 0]
+    shifted = _x.copy()
+    for axis, bound in enumerate(bounds):
+        bound_len = bound[1] - bound[0]
+        
+        relative = _x[axis]
+        if relative >= bound_len:
+            shifted[axis] = relative % bound_len
+        elif relative < 0:
+            shifted[axis] = relative + ((-relative) // bound_len + 1) * bound_len
+            if np.isclose(shifted[axis], bound_len):
+                shifted[axis] = 0.0
+
+        if shifted[axis] < 0 or shifted[axis] >= bound_len:
+            print(axis, bound_len, relative, shifted[axis])
+            assert False
+
+    shifted = shifted + bounds[:, 0]
     return shifted
 
 

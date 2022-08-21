@@ -88,6 +88,7 @@ from QAOAKit import (
 
 )
 from QAOAKit.utils import (
+    angles_from_qaoa_format,
     beta_shift_sector,
     gamma_shift_sector,
     get_curr_formatted_timestamp,
@@ -102,7 +103,8 @@ from QAOAKit.utils import (
     brute_force,
     get_pynauty_certificate,
     get_full_weighted_qaoa_dataset_table,
-    save_partial_qaoa_dataset_table
+    save_partial_qaoa_dataset_table,
+    shift_parameters
 )
 
 from QAOAKit.classical import thompson_parekh_marwaha
@@ -545,90 +547,108 @@ def optimize_on_p1_reconstructed_landscape():
     # # print(t[:10])
     # recon = np.sin(t).reshape(50, 50)
     # print(recon)
-    optimizer = wrap_qiskit_optimizer_to_landscape_optimizer(
-        SPSA)(bounds=bounds, landscape=recon['ideals'])
-
-    # optimizer = SPSA()
-
-    # optimizer = ADAM()
-    # optimizer = SPSA()
-    # optimizer = AQGD()
-    # opts = [ADAM,
-    # AQGD,
-    # CG,
-    # COBYLA,
-    # L_BFGS_B,
-    # GSLS,
-    # GradientDescent,
-    # NELDER_MEAD,
-    # NFT,
-    # P_BFGS,
-    # POWELL,
-    # SLSQP,
-    # SPSA,
-    # QNSPSA,
-    # TNC,
-    # SciPyOptimizer]
 
     # obj_val = -(sv1.expectation_value(C) + offset)
     opt_cut = row["C_opt"]
     
-    counts = []
-    values = []
-    params = []
-    def cb_store_intermediate_result(eval_count, parameters, mean, std):
-        # print('fuck')
-        counts.append(eval_count)
-        values.append(mean)
-        params.append(parameters)
+    # counts = []
+    # values = []
+    # params = []
+    # def cb_store_intermediate_result(eval_count, parameters, mean, std):
+    #     # print('fuck')
+    #     counts.append(eval_count)
+    #     values.append(mean)
+    #     params.append(parameters)
 
-    # initial_point = np.hstack([[1.0 for _ in range(p)], [-1.0 for _ in range(p)]])
-    # initial_point = [1.0 for _ in range(2*p)]
-    qaoa = QAOA(
-        optimizer=optimizer,
-        reps=p,
-        # initial_point=angles_to_qiskit_format(angles1),
-        # initial_point=initial_point,
-        quantum_instance=backend,
-        callback=cb_store_intermediate_result)
-    result = qaoa.compute_minimum_eigenvalue(C)
-    # print(qaoa.optimal_params)
-    print("opt_cut                     :", opt_cut)
-    print("recon landscape minimum     :", result.eigenvalue)
-    print("QAOA energy + offset:", - (result.eigenvalue + offset))
-
-    # print("len of params:", len(params))
-    print("len of params:", len(optimizer.params_path))
-    # opt_point = params[-1].copy()
-    params = [
-        _params
-        # angles_to_qaoa_format(angles_from_qiskit_format(_params))
-        for _params in params
-    ]
-    # params.insert(0, angles_to_qaoa_format(angles_from_qiskit_format(qaoa.initial_point)))
-    # params.insert(0, angles_to_qaoa_format(angles_from_qiskit_format(qaoa.optimal_params)))
-
-    # vis_landscape_multi_p(
-    #     row["G"],
-    #     f'figs/test_opt_method/{signature}_nQ{n_qubits}_p{p}_{noise_sign}/G{cnt}',
-    #     beta_to_qaoa_format(row["beta"]),
-    #     gamma_to_qaoa_format(row["gamma"]),
-    #     # noise_model,
-    #     # params
-    #     # angles_to_qaoa_format(angles1)
-    #     # [params[-1]]
-    #     params
-    # )
-    recon_params_path_dict = {
-        "ideals": optimizer.params_path
+    initial_angles = {
+        "gamma": np.array([np.random.uniform(bounds[0][0], bounds[0][1])]),
+        "beta": np.array([np.random.uniform(bounds[1][0], bounds[1][1])])
     }
+    recon_params_path_dict = {}
+    origin_params_path_dict = {}
+
+    for label_type in ['origin', 'recon']:
+        for label in origin.keys():
+            if label_type == 'origin':
+                landscape = origin[label]
+            else:
+                landscape = recon[label]
+
+            optimizer = wrap_qiskit_optimizer_to_landscape_optimizer(
+                SPSA)(bounds=bounds, landscape=landscape)
+
+            # optimizer = SPSA()
+            # optimizer = ADAM()
+            # optimizer = SPSA()
+            # optimizer = AQGD()
+            # opts = [ADAM,
+            # AQGD,
+            # CG,
+            # COBYLA,
+            # L_BFGS_B,
+            # GSLS,
+            # GradientDescent,
+            # NELDER_MEAD,
+            # NFT,
+            # P_BFGS,
+            # POWELL,
+            # SLSQP,
+            # SPSA,
+            # QNSPSA,
+            # TNC,
+            # SciPyOptimizer]
+            # initial_point = np.hstack([[1.0 for _ in range(p)], [-1.0 for _ in range(p)]])
+            qaoa = QAOA(
+                optimizer=optimizer,
+                reps=p,
+                # initial_point=angles_to_qiskit_format(
+                #     {"gamma": row["gamma"],
+                #     "beta": row["beta"]}
+                # ),
+                initial_point=angles_to_qiskit_format(angles_from_qaoa_format(**initial_angles)),
+                quantum_instance=backend,
+                # callback=cb_store_intermediate_result
+                )
+            result = qaoa.compute_minimum_eigenvalue(C)
+            # print(qaoa.optimal_params)
+            print("opt_cut                     :", opt_cut)
+            print("recon landscape minimum     :", result.eigenvalue)
+            print("QAOA energy + offset:", - (result.eigenvalue + offset))
+
+            # print("len of params:", len(params))
+            print("len of params:", len(optimizer.params_path))
+            # opt_point = params[-1].copy()
+            params = [
+                # _params
+                shift_parameters(_params, bounds)
+                # angles_to_qaoa_format(angles_from_qiskit_format(_params))
+                for _params in optimizer.params_path
+            ]
+            # params.insert(0, np.concatenate([initial_angles['gamma'], initial_angles['beta']]))
+            # params.insert(0, angles_to_qaoa_format(angles_from_qiskit_format(qaoa.optimal_params)))
+
+            if label_type == 'origin':
+                origin_params_path_dict[label] = params
+            else: 
+                recon_params_path_dict[label] = params
+
+    true_optima = np.concatenate([
+        gamma_to_qaoa_format(row["gamma"]),
+        beta_to_qaoa_format(row["beta"]),
+    ])
     
+    true_optima = shift_parameters(true_optima, bounds)
+
     _vis_one_D_p1_recon(
         origin_dict=origin,
         recon_dict=recon,
+        full_range=data['full_range'].tolist(),
+        bounds=data['bounds'].tolist(),
+        true_optima=true_optima,
         title='test',
         save_path=f'{figdir}/origin_and_2D_recon_sf{sf:.3f}_again.png',
-        recon_params_path_dict=recon_params_path_dict
+        recon_params_path_dict=recon_params_path_dict,
+        origin_params_path_dict=origin_params_path_dict
     )
 
 if __name__ == "__main__":
