@@ -42,7 +42,8 @@ from .utils import (
     angles_from_qiskit_format,
     maxcut_obj,
     get_adjacency_matrix,
-    obj_from_statevector
+    obj_from_statevector,
+    qaoa_maxcut_energy
 )
 from .noisy_params_optim import (
     compute_expectation,
@@ -60,6 +61,8 @@ from qiskit.algorithms.optimizers import (
 )
 
 from qiskit.algorithms.optimizers.optimizer import POINT
+
+from QAOAKit import qaoa
 
 
 def cosamp(phi, u, s, epsilon=1e-10, max_iter=1000):
@@ -661,6 +664,7 @@ def _vis_one_D_p1_recon(
     # plt.figure
     plt.rc('font', size=28)
     fig, axs = plt.subplots(nrows=2, ncols=3, figsize=(30, 30))
+    fig.suptitle(title, y=0.92)
     axs = axs.reshape(-1)
 
     # TODO Check ij and xy
@@ -678,6 +682,8 @@ def _vis_one_D_p1_recon(
         im = axs[idx].pcolormesh(X, Y, origin) #, cmap='viridis', vmin=origin.min(), vmax=origin.max())
         axs[idx].set_title(f"origin, {label}")
         axs[idx].plot(true_optima[1], true_optima[0], marker="o", color='red', markersize=7, label="true optima")
+        axs[idx].set_xlabel('beta')
+        axs[idx].set_ylabel('gamma')
         # axs[idx].set_xlim(bottom=full_range['beta'][0], top=full_range['beta'][-1])
         # axs[idx].set_xlim(left=bounds['beta'][0], right=bounds['beta'][1])
         # axs[idx].set_ylim(bottom=bounds['gamma'][0], top=bounds['gamma'][1])
@@ -686,6 +692,8 @@ def _vis_one_D_p1_recon(
         im = axs[idx + 3].pcolormesh(X, Y, recon)
         axs[idx + 3].set_title(f"recon, {label}")
         axs[idx + 3].plot(true_optima[1], true_optima[0], marker="o", color='red', markersize=7, label="true optima")
+        axs[idx + 3].set_xlabel('beta')
+        axs[idx + 3].set_ylabel('gamma')
         # axs[idx + 3].set_xlim(left=bounds['beta'][0], right=bounds['beta'][1])
         # axs[idx + 3].set_ylim(bottom=bounds['gamma'][0], top=bounds['gamma'][1])
 
@@ -699,8 +707,8 @@ def _vis_one_D_p1_recon(
 
             axs[idx].plot(xs, ys, marker="o", color='purple', markersize=5, label="optimization path")
             axs[idx].plot(xs[0], ys[0], marker="o", color='white', markersize=9, label="initial point")
-            axs[idx].plot(xs[-1], ys[-1], marker="s", color='white', markersize=7, label="last point")
-            
+            axs[idx].plot(xs[-1], ys[-1], marker="s", color='white', markersize=12, label="last point")
+
         # recon
         if recon_params_path_dict and label in recon_params_path_dict:
             xs = [] # beta
@@ -711,7 +719,7 @@ def _vis_one_D_p1_recon(
 
             axs[idx + 3].plot(xs, ys, marker="o", color='purple', markersize=5, label="optimization path")
             axs[idx + 3].plot(xs[0], ys[0], marker="o", color='white', markersize=9, label="initial point")
-            axs[idx + 3].plot(xs[-1], ys[-1], marker="s", color='white', markersize=7, label="last point")
+            axs[idx + 3].plot(xs[-1], ys[-1], marker="s", color='white', markersize=12, label="last point")
         
         
         idx += 1
@@ -1152,6 +1160,205 @@ def one_D_CS_p1_generate_landscape(
         
     return [], []
 
+# ------------------------- generate gradient of landscape -------------------
+
+def gradient_num_diff(x_center, f, epsilon, max_evals_grouped=1):
+    """
+    We compute the gradient with the numeric differentiation in the parallel way,
+    around the point x_center.
+
+    Args:
+        x_center (ndarray): point around which we compute the gradient
+        f (func): the function of which the gradient is to be computed.
+        epsilon (float): the epsilon used in the numeric differentiation.
+        max_evals_grouped (int): max evals grouped
+    Returns:
+        grad: the gradient computed
+
+    """
+    forig = f(*((x_center,)))
+    grad = []
+    ei = np.zeros((len(x_center),), float)
+    todos = []
+    for k in range(len(x_center)):
+        ei[k] = 1.0
+        d = epsilon * ei
+        todos.append(x_center + d)
+        ei[k] = 0.0
+
+    counter = 0
+    chunk = []
+    chunks = []
+    length = len(todos)
+    # split all points to chunks, where each chunk has batch_size points
+    for i in range(length):
+        x = todos[i]
+        chunk.append(x)
+        counter += 1
+        # the last one does not have to reach batch_size
+        if counter == max_evals_grouped or i == length - 1:
+            chunks.append(chunk)
+            chunk = []
+            counter = 0
+
+    for chunk in chunks:  # eval the chunks in order
+        parallel_parameters = np.concatenate(chunk)
+        todos_results = f(parallel_parameters)  # eval the points in a chunk (order preserved)
+        if isinstance(todos_results, float):
+            grad.append((todos_results - forig) / epsilon)
+        else:
+            for todor in todos_results:
+                grad.append((todor - forig) / epsilon)
+
+    return np.array(grad)
+
+
+def qaoa_maxcut_energy_2b_wrapped(x, qc, G, is_noisy, shots):
+    # x = [beta, gamma]
+    n = x.shape[0]
+    beta = x[:n]
+    gamma = x[n:]
+    energy = _mitiq_executor_of_qaoa_maxcut_energy(qc.copy(), G, is_noisy=is_noisy, shots=shots)
+    return energy
+
+
+def _p1_grad_for_one_point(
+    G,
+    beta: float,
+    gamma: float,
+    shots: int
+):
+    qc = get_maxcut_qaoa_circuit(
+        G, beta=[beta], gamma=[gamma],
+        transpile_to_basis=True, save_state=False)
+
+    x0 = np.array([beta, gamma])
+    fun = partial(qaoa_maxcut_energy_2b_wrapped,
+        qc=qc,
+        G=G,
+        is_noisy=False,
+        shots=shots
+    )
+    grad = gradient_num_diff(x_center=x0, f=fun, epsilon=1e-10)
+    return grad
+
+
+def _p1_grad_for_one_point_mapper(param):
+    return _p1_grad_for_one_point(*param)
+
+
+def p1_generate_grad(
+    G: nx.Graph,
+    p: int,
+    figdir: str,
+    beta_opt: np.array, # converted
+    gamma_opt: np.array, # converted
+    noise_model: NoiseModel,
+    params_path: list,
+    C_opt: float
+):
+    # ! Convention: First beta, Last gamma
+    
+    # hyper parameters
+    # alpha = 0.1
+    n_shots = 2048
+    n_pts_per_unit = 36     # num. of original points per unit == 4096, i.e. resolution rate = 1 / n
+    
+    # beta first, gamma later
+    bounds = {'beta': [-np.pi/4, np.pi/4],
+              'gamma': [-np.pi, np.pi]}
+
+    n_pts = {}
+    # n_samples = {}
+    for label, bound in bounds.items():
+        bound_len = bound[1] - bound[0]
+        n_pts[label] = np.floor(n_pts_per_unit * bound_len).astype(int)
+        # n_samples[label] = np.ceil(n_pts_per_unit * bound_len * sampling_frac).astype(int)
+    
+    print('bounds: ', bounds)
+    print('n_pts: ', n_pts)
+    # print('n_samples: ', n_samples)
+    # print('alpha: ', alpha)
+    print('n_pts_per_unit: ', n_pts_per_unit)
+
+    _LABELS = ['mitis', 'unmitis', 'ideals']
+    origin = {label: [] for label in _LABELS}
+
+    full_range = {
+        'gamma': np.linspace(bounds['gamma'][0], bounds['gamma'][1], n_pts['gamma']),
+        'beta': np.linspace(bounds['beta'][0], bounds['beta'][1], n_pts['beta'])
+    }
+
+    params = []
+    for gamma in full_range['gamma']:
+        for beta in full_range['beta']:
+            param = (
+                G.copy(),
+                beta,
+                gamma,
+                n_shots
+            )
+            params.append(param)
+    
+    print(len(params))
+
+    start_time = time.time()
+    print("start time: ", get_curr_formatted_timestamp())
+    with concurrent.futures.ProcessPoolExecutor() as executor:
+        # future = executor.submit(
+        #     _p1_grad_for_one_point_mapper,
+        #     params[0]
+        # )
+        futures = executor.map(
+            _p1_grad_for_one_point_mapper, params
+        )
+    # print(future.result())
+    print("end time: ", get_curr_formatted_timestamp())
+    end_time = time.time()
+
+    print(f"full landscape time usage: {end_time - start_time} s")
+
+    grads = []
+    for f in futures:
+        grads.append(f)
+
+    grads = np.array(grads).reshape(n_pts['gamma'], n_pts['beta'], 2*p)
+
+    # for f in futures:
+        # origin['ideals'].append(f[0])
+        # origin['unmitis'].append(f[1])
+        # origin['mitis'].append(f[2])
+
+    # for label, arr in origin.items():
+        # origin[label] = np.array(arr).reshape(n_pts['gamma'], n_pts['beta'])
+        # print(origin[label].shape)
+        
+    np.savez_compressed(f"{figdir}/grad_data",
+        # ! gradient
+        grads=grads,
+
+        # ! reconstruct
+        # origin=origin,
+        # recon=recon,
+        # mitis=mitis, unmitis=unmitis, ideals=ideals,
+        # unmitis_recon=unmitis_recon, mitis_recon=mitis_recon, ideals_recon=ideals_recon,
+
+        # ! parameters
+        n_pts=n_pts,
+        # n_samples=n_samples, sampling_frac=sampling_frac,
+        # perm=perm,
+        full_range=full_range,
+        bounds=bounds,
+        n_shots=n_shots,
+        n_pts_per_unit=n_pts_per_unit,
+
+        # ! n_optima
+        # improved_n_optima=improved_n_optima,
+        # improved_n_optima_recon=improved_n_optima_recon,
+        C_opt=C_opt)
+
+    return
+
 
 # ============================ two D CS ====================
 # tutorial: http://www.pyrunner.com/weblog/2016/05/26/compressed-sensing-python/
@@ -1340,6 +1547,7 @@ def wrap_qiskit_optimizer_to_landscape_optimizer(QiskitOptimizer):
             # print(super().callback)
             res = super().minimize(query_fun_value_from_landscape, x0, jac, bounds)
             print('res', res)
+            print(jac)
             return res
 
     return LandscapeOptimizer
