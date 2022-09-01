@@ -123,7 +123,8 @@ from QAOAKit.compressed_sensing import (
     one_D_CS_p1_recon_with_given_landscapes_and_varing_sampling_frac,
     two_D_CS_p1_recon_with_given_landscapes,
     wrap_qiskit_optimizer_to_landscape_optimizer,
-    _vis_one_D_p1_recon
+    _vis_one_D_p1_recon,
+    p1_generate_grad
 )
 
 
@@ -551,14 +552,14 @@ def optimize_on_p1_reconstructed_landscape():
     # obj_val = -(sv1.expectation_value(C) + offset)
     opt_cut = row["C_opt"]
     
-    # counts = []
-    # values = []
-    # params = []
-    # def cb_store_intermediate_result(eval_count, parameters, mean, std):
-    #     # print('fuck')
-    #     counts.append(eval_count)
-    #     values.append(mean)
-    #     params.append(parameters)
+    counts = []
+    values = []
+    params = []
+    def cb_store_intermediate_result(eval_count, parameters, mean, std):
+        # print('fuck')
+        counts.append(eval_count)
+        values.append(mean)
+        params.append(parameters)
 
     initial_angles = {
         "gamma": np.array([np.random.uniform(bounds[0][0], bounds[0][1])]),
@@ -574,8 +575,23 @@ def optimize_on_p1_reconstructed_landscape():
             else:
                 landscape = recon[label]
 
+            counts = []
+            values = []
+            params = []
+
             optimizer = wrap_qiskit_optimizer_to_landscape_optimizer(
-                SPSA)(bounds=bounds, landscape=landscape)
+                # SPSA
+                ADAM
+                # L_BFGS_B
+            #     # COBYLA
+            )(bounds=bounds, landscape=landscape)
+            
+            # optimizer = L_BFGS_B()
+
+            # optimizer_name = 'SPSA'
+            optimizer_name = "ADAM"
+            # optimizer_name = "L_BFGS_B"
+            # optimizer_name = "COBYLA"
 
             # optimizer = SPSA()
             # optimizer = ADAM()
@@ -615,14 +631,16 @@ def optimize_on_p1_reconstructed_landscape():
             print("recon landscape minimum     :", result.eigenvalue)
             print("QAOA energy + offset:", - (result.eigenvalue + offset))
 
-            # print("len of params:", len(params))
-            print("len of params:", len(optimizer.params_path))
+            params = optimizer.params_path
+            print(params)
+            print("len of params:", len(params))
+            # print("len of params:", len(optimizer.params_path))
             # opt_point = params[-1].copy()
             params = [
                 # _params
                 shift_parameters(_params, bounds)
                 # angles_to_qaoa_format(angles_from_qiskit_format(_params))
-                for _params in optimizer.params_path
+                for _params in params
             ]
             # params.insert(0, np.concatenate([initial_angles['gamma'], initial_angles['beta']]))
             # params.insert(0, angles_to_qaoa_format(angles_from_qiskit_format(qaoa.optimal_params)))
@@ -645,11 +663,77 @@ def optimize_on_p1_reconstructed_landscape():
         full_range=data['full_range'].tolist(),
         bounds=data['bounds'].tolist(),
         true_optima=true_optima,
-        title='test',
-        save_path=f'{figdir}/origin_and_2D_recon_sf{sf:.3f}_again.png',
+        title=f'{optimizer_name} with sampling fraction {sf:.3f}',
+        save_path=f'{figdir}/origin_and_2D_recon_sf{sf:.3f}_{optimizer_name}.png',
         recon_params_path_dict=recon_params_path_dict,
         origin_params_path_dict=origin_params_path_dict
     )
+
+
+def p1_generate_grad_top():
+    reg3_dataset_table = get_3_reg_dataset_table()
+    print("read 3 reg dataset OK")
+    print("use fixed angles to calculate n_optima")
+    signature = get_curr_formatted_timestamp()
+    # with concurrent.futures.ProcessPoolExecutor() as executor:
+    for n_qubits in range(8, 9, 2): # [1, 16]
+    # for n_qubits in range(4, 5): # [1, 16]
+        for p in range(1, 2): # [1, 11]
+            start_time = time.time()
+            df = reg3_dataset_table.reset_index()
+            df = df[(df["n"] == n_qubits) & (df["p_max"] == p)]
+            df = df.iloc[1: 2]
+            # df = df.iloc[0: MAX_NUM_GRAPHS_PER_NUM_QUBITS]
+            # df = df.iloc[MAX_NUM_GRAPHS_PER_NUM_QUBITS:2*MAX_NUM_GRAPHS_PER_NUM_QUBITS]
+            
+            print(f"n_qubits={n_qubits}")
+            print(f"num of graphs: {len(df)}")
+            print(f"p={p}")
+            for row_id, row in df.iterrows():
+                
+                print(f"handling {row_id}")
+                angles = angles_to_qaoa_format(get_fixed_angles(d=3, p=p))
+
+                # print(row["beta"])
+                # print(row["gamma"])
+                # print(angles)
+                # print(row["p_max"])
+                # print(row["C_opt"], row["C_{true opt}"], row["C_fixed"])
+
+                C_opt = row["C_fixed"]
+                print("C_fixed", C_opt)
+                G = row["G"]
+
+                figdir = f'figs/cnt_opt_miti/{signature}/G{row_id}_nQ{n_qubits}_p{p}_grad'
+                
+                if not os.path.exists(figdir):
+                    os.makedirs(figdir)
+
+                nx.draw_networkx(G)
+                plt.title(f"")
+                plt.savefig(f"{figdir}/G{row_id}.png")
+                plt.cla()
+
+                p1_generate_grad(
+                    G=G,
+                    p=p,
+                    figdir=figdir, 
+                    # beta_opt=beta_to_qaoa_format(angles["beta"]),
+                    # gamma_opt=gamma_to_qaoa_format(angles["gamma"]),
+                    beta_opt=angles["beta"],
+                    gamma_opt=angles["gamma"],
+                    noise_model=None,
+                    params_path=[],
+                    C_opt=C_opt
+                )
+
+
+                print(" ================ ")
+
+            end_time = time.time()
+            print(f"for p={p}, nQ={n_qubits}, it takes {end_time-start_time} s")
+
+    return
 
 if __name__ == "__main__":
     # test_qiskit_qaoa_circuit()
@@ -668,4 +752,5 @@ if __name__ == "__main__":
     # one_D_CS_p1_recon_with_given_landscapes_top()
     # two_D_CS_p1_recon_with_given_landscapes_top()
 
-    optimize_on_p1_reconstructed_landscape()
+    # optimize_on_p1_reconstructed_landscape()
+    p1_generate_grad_top()
