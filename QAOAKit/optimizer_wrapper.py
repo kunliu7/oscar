@@ -98,8 +98,16 @@ def wrap_qiskit_optimizer_to_landscape_optimizer(QiskitOptimizer):
         #     jac: Optional[Callable[[POINT], POINT]] = None,
         #     bounds: Optional[List[Tuple[float, float]]] = None):
         #     return super().minimize(fun, x0, jac, bounds)
+        def qiskit_format_to_qaoa_format_arr(self, x: POINT):
+            angles = angles_from_qiskit_format(x)
+            angles = angles_to_qaoa_format(angles)
+
+            x = np.concatenate([angles['gamma'], angles['beta']])
+            return x
+
 
         def approximate_fun_value(self, x: POINT) -> float:
+            x = self.qiskit_format_to_qaoa_format_arr(x)
 
             val = approximate_fun_value_by_2D_interpolation(
                 x=x,
@@ -107,6 +115,7 @@ def wrap_qiskit_optimizer_to_landscape_optimizer(QiskitOptimizer):
                 bounds=self.bounds
             )
 
+            self.params_path.append(x)
             return val
 
         def minimize(self, 

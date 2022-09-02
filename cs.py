@@ -1,4 +1,3 @@
-import re
 import networkx as nx
 import matplotlib.pyplot as plt
 import numpy as np
@@ -122,9 +121,11 @@ from QAOAKit.compressed_sensing import (
     one_D_CS_p1_generate_landscape,
     one_D_CS_p1_recon_with_given_landscapes_and_varing_sampling_frac,
     two_D_CS_p1_recon_with_given_landscapes,
-    wrap_qiskit_optimizer_to_landscape_optimizer,
     _vis_one_D_p1_recon,
     p1_generate_grad
+)
+from QAOAKit.optimizer_wrapper import (
+    wrap_qiskit_optimizer_to_landscape_optimizer
 )
 
 
@@ -584,7 +585,12 @@ def optimize_on_p1_reconstructed_landscape():
                 ADAM
                 # L_BFGS_B
             #     # COBYLA
-            )(bounds=bounds, landscape=landscape)
+            )(
+                bounds=bounds, 
+                landscape=landscape,
+                fun_type='INTERPOLATE'
+                # fun_type='None'
+            )
             
             # optimizer = L_BFGS_B()
 
@@ -632,7 +638,7 @@ def optimize_on_p1_reconstructed_landscape():
             print("QAOA energy + offset:", - (result.eigenvalue + offset))
 
             params = optimizer.params_path
-            print(params)
+            # print(params)
             print("len of params:", len(params))
             # print("len of params:", len(optimizer.params_path))
             # opt_point = params[-1].copy()
@@ -668,6 +674,51 @@ def optimize_on_p1_reconstructed_landscape():
         recon_params_path_dict=recon_params_path_dict,
         origin_params_path_dict=origin_params_path_dict
     )
+
+
+# ================== gradient ==============
+
+def approximate_grad_by_2D_interpolation_top():
+
+    data_dir = "figs/cnt_opt_miti/2022-08-10_10:14:03/G40_nQ8_p1"
+    data = np.load(f"{data_dir}/data.npz", allow_pickle=True)
+    origin = data['origin'].tolist()
+
+    figdir = f"{data_dir}/2D_CS_recon"
+    if not os.path.exists(figdir):
+        os.makedirs(figdir)
+
+    reg3_dataset_table = get_3_reg_dataset_table()
+    n_qubits = 8
+    p = 1
+    sf = 0.05
+    # recon = two_D_CS_p1_recon_with_given_landscapes(
+    #     figdir=figdir,
+    #     origin=data['origin'].tolist(),
+    #     sampling_frac=sf
+    # )
+    # np.savez_compressed(f'{figdir}', recon=recon)
+
+    # return
+    recon = np.load(f'{figdir}.npz', allow_pickle=True)['recon'].tolist()
+    
+    bounds = data['bounds'].tolist()
+    bounds = np.array([bounds['gamma'], bounds['beta']])
+    
+    x = np.array([[0.1, 0.3], [0.2, 0.4]])
+    guess = approximate_grad_by_2D_interpolation(
+        x=x,
+        landscape=origin['ideals'],
+        bounds=bounds
+    )
+    print(guess)
+    # print(recon)
+
+    # df = reg3_dataset_table.reset_index()
+    # df = df[(df["n"] == n_qubits) & (df["p_max"] == p)]
+    # for row_id, row in df.iloc[1:2].iterrows():
+    #     pass
+
 
 
 def p1_generate_grad_top():
@@ -735,6 +786,10 @@ def p1_generate_grad_top():
 
     return
 
+
+def compare_with_original_grad_top():
+    pass
+
 if __name__ == "__main__":
     # test_qiskit_qaoa_circuit()
     # test_noisy_qaoa_maxcut_energy()
@@ -754,3 +809,4 @@ if __name__ == "__main__":
 
     # optimize_on_p1_reconstructed_landscape()
     p1_generate_grad_top()
+    # approximate_grad_by_2D_interpolation_top()
