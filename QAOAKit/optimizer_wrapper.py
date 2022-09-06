@@ -44,7 +44,8 @@ from .utils import (
     maxcut_obj,
     get_adjacency_matrix,
     obj_from_statevector,
-    qaoa_maxcut_energy
+    qaoa_maxcut_energy,
+    shift_parameters
 )
 from .noisy_params_optim import (
     compute_expectation,
@@ -66,6 +67,9 @@ from qiskit.algorithms.optimizers import (
 
 from qiskit.algorithms.optimizers.optimizer import POINT
 
+def get_numerical_derivative(fun: Optional[Callable[[POINT], POINT]], eps=1e-10):
+    jac = Optimizer.wrap_function(Optimizer.gradient_num_diff, (fun, eps))
+    return jac
 
 def wrap_qiskit_optimizer_to_landscape_optimizer(QiskitOptimizer):
     class LandscapeOptimizer(QiskitOptimizer):
@@ -87,7 +91,7 @@ def wrap_qiskit_optimizer_to_landscape_optimizer(QiskitOptimizer):
             bound_lens = np.apply_along_axis(lambda bound: bound[1] - bound[0], axis=1, arr=bounds)
             print('bound_lens', bound_lens)
             self.grid_lens = bound_lens / self.landscape_shape # element-wise
-            print(self.grid_lens)
+            print("grid_lens", self.grid_lens)
             self.params_path = []
 
             self.fun_type = fun_type
@@ -109,6 +113,7 @@ def wrap_qiskit_optimizer_to_landscape_optimizer(QiskitOptimizer):
         def approximate_fun_value(self, x: POINT) -> float:
             x = self.qiskit_format_to_qaoa_format_arr(x)
 
+            x = shift_parameters(x, self.bounds)
             val = approximate_fun_value_by_2D_interpolation(
                 x=x,
                 landscape=self.landscape,
@@ -116,7 +121,9 @@ def wrap_qiskit_optimizer_to_landscape_optimizer(QiskitOptimizer):
             )
 
             self.params_path.append(x)
-            return val
+            # print("appro", val)
+            return val[0]
+
 
         def minimize(self, 
             fun: Callable[[POINT], float], 
@@ -162,8 +169,6 @@ def wrap_qiskit_optimizer_to_landscape_optimizer(QiskitOptimizer):
             if self.fun_type == 'INTERPOLATE':
                 res = super().minimize(self.approximate_fun_value, x0, jac, bounds)
             else:
-            # print(self.callback)
-            # print(super().callback)
                 res = super().minimize(query_fun_value_from_landscape, x0, jac, bounds)
             print('res', res)
             print(jac)

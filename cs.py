@@ -1,3 +1,4 @@
+from random import random
 import networkx as nx
 import matplotlib.pyplot as plt
 import numpy as np
@@ -122,12 +123,17 @@ from QAOAKit.compressed_sensing import (
     one_D_CS_p1_recon_with_given_landscapes_and_varing_sampling_frac,
     two_D_CS_p1_recon_with_given_landscapes,
     _vis_one_D_p1_recon,
-    p1_generate_grad
+    p1_generate_grad,
+    _mitiq_executor_of_qaoa_maxcut_energy
 )
 from QAOAKit.optimizer_wrapper import (
-    wrap_qiskit_optimizer_to_landscape_optimizer
+    wrap_qiskit_optimizer_to_landscape_optimizer,
+    get_numerical_derivative
 )
 
+from QAOAKit.interpolate import (
+    approximate_fun_value_by_2D_interpolation
+)
 
 # from qiskit_optimization import QuadraticProgram
 from qiskit.algorithms.minimum_eigen_solvers.qaoa import QAOAAnsatz
@@ -706,7 +712,7 @@ def approximate_grad_by_2D_interpolation_top():
     bounds = np.array([bounds['gamma'], bounds['beta']])
     
     x = np.array([[0.1, 0.3], [0.2, 0.4]])
-    guess = approximate_grad_by_2D_interpolation(
+    guess = approximate_fun_value_by_2D_interpolation(
         x=x,
         landscape=origin['ideals'],
         bounds=bounds
@@ -778,7 +784,6 @@ def p1_generate_grad_top():
                     C_opt=C_opt
                 )
 
-
                 print(" ================ ")
 
             end_time = time.time()
@@ -788,6 +793,106 @@ def p1_generate_grad_top():
 
 
 def compare_with_original_grad_top():
+    reg3_dataset_table = get_3_reg_dataset_table()
+
+    grad_data_dir = "figs/cnt_opt_miti/2022-09-01_22:20:04/G40_nQ8_p1_grad"
+    data_dir = "figs/cnt_opt_miti/2022-08-10_10:14:03/G40_nQ8_p1"
+    data = np.load(f"{data_dir}/data.npz", allow_pickle=True)
+    grad_data = np.load(f"{grad_data_dir}/grad_data.npz", allow_pickle=True)
+
+    grads = grad_data['grads'].tolist()
+    origin = data['origin'].tolist()
+
+    n_test = 1000
+
+    n_qubits = 8
+    p = 1
+    df = reg3_dataset_table.reset_index()
+    # print(df)
+    # print(df.columns)
+    df = df[(df["n"] == n_qubits) & (df["p_max"] == p)]
+    for row_id, row in df.iloc[1:2].iterrows():
+        pass
+    print("============================")
+    angles1 = opt_angles_for_graph(row["G"], row["p_max"])
+    G = row["G"]
+    print('row_id:', row_id)
+    # qc1, C, offset = get_maxcut_qaoa_qiskit_circuit_unbinded_parameters(
+    #     G, p
+    # )
+
+    bounds = data['bounds'].tolist()
+    bounds = np.array([bounds['gamma'], bounds['beta']])
+    optimizer = wrap_qiskit_optimizer_to_landscape_optimizer(
+        # SPSA
+        ADAM
+        # L_BFGS_B
+    #     # COBYLA
+    )(
+        bounds=bounds, 
+        landscape=origin['ideals'],
+        fun_type='INTERPOLATE'
+    )
+
+    # eps = 1e-10
+    # eps = 0.01
+    eps = 0.1
+    
+    def _get_ideal_energy_by_qc(x):
+        x = optimizer.qiskit_format_to_qaoa_format_arr(x)
+        qc = get_maxcut_qaoa_circuit(
+            G, gamma=x[:p], beta=x[p:], 
+            # transpile_to_basis=True, save_state=False
+        )
+        energy = _mitiq_executor_of_qaoa_maxcut_energy(
+            qc=qc,
+            G=G,
+            is_noisy=False,
+            shots=2048
+        )
+        # energy = qaoa_maxcut_energy(G, gamma=x[:p], beta=x[p:])
+        return -energy
+        
+    jac_appro = get_numerical_derivative(
+        optimizer.approximate_fun_value, eps
+    )
+
+    total_norm = 0
+    for i in range(n_test):
+        x = np.random.rand(2)
+        # print("x", x)
+
+        # optimizer.approximate_fun_value(x)
+        jac_ideal = get_numerical_derivative(
+            _get_ideal_energy_by_qc, eps
+        )
+
+        grad_ideal = jac_ideal(x)
+        grad_appro = jac_appro(x)
+
+        # print(grad_ideal, grad_appro)
+        norm = ((grad_ideal - grad_appro)**2).mean()
+        print(f"norm={norm}")
+        total_norm += norm
+
+    total_norm /= n_test
+    print("total norm", total_norm)
+
+    # approximate_grad_by_2D_interpolation_top
+    
+
+    # _vis_one_D_p1_recon(
+    #     origin_dict=origin,
+    #     recon_dict=recon,
+    #     full_range=data['full_range'].tolist(),
+    #     bounds=data['bounds'].tolist(),
+    #     true_optima=true_optima,
+    #     title=f'{optimizer_name} with sampling fraction {sf:.3f}',
+    #     save_path=f'{figdir}/origin_and_2D_recon_sf{sf:.3f}_{optimizer_name}.png',
+    #     recon_params_path_dict=recon_params_path_dict,
+    #     origin_params_path_dict=origin_params_path_dict
+    # )
+
     pass
 
 if __name__ == "__main__":
@@ -808,5 +913,6 @@ if __name__ == "__main__":
     # two_D_CS_p1_recon_with_given_landscapes_top()
 
     # optimize_on_p1_reconstructed_landscape()
-    p1_generate_grad_top()
+    compare_with_original_grad_top()
+    # p1_generate_grad_top()
     # approximate_grad_by_2D_interpolation_top()
