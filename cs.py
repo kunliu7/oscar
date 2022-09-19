@@ -43,7 +43,9 @@ from itertools import groupby
 import timeit
 import sys, os
 from scipy.optimize import minimize
-
+from scipy.spatial.distance import (
+    cosine
+)
 from qiskit.quantum_info import Statevector
 # from QAOAKit import vis
 
@@ -799,9 +801,12 @@ def compare_with_original_grad_top():
     data_dir = "figs/cnt_opt_miti/2022-08-10_10:14:03/G40_nQ8_p1"
     data = np.load(f"{data_dir}/data.npz", allow_pickle=True)
     grad_data = np.load(f"{grad_data_dir}/grad_data.npz", allow_pickle=True)
+    recon_data_dir = "figs/cnt_opt_miti/2022-08-10_10:14:03/G40_nQ8_p1/2D_CS_recon.npz"
+    recon_data = np.load(recon_data_dir, allow_pickle=True)
 
     grads = grad_data['grads'].tolist()
     origin = data['origin'].tolist()
+    recon = recon_data['recon'].tolist()
 
     n_test = 1000
 
@@ -830,36 +835,59 @@ def compare_with_original_grad_top():
     #     # COBYLA
     )(
         bounds=bounds, 
-        landscape=origin['ideals'],
+        # landscape=origin['ideals'],
+        # landscape=recon['ideals'],
+        # landscape=recon['unmitis'],
+        landscape=recon['mitis'],
         fun_type='INTERPOLATE'
     )
 
-    # eps = 1e-10
+    eps = 1e-10
     # eps = 0.01
-    eps = 0.1
+    # eps = 0.1
+    noise_model = get_depolarizing_error_noise_model(p1Q=0.001, p2Q=0.005) # ! base noise model
     
     def _get_ideal_energy_by_qc(x):
         x = optimizer.qiskit_format_to_qaoa_format_arr(x)
-        qc = get_maxcut_qaoa_circuit(
-            G, gamma=x[:p], beta=x[p:], 
-            # transpile_to_basis=True, save_state=False
-        )
-        energy = _mitiq_executor_of_qaoa_maxcut_energy(
-            qc=qc,
-            G=G,
-            is_noisy=False,
-            shots=2048
-        )
-        # energy = qaoa_maxcut_energy(G, gamma=x[:p], beta=x[p:])
+        # qc = get_maxcut_qaoa_circuit(
+        #     G, gamma=x[:p], beta=x[p:], 
+        #     # transpile_to_basis=True, save_state=False
+        # )
+        # energy = _mitiq_executor_of_qaoa_maxcut_energy(
+        #     qc=qc,
+        #     G=G,
+        #     is_noisy=True,
+        #     shots=2048
+        # )
+        energy = noisy_qaoa_maxcut_energy(G=G, gamma=x[:p], beta=x[p:], noise_model=None)
         return -energy
         
     jac_appro = get_numerical_derivative(
         optimizer.approximate_fun_value, eps
     )
 
+    if False:
+        xs = []
+        for i in range(n_test):
+            angles = {
+                "gamma": [np.random.uniform(-1, 1)],
+                "beta": [np.random.uniform(-1, 1)]
+            }
+            
+            x = angles_to_qiskit_format(angles)
+            xs.append(x)
+
+        xs = np.array(xs)
+        np.savez(f"{grad_data_dir}/random_samples_{n_test}", xs)
+
+        return
+    else:
+        xs = np.load(f"{grad_data_dir}/random_samples_{n_test}.npz")['arr_0']
+
+
     total_norm = 0
     for i in range(n_test):
-        x = np.random.rand(2)
+        x = xs[i]
         # print("x", x)
 
         # optimizer.approximate_fun_value(x)
@@ -870,9 +898,12 @@ def compare_with_original_grad_top():
         grad_ideal = jac_ideal(x)
         grad_appro = jac_appro(x)
 
+        # print(np.linalg.norm(grad_ideal), np.linalg.norm(grad_appro))
         # print(grad_ideal, grad_appro)
-        norm = ((grad_ideal - grad_appro)**2).mean()
-        print(f"norm={norm}")
+        # norm = ((grad_ideal - grad_appro)**2).mean()
+
+        norm = cosine(grad_ideal, grad_appro)
+        # print(f"norm={norm}")
         total_norm += norm
 
     total_norm /= n_test
