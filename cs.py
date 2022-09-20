@@ -1,10 +1,10 @@
-from random import random
 import networkx as nx
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import time
 import concurrent.futures
+import timeit
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, execute
 from qiskit.algorithms.optimizers import (
     ADAM,
@@ -926,6 +926,54 @@ def compare_with_original_grad_top():
 
     pass
 
+def CS_on_google_data():
+    data_types = ['sk', '3reg', 'grid']
+    # data_types = ['grid, sk, 3reg']
+    for data_type in data_types:
+        data_path = f"google_data/Google_Data/google_{data_type}.npz"
+
+        data = np.load(data_path, allow_pickle=True)
+
+        betas = data['betas']
+        gammas = data['gammas']
+        energies = data['energies']
+        bounds = data['bounds'].tolist()
+        # print(bounds)
+
+        df = pd.DataFrame(data={'Beta': betas, 'Gamma': gammas, 'E': energies})
+        df = df.pivot(index='Gamma', columns='Beta', values='E')
+
+        landscape = np.array(df)
+        print("landscape shape: ", landscape.shape)
+
+        figdir = "./google_data"
+        # print(np.linspace(bounds['beta'][0], bounds['beta'][1], landscape.shape[1]))
+        full_range = {
+            "beta": np.linspace(bounds['beta'][0], 
+                bounds['beta'][1],
+                landscape.shape[1]),
+            "gamma": np.linspace(bounds['gamma'][0], bounds['gamma'][1], landscape.shape[0]),
+        }
+
+        recons = []
+        times = []
+        for sf in np.arange(0.05, 0.5, 0.03):
+            start = timeit.timeit()
+            recon = two_D_CS_p1_recon_with_given_landscapes(
+                figdir=figdir,
+                origin={'unmitis': landscape},
+                full_range=full_range,
+                sampling_frac=sf
+            )
+            end = timeit.timeit()
+            print(f"start: {start}, end: {end}")
+            times.append(end - start)
+            recons.append(recon)
+
+        np.savez_compressed(f"{figdir}/recons_{data_type}",
+            recons=recons, origin=landscape, times=times)
+
+
 if __name__ == "__main__":
     # test_qiskit_qaoa_circuit()
     # test_noisy_qaoa_maxcut_energy()
@@ -944,6 +992,8 @@ if __name__ == "__main__":
     # two_D_CS_p1_recon_with_given_landscapes_top()
 
     # optimize_on_p1_reconstructed_landscape()
-    compare_with_original_grad_top()
+    # compare_with_original_grad_top()
     # p1_generate_grad_top()
     # approximate_grad_by_2D_interpolation_top()
+
+    CS_on_google_data()
