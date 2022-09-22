@@ -45,6 +45,7 @@ from .noisy_params_optim import (
 
 # vis
 import numpy as np
+import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 from random import sample
 
@@ -903,3 +904,107 @@ def vis_multi_landscapes_and_count_optima_and_mitiq_MP_and_one_variable(
         
     return [], []
 
+
+# ================================ 
+
+def vis_two_BPs_p1_recon(
+        origin_dict,
+        recon_dict,
+        # gamma_range,
+        # beta_range,
+        # C_opt, bound, var_opt,
+        bounds,
+        full_range,
+        # mitis_recon,
+        # unmitis_recon,
+        # ideal_recon,
+        # xlabel, 
+        box1,
+        box2,
+        box1_points,
+        box2_points,
+        title,
+        save_path
+    ):
+
+    # plt.figure
+    plt.rc('font', size=28)
+    fig, axs = plt.subplots(nrows=1, ncols=2, figsize=(30, 30))
+    fig.suptitle(title, y=0.92)
+    axs = axs.reshape(-1)
+
+    rect1 = patches.Rectangle(
+        (box1['beta'][0], box1['gamma'][0]),
+         box1['beta'][1] - box1['beta'][0],
+         box1['gamma'][1] - box1['gamma'][0],
+        linewidth=1, edgecolor='r', facecolor='none')
+    rect2 = patches.Rectangle(
+        (box2['beta'][0], box2['gamma'][0]),
+         box2['beta'][1] - box2['beta'][0],
+         box2['gamma'][1] - box2['gamma'][0],
+        linewidth=1, edgecolor='b', facecolor='none')
+    # ,linewidth=1, edgecolor='r', facecolor='none')
+
+    # Add the patch to the Axes
+    # ax.add_patch(rect1)
+
+    # TODO Check ij and xy
+    X, Y = np.meshgrid(full_range['beta'], full_range['gamma'])
+
+    # c = ax.pcolormesh(X, Y, Z, cmap='viridis', vmin=Z.min(), vmax=Z.max())
+    idx = 0
+    for label, origin in origin_dict.items():
+        recon = recon_dict[label]
+        # axs[idx]
+        # Z = np.array(Z).T
+        # c = axs[idx].pcolormesh(X, Y, Z, cmap='viridis', vmin=Z.min(), vmax=Z.max())
+        
+        # im = axs[idx].imshow(origin)
+        im = axs[idx].pcolormesh(X, Y, origin) #, cmap='viridis', vmin=origin.min(), vmax=origin.max())
+        axs[idx].set_title(f"origin, {label}")
+        axs[idx].set_xlabel('beta')
+        axs[idx].set_ylabel('gamma')
+        # up down left right
+        # axs[idx].Rectange((box1[0], box1[2]), box1[3] - box1[2], box1[0] - box1[1])
+        axs[idx].add_patch(copy.deepcopy(rect1))
+        axs[idx].add_patch(copy.deepcopy(rect2))
+
+        if box1_points:
+            xs = []
+            ys = []
+            for p in box1_points:
+                xs.append(p['beta'])
+                ys.append(p['gamma'])
+            axs[idx].scatter(xs, ys, s=2)
+
+        if box2_points:
+            xs = []
+            ys = []
+            for p in box2_points:
+                xs.append(p['beta'])
+                ys.append(p['gamma'])
+            axs[idx].scatter(xs, ys)
+                
+        # axs[idx].set_xlim(bottom=full_range['beta'][0], top=full_range['beta'][-1])
+        # axs[idx].set_xlim(left=bounds['beta'][0], right=bounds['beta'][1])
+        # axs[idx].set_ylim(bottom=bounds['gamma'][0], top=bounds['gamma'][1])
+
+        # im = axs[idx + 3].imshow(recon)
+        shift = 1
+        im = axs[idx + shift].pcolormesh(X, Y, recon)
+        axs[idx + shift].set_title(f"recon, {label}")
+        axs[idx + shift].set_xlabel('beta')
+        axs[idx + shift].set_ylabel('gamma')
+        axs[idx + shift].add_patch(copy.deepcopy(rect1))
+        axs[idx + shift].add_patch(copy.deepcopy(rect2))
+        # axs[idx + 3].set_xlim(left=bounds['beta'][0], right=bounds['beta'][1])
+        # axs[idx + 3].set_ylim(bottom=bounds['gamma'][0], top=bounds['gamma'][1])
+
+        idx += 1
+
+    plt.legend()
+    fig.colorbar(im, ax=[axs[i] for i in range(6)])
+    # plt.title(title)
+    # plt.subtitle(title)
+    fig.savefig(save_path)
+    plt.close('all')

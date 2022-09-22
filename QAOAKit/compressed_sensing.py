@@ -682,7 +682,8 @@ def _vis_one_D_p1_recon(
         # im = axs[idx].imshow(origin)
         im = axs[idx].pcolormesh(X, Y, origin) #, cmap='viridis', vmin=origin.min(), vmax=origin.max())
         axs[idx].set_title(f"origin, {label}")
-        axs[idx].plot(true_optima[1], true_optima[0], marker="o", color='red', markersize=7, label="true optima")
+        if true_optima:
+            axs[idx].plot(true_optima[1], true_optima[0], marker="o", color='red', markersize=7, label="true optima")
         axs[idx].set_xlabel('beta')
         axs[idx].set_ylabel('gamma')
         # axs[idx].set_xlim(bottom=full_range['beta'][0], top=full_range['beta'][-1])
@@ -692,7 +693,8 @@ def _vis_one_D_p1_recon(
         # im = axs[idx + 3].imshow(recon)
         im = axs[idx + 3].pcolormesh(X, Y, recon)
         axs[idx + 3].set_title(f"recon, {label}")
-        axs[idx + 3].plot(true_optima[1], true_optima[0], marker="o", color='red', markersize=7, label="true optima")
+        if true_optima:
+            axs[idx + 3].plot(true_optima[1], true_optima[0], marker="o", color='red', markersize=7, label="true optima")
         axs[idx + 3].set_xlabel('beta')
         axs[idx + 3].set_ylabel('gamma')
         # axs[idx + 3].set_xlim(left=bounds['beta'][0], right=bounds['beta'][1])
@@ -1557,7 +1559,7 @@ def wrap_qiskit_optimizer_to_landscape_optimizer(QiskitOptimizer):
 def two_D_CS_p1_recon_with_given_landscapes(
     figdir: str,
     origin: dict,
-    # full_range: dict,
+    full_range: dict,
     # n_pts: dict,
     sampling_frac: float
 ):
@@ -1586,7 +1588,10 @@ def two_D_CS_p1_recon_with_given_landscapes(
     # unmitis = []
     # ideals = []
 
-    _LABELS = ['mitis', 'unmitis', 'ideals']
+    # _LABELS = ['mitis', 'unmitis', 'ideals']
+    _LABELS = []
+    for label in origin.keys():
+        _LABELS.append(label)
 
     # x = np.cos(2 * 97 * np.pi * full_range) + np.cos(2 * 777 * np.pi * full_range)
     # x = np.cos(2 * np.pi * full_range) # + np.cos(2 * np.pi * full_range)
@@ -1611,7 +1616,7 @@ def two_D_CS_p1_recon_with_given_landscapes(
     
     # for label in _LABELS:
         # X = origin[label]
-    ny, nx = origin['ideals'].shape
+    ny, nx = origin[_LABELS[0]].shape
 
     # extract small sample of signal
     k = round(nx * ny * sampling_frac)
@@ -1642,6 +1647,9 @@ def two_D_CS_p1_recon_with_given_landscapes(
         _vis_one_D_p1_recon(
             origin_dict=origin,
             recon_dict=recon,
+            full_range=full_range,
+            bounds=None,
+            true_optima=None,
             title='test',
             save_path=f'{figdir}/origin_and_2D_recon_sf{sampling_frac:.3f}.png'
         )

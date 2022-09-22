@@ -66,6 +66,7 @@ from QAOAKit.vis import(
     vis_landscape_multi_p_and_and_count_optima_MP,
     vis_multi_landscape_and_count_optima_and_mitiq_MP,
     vis_multi_landscapes_and_count_optima_and_mitiq_MP_and_one_variable,
+    vis_two_BPs_p1_recon
 )
 
 from QAOAKit import (
@@ -826,8 +827,8 @@ def compare_with_original_grad_top():
     #     G, p
     # )
 
-    bounds = data['bounds'].tolist()
-    bounds = np.array([bounds['gamma'], bounds['beta']])
+    bounds_dict = data['bounds'].tolist()
+    bounds = np.array([bounds_dict['gamma'], bounds_dict['beta']])
     optimizer = wrap_qiskit_optimizer_to_landscape_optimizer(
         # SPSA
         ADAM
@@ -899,7 +900,8 @@ def compare_with_original_grad_top():
         grad_appro = jac_appro(x)
 
         # print(np.linalg.norm(grad_ideal), np.linalg.norm(grad_appro))
-        # print(grad_ideal, grad_appro)
+        # print(grad_ideal)
+        # print(grad_appro)
         # norm = ((grad_ideal - grad_appro)**2).mean()
 
         norm = cosine(grad_ideal, grad_appro)
@@ -974,6 +976,234 @@ def CS_on_google_data():
             recons=recons, origin=landscape, times=times)
 
 
+def get_grid_points(bounds, n_samples_along_axis):
+    # from qaoa format to angles to qiskit format
+    xs = []
+    qaoa_angles = []
+    for gamma in np.linspace(bounds['gamma'][0], bounds['gamma'][1], 10):
+        for beta in np.linspace(bounds['beta'][0], bounds['beta'][1], 20):
+            qaoa_angles.append({
+                'gamma': [gamma],
+                'beta': [beta]
+            })
+            angles = angles_from_qaoa_format(
+                gamma=np.array([gamma]),
+                beta=np.array([beta])
+            )
+            # print(angles)
+            x = angles_to_qiskit_format(angles)
+            xs.append(x)
+
+    xs = np.array(xs)
+    return xs, qaoa_angles
+
+
+def compare_two_BPs():
+    # compare two places of BPs, and visualize
+    reg3_dataset_table = get_3_reg_dataset_table()
+
+    grad_data_dir = "figs/cnt_opt_miti/2022-09-01_22:20:04/G40_nQ8_p1_grad"
+    data_dir = "figs/cnt_opt_miti/2022-08-10_10:14:03/G40_nQ8_p1"
+    data = np.load(f"{data_dir}/data.npz", allow_pickle=True)
+    grad_data = np.load(f"{grad_data_dir}/grad_data.npz", allow_pickle=True)
+    recon_data_dir = "figs/cnt_opt_miti/2022-08-10_10:14:03/G40_nQ8_p1/2D_CS_recon.npz"
+    recon_data = np.load(recon_data_dir, allow_pickle=True)
+
+    grads = grad_data['grads'].tolist()
+    origin = data['origin'].tolist()
+    recon = recon_data['recon'].tolist()
+
+    n_qubits = 8
+    p = 1
+    df = reg3_dataset_table.reset_index()
+    # print(df)
+    # print(df.columns)
+    df = df[(df["n"] == n_qubits) & (df["p_max"] == p)]
+    for row_id, row in df.iloc[1:2].iterrows(): # ! do not change!
+        pass
+    print("============================")
+    angles1 = opt_angles_for_graph(row["G"], row["p_max"])
+    G = row["G"]
+    print('row_id:', row_id)
+    # qc1, C, offset = get_maxcut_qaoa_qiskit_circuit_unbinded_parameters(
+    #     G, p
+    # )
+
+    bounds_dict = data['bounds'].tolist()
+    bounds = np.array([bounds_dict['gamma'], bounds_dict['beta']])
+    optimizer = wrap_qiskit_optimizer_to_landscape_optimizer(
+        # SPSA
+        ADAM
+        # L_BFGS_B
+    #     # COBYLA
+    )(
+        bounds=bounds, 
+        # landscape=origin['ideals'],
+        landscape=recon['ideals'],
+        # landscape=recon['unmitis'],
+        # landscape=recon['mitis'],
+        fun_type='INTERPOLATE'
+    )
+
+    # left, right, down, up, in qaoa format
+    # box1 = [-0.25, 0.25, 0.6, 1.1]
+    # box2 = [-0.25, 0.25, 0.1, 0.6]
+
+    # box1_bounds = {
+    #     'gamma': [box1[2], box1[3]],
+    #     'beta': [box1[0], box1[1]]
+    # }
+
+    # box2_bounds = {
+    #     'gamma': [box2[2], box2[3]],
+    #     'beta': [box2[0], box2[1]]
+    # }
+
+    box1_bounds = {
+        'gamma': [0.7, 0.9],
+        # 'beta': [-0.25, 0.25]
+        'beta': bounds_dict['beta']
+        # 'beta': [0, 0.25]
+        # 'beta': [-0.5, 0.5]
+    }
+
+    # box1_bounds = bounds_dict.copy()
+
+    box2_bounds = {
+        'gamma': [0.2, 0.4],
+        # 'beta': [-0.25, 0.25]
+        'beta': bounds_dict['beta']
+        # 'beta': [0, 0.25]
+        # 'beta': [-0.5, 0.5]
+    }
+
+    # box2_bounds = bounds_dict.copy()
+
+    sf = 0.05
+    n_samples_along_axis = 10
+
+    figdir = f"{data_dir}/two_BPs"
+    if not os.path.exists(figdir):
+        os.makedirs(figdir)
+
+    # eps = 1e-10
+    # eps = 0.001
+    eps = 0.01
+    # eps = 0.1
+    noise_model = get_depolarizing_error_noise_model(p1Q=0.001, p2Q=0.005) # ! base noise model
+
+    def _get_ideal_energy_by_qc(x):
+        x = optimizer.qiskit_format_to_qaoa_format_arr(x)
+        # qc = get_maxcut_qaoa_circuit(
+        #     G, gamma=x[:p], beta=x[p:], 
+        #     # transpile_to_basis=True, save_state=False
+        # )
+        # energy = _mitiq_executor_of_qaoa_maxcut_energy(
+        #     qc=qc,
+        #     G=G,
+        #     is_noisy=True,
+        #     shots=2048
+        # )
+        energy = noisy_qaoa_maxcut_energy(G=G, gamma=x[:p], beta=x[p:], noise_model=None)
+        return -energy
+        
+    jac_appro = get_numerical_derivative(
+        optimizer.approximate_fun_value, eps
+    )
+
+    jac_ideal = get_numerical_derivative(
+        _get_ideal_energy_by_qc, eps
+    )
+
+    if False:
+        box1_points, qaoa_angles1 = get_grid_points(box1_bounds, n_samples_along_axis)
+        print(len(box1_points))
+        box2_points, qaoa_angles2 = get_grid_points(box2_bounds, n_samples_along_axis)
+        print(len(box2_points))
+        np.savez_compressed(f"{figdir}/box1_and_box2_points.npz",
+            box1_points=box1_points, box2_points=box2_points,
+            qaoa_angles1=qaoa_angles1, qaoa_angles2=qaoa_angles2)
+    else:
+        xs = np.load(f"{figdir}/box1_and_box2_points.npz", allow_pickle=True)
+        box1_points = xs['box1_points']
+        box2_points = xs['box2_points']
+        qaoa_angles1 = xs['qaoa_angles1']
+        qaoa_angles2 = xs['qaoa_angles2']
+
+    recon_var_dict = { 
+        label: {'gamma': 0.0, 'beta': 0.0} 
+        for label in origin.keys() 
+    }
+    print(recon_var_dict)
+
+    def get_norm(points):
+        total_norm = 0
+        grads_ideal = []
+        grads_appro = []
+        for i in range(len(points)):
+            x = points[i]
+            # print("x", x)
+
+            # optimizer.approximate_fun_value(x)
+
+            grad_ideal = jac_ideal(x)
+            grad_appro = jac_appro(x)
+            grads_ideal.append(grad_ideal)
+            grads_appro.append(grad_appro)
+
+            # assert grad_ideal[0] < 10 and grad_ideal[1] < 10
+            # assert grad_appro[0] < 10 and grad_appro[1] < 10
+            # print(grad_ideal.dtype)
+
+            # print(np.linalg.norm(grad_ideal), np.linalg.norm(grad_appro))
+            # print(grad_ideal, grad_appro)
+            # norm = ((grad_ideal - grad_appro)**2).mean()
+
+            norm = cosine(grad_ideal, grad_appro)
+            print(f"norm={norm}")
+            total_norm += norm
+
+        grads_ideal = np.array(grads_ideal)
+        print(grads_ideal.shape)
+        grads_appro = np.array(grads_appro)
+        print(grads_appro.shape)
+
+        var_ideal = np.var(grads_ideal, axis=0)
+        var_appro = np.var(grads_appro, axis=0)
+
+        mean_ideal = np.mean(grads_ideal, axis=0)
+        mean_appro = np.mean(grads_appro, axis=0)
+
+        total_norm /= len(grad_ideal)
+        print("var of ideal: ", var_ideal)
+        print("var of appro: ", var_appro)
+        print("mean of ideal: ", mean_ideal)
+        print("mean of appro: ", mean_appro)
+        return total_norm
+
+    box1_norm = get_norm(box1_points)
+    box2_norm = get_norm(box2_points)
+
+    print(box1_norm, box2_norm)
+    
+    vis_two_BPs_p1_recon(
+        origin_dict=origin,
+        recon_dict=recon,
+        full_range=data['full_range'].tolist(),
+        bounds=data['bounds'].tolist(),
+        box1=box1_bounds,
+        box2=box2_bounds,
+        box1_points=qaoa_angles1,
+        box2_points=qaoa_angles2,
+        # box1_points=None,
+        # box2_points=None,
+        title=f'BP with sampling fraction {sf:.3f}',
+        save_path=f'{figdir}/two_BPs_recon_sf{sf:.3f}.png'
+    )
+
+    return
+
+
 if __name__ == "__main__":
     # test_qiskit_qaoa_circuit()
     # test_noisy_qaoa_maxcut_energy()
@@ -996,4 +1226,6 @@ if __name__ == "__main__":
     # p1_generate_grad_top()
     # approximate_grad_by_2D_interpolation_top()
 
-    CS_on_google_data()
+    # CS_on_google_data()
+
+    compare_two_BPs()
