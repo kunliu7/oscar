@@ -904,10 +904,6 @@ def gen_p1_landscape(
     print('n_pts_per_unit: ', n_pts_per_unit)
     # sample P points from N randomly
 
-    # mitis = []
-    # unmitis = []
-    # ideals = []
-
     _LABELS = ['mitis', 'unmitis', 'ideals']
     origin = {label: [] for label in _LABELS}
 
@@ -916,13 +912,8 @@ def gen_p1_landscape(
         'beta': np.linspace(bounds['beta'][0], bounds['beta'][1], n_pts['beta'])
     }
 
-    
     params = []
     for gamma in full_range['gamma']:
-        # mitis = []
-        # unmitis = []
-        # ideals = []
-
         for beta in full_range['beta']:
             param = (
                 G.copy(),
@@ -931,55 +922,13 @@ def gen_p1_landscape(
                 n_shots
             )
             params.append(param)
-            # circuit = get_maxcut_qaoa_circuit(
-            #     G, beta=[beta], gamma=[gamma],
-            #     transpile_to_basis=True, save_state=False)
-            
-            # ideal_f = executor.submit(
-            #     _mitiq_executor_of_qaoa_maxcut_energy,
-            #     circuit.copy(),
-            #     G,
-            #     False,
-            #     n_shots
-            # )
-
-            # unmiti_f = executor.submit(
-            #     _mitiq_executor_of_qaoa_maxcut_energy,
-            #     circuit.copy(),
-            #     G,
-            #     True,
-            #     n_shots
-            # )
-
-            # miti_f = executor.submit(
-            #     zne.execute_with_zne,
-            #     circuit.copy(),
-            #     partial(_mitiq_executor_of_qaoa_maxcut_energy, is_noisy=True, G=G, shots=n_shots),
-            # )
-            
-            # mitis.append(miti_f.result())
-            # unmitis.append(unmiti_f.result())
-            # ideals.append(ideal_f.result())
-
-            # ideal = mitiq_executor_of_qaoa_maxcut_energy(circuit.copy(), is_noisy=False)
-            # unmiti = mitiq_executor_of_qaoa_maxcut_energy(circuit.copy(), is_noisy=True)
-            # miti = zne.execute_with_zne(
-            #     circuit=circuit.copy(),
-            #     executor=partial(mitiq_executor_of_qaoa_maxcut_energy, is_noisy=True),
-            # )
-            # mitis.append(miti)
-            # unmitis.append(unmiti)
-            # ideals.append(ideal)
-
-        # origin['mitis'].append(mitis.copy())
-        # origin['unmitis'].append(unmitis.copy())
-        # origin['ideals'].append(ideals.copy())
-
+    
     print(len(params))
 
     start_time = time.time()
     print("start time: ", get_curr_formatted_timestamp())
     with concurrent.futures.ProcessPoolExecutor() as executor:
+        # ! submit will shows exception, while map does not
         # future = executor.submit(
         #     _one_D_CS_p1_recon_for_one_point,
         #     *params[0]
@@ -1000,30 +949,6 @@ def gen_p1_landscape(
     for label, arr in origin.items():
         origin[label] = np.array(arr).reshape(n_pts['gamma'], n_pts['beta'])
         print(origin[label].shape)
-        
-    # x = np.cos(2 * 97 * np.pi * full_range) + np.cos(2 * 777 * np.pi * full_range)
-    # x = np.cos(2 * np.pi * full_range) # + np.cos(2 * np.pi * full_range)
-    
-    # print('start: solve l1 norm')
-    # recon = {label: [] for label in _LABELS}
-    # for idx_gamma, _ in enumerate(full_range['gamma']):
-    #     Psi = dct(np.identity(n_pts['beta']))
-    #     perm = np.floor(np.random.rand(n_samples['beta']) * n_pts['beta']).astype(int)
-
-    #     ideals_recon = recon_by_Lasso(Psi[perm, :], origin['ideals'][idx_gamma, perm], alpha)
-    #     unmitis_recon = recon_by_Lasso(Psi[perm, :], origin['unmitis'][idx_gamma, perm], alpha)
-    #     mitis_recon = recon_by_Lasso(Psi[perm, :], origin['mitis'][idx_gamma, perm], alpha)
-
-    #     recon['ideals'].append(ideals_recon.copy())
-    #     recon['unmitis'].append(unmitis_recon.copy())
-    #     recon['mitis'].append(mitis_recon.copy())
-
-    # _vis_one_D_p1_recon(
-    #     origin_dict=origin,
-    #     recon_dict=recon,
-    #     title='test',
-    #     save_path=f'{figdir}/origin_recon.png'
-    # )
 
     np.savez_compressed(f"{figdir}/data",
 
@@ -1047,9 +972,9 @@ def gen_p1_landscape(
         # improved_n_optima_recon=improved_n_optima_recon,
         C_opt=C_opt)
 
-    print('data is saved')
+    print('generated landscapes data is saved')
     return
-    
+
 
 @DeprecationWarning
 def one_D_CS_p1_generate_landscape(
