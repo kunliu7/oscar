@@ -65,7 +65,7 @@ from qiskit.algorithms.optimizers.optimizer import POINT
 
 from QAOAKit import qaoa
 
-
+@DeprecationWarning()
 def cosamp(phi, u, s, epsilon=1e-10, max_iter=1000):
     """
     Return an `s`-sparse approximation of the target signal
@@ -139,6 +139,7 @@ def recon_1D_by_cvxpy(A, b):
     return Xa
 
 
+@DeprecationWarning()
 def recon_by_CoSaMP(y, Psi, perm, sparsity):
     # n = x.shape[0]
     # xt = np.fft.fft(x) # Fourier transformed signal
@@ -156,6 +157,7 @@ def recon_by_CoSaMP(y, Psi, perm, sparsity):
     return xrecon
 
 
+@DeprecationWarning()
 def _vis_y_and_x_recon(
         C_opt, bound, var_opt,
         recon_range, x_recon,
@@ -219,6 +221,7 @@ def _vis_miti_and_unmiti_recon(
 
 
 
+@DeprecationWarning()
 def CS_and_one_landscape_and_cnt_optima_and_mitiq_and_one_variable(
         G: nx.Graph,
         p: int,
@@ -406,6 +409,7 @@ def CS_and_one_landscape_and_cnt_optima_and_mitiq_and_one_variable(
     return
 
 
+@DeprecationWarning()
 def CS_and_one_landscape_and_cnt_optima_and_mitiq_and_one_variable_and_sampling_frac(
         G: nx.Graph,
         p: int,
@@ -593,6 +597,7 @@ def CS_and_one_landscape_and_cnt_optima_and_mitiq_and_one_variable_and_sampling_
     return
 
 
+@DeprecationWarning()
 def multi_landscapes_and_cnt_optima_and_mitiq_and_MP_and_one_variable_and_CS(
         G: nx.Graph, 
         p: int,
@@ -734,12 +739,23 @@ def _vis_one_D_p1_recon(
     plt.close('all')
 
 
-def _one_D_CS_p1_recon_for_one_point(
+def _get_ideal_unmiti_miti_value_for_one_point_p1(
     G,
     beta,
     gamma,
     shots
 ):
+    """Generate ideal, unmitigated and mitigated expectation value for given one point
+
+    Args:
+        G (_type_): _description_
+        beta (_type_): _description_
+        gamma (_type_): _description_
+        shots (_type_): _description_
+
+    Returns:
+        _type_: _description_
+    """
     circuit = get_maxcut_qaoa_circuit(
         G, beta=[beta], gamma=[gamma],
         transpile_to_basis=True, save_state=False)
@@ -770,8 +786,8 @@ def _mitiq_executor_of_qaoa_maxcut_energy(qc, G, is_noisy, shots) -> float:
     return -expval
 
 
-def _one_D_CS_p1_recon_for_one_point_mapper(param):
-    return _one_D_CS_p1_recon_for_one_point(*param)
+def _get_ideal_unmiti_miti_value_for_one_point_p1_wrapper_for_concurrency(param):
+    return _get_ideal_unmiti_miti_value_for_one_point_p1(*param)
 
 
 def one_D_CS_p1_recon_with_given_landscapes_and_varing_sampling_frac(
@@ -853,7 +869,7 @@ def one_D_CS_p1_recon_with_given_landscapes_and_varing_sampling_frac(
     return recon
 
 
-def one_D_CS_p1_generate_landscape_task(
+def gen_p1_landscape(
         G: nx.Graph,
         p: int,
         figdir: str,
@@ -969,7 +985,7 @@ def one_D_CS_p1_generate_landscape_task(
         #     *params[0]
         # )
         futures = executor.map(
-            _one_D_CS_p1_recon_for_one_point_mapper, params
+            _get_ideal_unmiti_miti_value_for_one_point_p1_wrapper_for_concurrency, params
         )
     print("end time: ", get_curr_formatted_timestamp())
     end_time = time.time()
@@ -1031,93 +1047,11 @@ def one_D_CS_p1_generate_landscape_task(
         # improved_n_optima_recon=improved_n_optima_recon,
         C_opt=C_opt)
 
-    print('end: solve l1 norm')
-    
-    # ----- count optima
-
-    # max_unmiti = unmitis.max()
-    # improved_n_optima = np.sum(
-    #     # np.isclose(unmitis_recon, C_opt, atol=C_opt-max_miti) == True
-    #     mitis > max_unmiti
-    # )
-    
-    # max_unmiti_recon = unmitis_recon.max()
-    # improved_n_optima_recon = np.sum(
-    #     # np.isclose(mitis_recon, C_opt, atol=abs(C_opt-max_unmiti_recon)) == True
-    #     mitis_recon > max_unmiti_recon
-    # )
-
-    # print('improved_n_optima, recon', improved_n_optima, improved_n_optima_recon)
-
-    # =============== vis unmiti ===============
-
-    # _vis_y_and_x_recon(
-    #     C_opt=C_opt, bound=bound, var_opt=_BETA_GAMMA_OPT[var_idx],
-
-    #     recon_range=full_range, x_recon=mitis_recon,
-    #     sample_range=full_range[perm], x_sample=mitis[perm],
-    #     full_range=full_range, x_full=mitis,
-
-    #     xlabel=_X_Y_LABELS[var_idx],
-    #     title=f'QAOA energy, nQ{G.number_of_nodes()}, recon miti',
-    #     save_path=f'{figdir}/zne_varIdx={var_idx}_mitis_recon.png'
-    # )
-    
-    # _vis_y_and_x_recon(
-    #     C_opt=C_opt, bound=bound, var_opt=_BETA_GAMMA_OPT[var_idx],
-        
-    #     recon_range=full_range, x_recon=unmitis_recon,
-    #     sample_range=full_range[perm], x_sample=unmitis[perm],
-    #     full_range=full_range, x_full=unmitis,
-
-    #     xlabel=_X_Y_LABELS[var_idx],
-    #     title=f'QAOA energy, nQ{G.number_of_nodes()}, recon unmiti',
-    #     save_path=f'{figdir}/zne_varIdx={var_idx}_unmitis_recon.png'
-    # )
-    
-    # _vis_y_and_x_recon(
-    #     C_opt=C_opt, bound=bound, var_opt=_BETA_GAMMA_OPT[var_idx],
-
-    #     recon_range=full_range, x_recon=ideals_recon,
-    #     sample_range=full_range[perm], x_sample=ideals[perm],
-    #     full_range=full_range, x_full=ideals,
-
-    #     xlabel=_X_Y_LABELS[var_idx],
-    #     title=f'QAOA energy, nQ{G.number_of_nodes()}, recon ideal',
-    #     save_path=f'{figdir}/zne_varIdx={var_idx}_ideal.png'
-    # )
-
-    # _vis_miti_and_unmiti_recon(
-    #     C_opt=C_opt, bound=bound, var_opt=_BETA_GAMMA_OPT[var_idx],
-    #     full_range=full_range,
-    #     mitis_recon=mitis_recon,
-    #     unmitis_recon=unmitis_recon,
-    #     ideal_recon=ideals_recon,
-    #     xlabel=_X_Y_LABELS[var_idx],
-    #     title=f'QAOA energy, nQ{G.number_of_nodes()}, reconstructed unmiti and miti',
-    #     save_path=f'{figdir}/zne_varIdx={var_idx}_unmitis_recon_and_mitis_recon.png'
-    # )
-
-    # ======== save ==========
-
-    # np.savez_compressed(f"{figdir}/varIdx{var_idx}",
-
-    #     # reconstruct
-    #     mitis=mitis, unmitis=unmitis, ideals=ideals,
-    #     unmitis_recon=unmitis_recon, mitis_recon=mitis_recon, ideals_recon=ideals_recon,
-
-    #     # parameters
-    #     n_pts=n_pts, n_samples=n_samples, sampling_frac=sampling_frac,
-    #     perm=perm, full_range=full_range,
-
-    #     # n_optima
-    #     improved_n_optima=improved_n_optima,
-    #     improved_n_optima_recon=improved_n_optima_recon,
-    #     C_opt=C_opt)
-
+    print('data is saved')
     return
+    
 
-
+@DeprecationWarning
 def one_D_CS_p1_generate_landscape(
         G: nx.Graph, 
         p: int,
@@ -1159,7 +1093,7 @@ def one_D_CS_p1_generate_landscape(
     #     )
     #     print(future.result())
 
-    one_D_CS_p1_generate_landscape_task(*params[0])
+    gen_p1_landscape(*params[0])
         
     return [], []
 
@@ -1563,6 +1497,17 @@ def two_D_CS_p1_recon_with_given_landscapes(
     # n_pts: dict,
     sampling_frac: float
 ):
+    """Reconstruct landscapes by sampling on given landscapes.
+
+    Args:
+        figdir (str): _description_
+        origin (dict): _description_
+        full_range (dict): _description_
+        sampling_frac (float): _description_
+
+    Returns:
+        _type_: _description_
+    """
     # ! Convention: First beta, Last gamma
     
     # hyper parameters
