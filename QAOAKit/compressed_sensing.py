@@ -24,6 +24,7 @@ from sklearn import linear_model
 from qiskit.providers.aer.noise import NoiseModel
 import concurrent.futures
 from mitiq import zne, Observable, PauliString
+from mitiq.zne.zne import execute_with_zne
 from mitiq.interface.mitiq_qiskit.qiskit_utils import (
     execute,
     execute_with_noise,
@@ -65,7 +66,7 @@ from qiskit.algorithms.optimizers.optimizer import POINT
 
 from QAOAKit import qaoa
 
-@DeprecationWarning()
+# @DeprecationWarning()
 def cosamp(phi, u, s, epsilon=1e-10, max_iter=1000):
     """
     Return an `s`-sparse approximation of the target signal
@@ -139,7 +140,7 @@ def recon_1D_by_cvxpy(A, b):
     return Xa
 
 
-@DeprecationWarning()
+# @DeprecationWarning()
 def recon_by_CoSaMP(y, Psi, perm, sparsity):
     # n = x.shape[0]
     # xt = np.fft.fft(x) # Fourier transformed signal
@@ -157,7 +158,7 @@ def recon_by_CoSaMP(y, Psi, perm, sparsity):
     return xrecon
 
 
-@DeprecationWarning()
+# @DeprecationWarning()
 def _vis_y_and_x_recon(
         C_opt, bound, var_opt,
         recon_range, x_recon,
@@ -221,7 +222,7 @@ def _vis_miti_and_unmiti_recon(
 
 
 
-@DeprecationWarning()
+# @DeprecationWarning()
 def CS_and_one_landscape_and_cnt_optima_and_mitiq_and_one_variable(
         G: nx.Graph,
         p: int,
@@ -409,7 +410,7 @@ def CS_and_one_landscape_and_cnt_optima_and_mitiq_and_one_variable(
     return
 
 
-@DeprecationWarning()
+# @DeprecationWarning()
 def CS_and_one_landscape_and_cnt_optima_and_mitiq_and_one_variable_and_sampling_frac(
         G: nx.Graph,
         p: int,
@@ -597,7 +598,7 @@ def CS_and_one_landscape_and_cnt_optima_and_mitiq_and_one_variable_and_sampling_
     return
 
 
-@DeprecationWarning()
+# @DeprecationWarning()
 def multi_landscapes_and_cnt_optima_and_mitiq_and_MP_and_one_variable_and_CS(
         G: nx.Graph, 
         p: int,
@@ -646,7 +647,7 @@ def multi_landscapes_and_cnt_optima_and_mitiq_and_MP_and_one_variable_and_CS(
     return [], []
 
 
-# ================== one dimensional CS p==1 ==================
+# ================== CS p==1 ==================
 
 def _vis_one_D_p1_recon(
         origin_dict,
@@ -743,47 +744,53 @@ def _get_ideal_unmiti_miti_value_for_one_point_p1(
     G,
     beta,
     gamma,
-    shots
+    shots,
+    noise_model
 ):
-    """Generate ideal, unmitigated and mitigated expectation value for given one point
-
-    Args:
-        G (_type_): _description_
-        beta (_type_): _description_
-        gamma (_type_): _description_
-        shots (_type_): _description_
-
-    Returns:
-        _type_: _description_
+    """Generate ideal, unmitigated and mitigated energy for given one point.
     """
     circuit = get_maxcut_qaoa_circuit(
         G, beta=[beta], gamma=[gamma],
-        transpile_to_basis=True, save_state=False)
+        # transpile_to_basis=True, save_state=False)
+        transpile_to_basis=False, save_state=False)
 
-    ideal = _mitiq_executor_of_qaoa_maxcut_energy(circuit.copy(), G, is_noisy=False, shots=shots)
-    unmiti = _mitiq_executor_of_qaoa_maxcut_energy(circuit.copy(), G, is_noisy=True, shots=shots)
-    miti = zne.execute_with_zne(
-        circuit=circuit.copy(),
-        executor=partial(_mitiq_executor_of_qaoa_maxcut_energy, G=G, is_noisy=True, shots=shots),
+    ideal = _executor_of_qaoa_maxcut_energy(
+        circuit.copy(), G, noise_model=None, shots=shots)
+    unmiti = _executor_of_qaoa_maxcut_energy(
+        circuit.copy(), G, noise_model=copy.deepcopy(noise_model), shots=shots)
+    # miti = 0
+    miti = execute_with_zne(
+        circuit.copy(),
+        executor=partial(
+            _executor_of_qaoa_maxcut_energy, G=G, noise_model=None, shots=shots),
     )
+    print(miti)
 
     return ideal, unmiti, miti
 
 
-def _mitiq_executor_of_qaoa_maxcut_energy(qc, G, is_noisy, shots) -> float:
+def _executor_of_qaoa_maxcut_energy(qc, G, noise_model, shots) -> float:
+    """Generate mitigated QAOA MaxCut energy.
+    """
     backend = AerSimulator()
     qc.measure_all()
     # backend = Aer.get_backend('aer_simulator')
-    noise_model = get_depolarizing_error_noise_model(p1Q=0.001, p2Q=0.005) # ! base noise model
+    # noise_model = get_depolarizing_error_noise_model(p1Q=0.001, p2Q=0.005) # ! base noise model
     # noise_model = None
     counts = backend.run(
         qc,
         shots=shots,
-        noise_model=noise_model if is_noisy else None
-    ).result().get_counts()
+        # noise_model=noise_model if is_noisy else None
+        noise_model=noise_model
+    ).result()
+
+    counts = counts.get_counts()
+    # print(counts)
     
     expval = compute_expectation(counts, G)
+    # print(expval)
     return -expval
+    # return expval
 
 
 def _get_ideal_unmiti_miti_value_for_one_point_p1_wrapper_for_concurrency(param):
@@ -877,18 +884,21 @@ def gen_p1_landscape(
         gamma_opt: np.array, # converted
         noise_model: NoiseModel,
         params_path: list,
-        C_opt: float
+        C_opt: float,
+        bounds = {'beta': [-np.pi/4, np.pi/4],
+                 'gamma': [-np.pi, np.pi]},
+        n_shots: int=2048,
+        n_pts_per_unit: int=36
     ):
     # ! Convention: First beta, Last gamma
     
     # hyper parameters
-    # alpha = 0.1
-    n_shots = 2048
-    n_pts_per_unit = 36     # num. of original points per unit == 4096, i.e. resolution rate = 1 / n
+    # n_shots = 2
+    # n_pts_per_unit = 2     # num. of original points per unit == 4096, i.e. resolution rate = 1 / n
     
     # beta first, gamma later
-    bounds = {'beta': [-np.pi/4, np.pi/4],
-              'gamma': [-np.pi, np.pi]}
+    # bounds = {'beta': [-np.pi/4, np.pi/4],
+    #           'gamma': [-np.pi, np.pi]}
 
     n_pts = {}
     # n_samples = {}
@@ -919,18 +929,19 @@ def gen_p1_landscape(
                 G.copy(),
                 beta,
                 gamma,
-                n_shots
+                n_shots,
+                copy.deepcopy(noise_model)
             )
             params.append(param)
     
-    print(len(params))
+    print('totally num. need to calculate energies:', len(params))
 
     start_time = time.time()
     print("start time: ", get_curr_formatted_timestamp())
     with concurrent.futures.ProcessPoolExecutor() as executor:
         # ! submit will shows exception, while map does not
         # future = executor.submit(
-        #     _one_D_CS_p1_recon_for_one_point,
+        #     _get_ideal_unmiti_miti_value_for_one_point_p1_wrapper_for_concurrency,
         #     *params[0]
         # )
         futures = executor.map(
@@ -939,9 +950,10 @@ def gen_p1_landscape(
     print("end time: ", get_curr_formatted_timestamp())
     end_time = time.time()
 
-    print(f"full landscape time usage: {end_time - start_time} s")
+    print(f"full landscape time usage: {(end_time - start_time) / 3600} h")
 
     for f in futures:
+        print(f)
         origin['ideals'].append(f[0])
         origin['unmitis'].append(f[1])
         origin['mitis'].append(f[2])
@@ -951,32 +963,23 @@ def gen_p1_landscape(
         print(origin[label].shape)
 
     np.savez_compressed(f"{figdir}/data",
-
-        # reconstruct
+        # landscapes
         origin=origin,
-        # recon=recon,
-        # mitis=mitis, unmitis=unmitis, ideals=ideals,
-        # unmitis_recon=unmitis_recon, mitis_recon=mitis_recon, ideals_recon=ideals_recon,
 
         # parameters
         n_pts=n_pts,
-        # n_samples=n_samples, sampling_frac=sampling_frac,
-        # perm=perm,
         full_range=full_range,
         bounds=bounds,
         n_shots=n_shots,
         n_pts_per_unit=n_pts_per_unit,
 
-        # n_optima
-        # improved_n_optima=improved_n_optima,
-        # improved_n_optima_recon=improved_n_optima_recon,
         C_opt=C_opt)
 
     print('generated landscapes data is saved')
     return
 
 
-@DeprecationWarning
+# @DeprecationWarning
 def one_D_CS_p1_generate_landscape(
         G: nx.Graph, 
         p: int,
@@ -1080,7 +1083,7 @@ def qaoa_maxcut_energy_2b_wrapped(x, qc, G, is_noisy, shots):
     n = x.shape[0]
     beta = x[:n]
     gamma = x[n:]
-    energy = _mitiq_executor_of_qaoa_maxcut_energy(qc.copy(), G, is_noisy=is_noisy, shots=shots)
+    energy = _executor_of_qaoa_maxcut_energy(qc.copy(), G, is_noisy=is_noisy, shots=shots)
     return energy
 
 
