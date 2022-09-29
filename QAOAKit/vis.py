@@ -929,7 +929,7 @@ def vis_two_BPs_p1_recon(
 
     # plt.figure
     plt.rc('font', size=28)
-    fig, axs = plt.subplots(nrows=1, ncols=2, figsize=(30, 30))
+    fig, axs = plt.subplots(nrows=2, ncols=3, figsize=(30, 30))
     fig.suptitle(title, y=0.92)
     axs = axs.reshape(-1)
 
@@ -969,7 +969,7 @@ def vis_two_BPs_p1_recon(
         axs[idx].add_patch(copy.deepcopy(rect1))
         axs[idx].add_patch(copy.deepcopy(rect2))
 
-        if box1_points:
+        if box1_points != None:
             xs = []
             ys = []
             for p in box1_points:
@@ -977,7 +977,7 @@ def vis_two_BPs_p1_recon(
                 ys.append(p['gamma'])
             axs[idx].scatter(xs, ys, s=2)
 
-        if box2_points:
+        if box2_points != None:
             xs = []
             ys = []
             for p in box2_points:
@@ -990,7 +990,7 @@ def vis_two_BPs_p1_recon(
         # axs[idx].set_ylim(bottom=bounds['gamma'][0], top=bounds['gamma'][1])
 
         # im = axs[idx + 3].imshow(recon)
-        shift = 1
+        shift = 3
         im = axs[idx + shift].pcolormesh(X, Y, recon)
         axs[idx + shift].set_title(f"recon, {label}")
         axs[idx + shift].set_xlabel('beta')
@@ -1004,6 +1004,51 @@ def vis_two_BPs_p1_recon(
 
     plt.legend()
     fig.colorbar(im, ax=[axs[i] for i in range(6)])
+    # plt.title(title)
+    # plt.subtitle(title)
+    fig.savefig(save_path)
+    plt.close('all')
+
+
+def _vis_recon_distributed_landscape(
+        landscapes,
+        labels,
+        # origin_dict,
+        # recon_dict,
+        # gamma_range,
+        # beta_range,
+        # C_opt, bound, var_opt,
+        bounds,
+        full_range,
+        true_optima,
+        # mitis_recon,
+        # unmitis_recon,
+        # ideal_recon,
+        # xlabel, 
+        title,
+        save_path,
+        recon_params_path_dict=None,
+        origin_params_path_dict=None
+    ):
+
+    # plt.figure
+    plt.rc('font', size=28)
+    fig, axs = plt.subplots(nrows=2, ncols=2, figsize=(30, 30))
+    fig.suptitle(title, y=0.92)
+    axs = axs.reshape(-1)
+
+    # TODO Check ij and xy
+    X, Y = np.meshgrid(full_range['beta'], full_range['gamma'])
+
+    # c = ax.pcolormesh(X, Y, Z, cmap='viridis', vmin=Z.min(), vmax=Z.max())
+    for idx, landscape in enumerate(landscapes):
+        im = axs[idx].pcolormesh(X, Y, landscape) #, cmap='viridis', vmin=origin.min(), vmax=origin.max())
+        axs[idx].set_title(labels[idx])
+        axs[idx].set_xlabel('beta')
+        axs[idx].set_ylabel('gamma')
+
+    plt.legend()
+    fig.colorbar(im, ax=[axs[i] for i in range(len(landscapes))])
     # plt.title(title)
     # plt.subtitle(title)
     fig.savefig(save_path)

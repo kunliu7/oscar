@@ -47,6 +47,7 @@ from scipy.spatial.distance import (
     cosine
 )
 from qiskit.quantum_info import Statevector
+from QAOAKit.n_dim_cs import recon_4D_landscape
 # from QAOAKit import vis
 
 sys.path.append('..')
@@ -58,6 +59,7 @@ from QAOAKit.noisy_params_optim import (
 )
 
 from QAOAKit.vis import(
+    _vis_recon_distributed_landscape,
     vis_landscape,
     vis_landscape_heatmap,
     vis_landscape_heatmap_multi_p,
@@ -121,6 +123,7 @@ from QAOAKit.examples_utils import get_20_node_erdos_renyi_graphs
 from QAOAKit.parameter_optimization import get_median_pre_trained_kde
 from QAOAKit.compressed_sensing import (
     gen_p1_landscape,
+    two_D_CS_p1_recon_with_distributed_landscapes,
     two_D_CS_p1_recon_with_given_landscapes,
 )
 from QAOAKit.optimizer_wrapper import (
@@ -145,7 +148,6 @@ def gen_p1_landscape_top():
     """
 
     MAX_NUM_GRAPHS_PER_NUM_QUBITS = 10
-    # print("?")
     reg3_dataset_table = get_3_reg_dataset_table()
     print("read 3 reg dataset OK")
     print("use fixed angles to calculate n_optima")
@@ -239,6 +241,61 @@ def two_D_CS_p1_recon_with_given_landscapes_top():
         )
 
 
+def reconstruct_by_distributed_landscapes_top():
+
+    noisy_data1 = np.load("figs/cnt_opt_miti/2022-08-08_19:48:31/data.npz", allow_pickle=True)
+    ideal = noisy_data1['origin'].tolist()['ideals']
+    full_range = noisy_data1['full_range'].tolist()
+
+    # depolarizing 0.001 and 0.005, one-qubit gate error and two-qubit gate error
+    noisy1 = noisy_data1['origin'].tolist()['unmitis']
+
+    noisy_data_dir2 = "figs/gen_p1_landscape/2022-09-29_00:31:54/G40_nQ8_p1_depolar0.003_0.007"
+    noisy_data2 = np.load(
+        "figs/gen_p1_landscape/2022-09-29_00:31:54/G40_nQ8_p1_depolar0.003_0.007/data.npz",
+        allow_pickle=True)
+
+    # depolarizing 0.003 and 0.007, one-qubit gate error and two-qubit gate error
+    noisy2 = noisy_data2['origin'].tolist()['unmitis']
+
+    datas = [
+        ideal,
+        noisy1,
+        noisy2
+    ]
+
+    for data in datas:
+        print(data.shape)
+
+    if False:
+        recon = two_D_CS_p1_recon_with_distributed_landscapes(
+            ideal=ideal.copy(),
+            origins=datas,
+            sampling_frac=0.05
+        )
+        
+        np.savez_compressed(f"{noisy_data_dir2}/recon_by_{len(datas)}_landscapes", recon)
+    else:
+        recon = np.load(f"{noisy_data_dir2}/recon_by_{len(datas)}_landscapes.npz")['arr_0']
+
+    print(recon.shape)
+
+    _vis_recon_distributed_landscape(
+        landscapes=datas + [recon],
+        labels=['ideal', 'depolarizing, 0.001, 0.005', 'depolarizing, 0.003, 0.007', 'reconstructed by 1/3 of each'],
+        full_range=full_range,
+        bounds=None,
+        true_optima=None,
+        title='reconstruct distributed landscapes, sampling fraction: 5%',
+        save_path=f'{noisy_data_dir2}/recon_by_{len(datas)}_landscapes.png'
+    )
+
+    error = np.linalg.norm(ideal - recon)
+    print("reconstruct error: ", error)
+
+    return
+
+
 
 def get_grid_points(bounds, n_samples_along_axis):
     # from qaoa format to angles to qiskit format
@@ -266,5 +323,21 @@ def get_grid_points(bounds, n_samples_along_axis):
     return xs, qaoa_angles
 
 
+def test_4D_CS():
+    t = np.linspace(0, 1, 10000)
+    origin = np.cos(2 * 97 * t * np.pi).reshape(10, 10, 10, 10)
+    recon = recon_4D_landscape(
+        figdir=None,
+        origin=origin,
+        full_range=None,
+        sampling_frac=0.05
+    )
+
+    error = np.linalg.norm(origin - recon)
+    print(error)
+
+
 if __name__ == "__main__":
-    gen_p1_landscape_top()
+    # gen_p1_landscape_top()
+    reconstruct_by_distributed_landscapes_top()
+    # test_4D_CS()

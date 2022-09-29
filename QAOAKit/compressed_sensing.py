@@ -51,6 +51,9 @@ from .noisy_params_optim import (
     compute_expectation,
     get_depolarizing_error_noise_model
 )
+from .vis import (
+    _vis_recon_distributed_landscape
+)
 
 # vis
 import numpy as np
@@ -764,7 +767,7 @@ def _get_ideal_unmiti_miti_value_for_one_point_p1(
         executor=partial(
             _executor_of_qaoa_maxcut_energy, G=G, noise_model=None, shots=shots),
     )
-    print(miti)
+    # print(miti)
 
     return ideal, unmiti, miti
 
@@ -953,7 +956,7 @@ def gen_p1_landscape(
     print(f"full landscape time usage: {(end_time - start_time) / 3600} h")
 
     for f in futures:
-        print(f)
+        # print(f)
         origin['ideals'].append(f[0])
         origin['unmitis'].append(f[1])
         origin['mitis'].append(f[2])
@@ -1531,6 +1534,54 @@ def two_D_CS_p1_recon_with_given_landscapes(
     return recon
 
 
+def two_D_CS_p1_recon_with_distributed_landscapes(
+    ideal: np.ndarray,
+    origins: List[np.ndarray],
+    # full_range: dict,
+    # n_pts: dict,
+    sampling_frac: float
+):
+    """Reconstruct landscapes by sampling on distributed landscapes.
+
+    """
+    # ! Convention: First beta, Last gamma
+    
+    print('start: solve l1 norm')
+    ny, nx = ideal.shape
+
+    # extract small sample of signal
+    k = round(nx * ny * sampling_frac)
+    
+    ri = np.random.choice(nx * ny, k, replace=False) # random sample of indices
+    # b = np.expand_dims(b, axis=1)
+
+    # create dct matrix operator using kron (memory errors for large ny*nx)
+    A = np.kron(
+        idct(np.identity(nx), norm='ortho', axis=0),
+        idct(np.identity(ny), norm='ortho', axis=0)
+        )
+    A = A[ri,:] # same as phi times kron
+
+    # b = X.T.flat[ri]
+
+    b = np.zeros(k)
+    origins_T = [
+        o.T for o in origins
+    ]
+    n_origins = len(origins)
+    for ik in range(k):
+        which_origin = ik % n_origins
+        b[ik] = origins_T[which_origin].flat[ri[ik]]
+
+    recon = recon_2D_by_cvxpy(nx, ny, A, b)
+
+    # if figdir:
+        
+
+    print('end: solve l1 norm')
+    return recon
+
+
 def vis_optimization_on_p1_landscape(
     figdir,
     params_path
@@ -1630,3 +1681,44 @@ def _vis_p1_params_path(
     # plt.subtitle(title)
     fig.savefig(save_path)
     plt.close('all')
+
+
+# ------------------------- helper functions
+
+def cal_recon_error(x, x_recon, residual_type):
+    # print(x.shape, x_recon.shape)
+
+    assert len(x.shape) == 1 or len(x.shape) == 2 and x.shape[1] == 1
+    assert len(x_recon.shape) == 1 or len(x_recon.shape) == 2 and x_recon.shape[1] == 1
+
+    x = x.reshape(-1)
+    x_recon = x_recon.reshape(-1)
+
+    diff = x - x_recon
+
+    if residual_type == 'MIN_MAX':
+        res = np.sqrt((diff ** 2).mean()) / (x.max() - x.min())
+    elif residual_type == 'MEAN':
+        res = np.sqrt((diff ** 2).mean()) / x.mean()
+    elif residual_type == 'MSE':
+        res = np.sqrt((diff ** 2).mean())
+    elif residual_type == 'CROSS_CORRELATION':
+        res = np.correlate(x_recon, x, mode='valid')
+        # print(res)
+        # assert np.isclose(res[0], np.sum(x_recon * x))
+        res = res[0] / np.sqrt(np.sum(x_recon ** 2) * np.sum(x ** 2))
+    elif residual_type == 'CONV':
+        # print(x_recon.shape)
+        # print(x_recon.shape, x.shape)
+        res = np.convolve(x_recon, x) # take x as filter
+        # print(res)
+        res = res[0]
+        # assert np.isclose(res[0])
+        # return res[0]
+    elif residual_type == 'ZNCC':
+        res = 0
+        # res = np.sum((x_recon - x_recon.mean()) * (x - x.mean())) / np.sqrt(x_recon.var() * x.var())
+    else:
+        assert f"Invalid residual_type {residual_type}"
+
+    return res
