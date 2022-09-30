@@ -242,6 +242,8 @@ def two_D_CS_p1_recon_with_given_landscapes_top():
 
 
 def reconstruct_by_distributed_landscapes_top():
+    # 6944.407839, 5891.432676, 5011.566536, 4321.232713, 3659.859955, 2980.218758, 2523.759679, 2140.338593, 1727.501286,
+    # 1371.053043, 1069.624135, 812.519126, 588.600523, 
 
     noisy_data1 = np.load("figs/cnt_opt_miti/2022-08-08_19:48:31/data.npz", allow_pickle=True)
     ideal = noisy_data1['origin'].tolist()['ideals']
@@ -267,34 +269,41 @@ def reconstruct_by_distributed_landscapes_top():
     for data in datas:
         print(data.shape)
 
-    if False:
-        recon = two_D_CS_p1_recon_with_distributed_landscapes(
-            ideal=ideal.copy(),
-            origins=datas,
-            sampling_frac=0.05
+    # --------- data prepared OK -----------
+
+    sfs = np.arange(0.05, 0.5, 0.03)
+
+    errors = []
+    for sf in sfs:
+
+        if True:
+            recon = two_D_CS_p1_recon_with_distributed_landscapes(
+                ideal=ideal.copy(),
+                origins=datas,
+                sampling_frac=sf
+            )
+            
+            np.savez_compressed(f"{noisy_data_dir2}/recon_by_{len(datas)}_landscapes_sf{sf:.3f}", recon)
+        else:
+            recon = np.load(f"{noisy_data_dir2}/recon_by_{len(datas)}_landscapes_sf{sf:.3f}.npz")['arr_0']
+
+        _vis_recon_distributed_landscape(
+            landscapes=datas + [recon],
+            labels=['ideal', 'depolarizing, 0.001, 0.005', 'depolarizing, 0.003, 0.007', 'reconstructed by 1/3 of each'],
+            full_range=full_range,
+            bounds=None,
+            true_optima=None,
+            title=f'reconstruct distributed landscapes, sampling fraction: {sf:.3f}',
+            save_path=f'{noisy_data_dir2}/recon_by_{len(datas)}_landscapes.png'
         )
-        
-        np.savez_compressed(f"{noisy_data_dir2}/recon_by_{len(datas)}_landscapes", recon)
-    else:
-        recon = np.load(f"{noisy_data_dir2}/recon_by_{len(datas)}_landscapes.npz")['arr_0']
 
-    print(recon.shape)
-
-    _vis_recon_distributed_landscape(
-        landscapes=datas + [recon],
-        labels=['ideal', 'depolarizing, 0.001, 0.005', 'depolarizing, 0.003, 0.007', 'reconstructed by 1/3 of each'],
-        full_range=full_range,
-        bounds=None,
-        true_optima=None,
-        title='reconstruct distributed landscapes, sampling fraction: 5%',
-        save_path=f'{noisy_data_dir2}/recon_by_{len(datas)}_landscapes.png'
-    )
-
-    error = np.linalg.norm(ideal - recon)
-    print("reconstruct error: ", error)
+        error = np.linalg.norm(ideal - recon)
+        errors.append(error)
+        print("reconstruct error: ", error)
+    
+    print(errors)
 
     return
-
 
 
 def get_grid_points(bounds, n_samples_along_axis):
