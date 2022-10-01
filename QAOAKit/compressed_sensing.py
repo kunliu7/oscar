@@ -1,4 +1,6 @@
 import imp
+import itertools
+from math import fabs
 from re import L
 import re
 import time
@@ -743,17 +745,18 @@ def _vis_one_D_p1_recon(
     plt.close('all')
 
 
-def _get_ideal_unmiti_miti_value_for_one_point_p1(
+def _get_ideal_unmiti_miti_value_for_one_point(
     G,
-    beta,
-    gamma,
-    shots,
-    noise_model
+    beta: list,
+    gamma: list,
+    shots: int,
+    noise_model,
+    ignore_miti: int=False
 ):
     """Generate ideal, unmitigated and mitigated energy for given one point.
     """
     circuit = get_maxcut_qaoa_circuit(
-        G, beta=[beta], gamma=[gamma],
+        G, beta=beta, gamma=gamma,
         # transpile_to_basis=True, save_state=False)
         transpile_to_basis=False, save_state=False)
 
@@ -761,12 +764,15 @@ def _get_ideal_unmiti_miti_value_for_one_point_p1(
         circuit.copy(), G, noise_model=None, shots=shots)
     unmiti = _executor_of_qaoa_maxcut_energy(
         circuit.copy(), G, noise_model=copy.deepcopy(noise_model), shots=shots)
-    # miti = 0
-    miti = execute_with_zne(
-        circuit.copy(),
-        executor=partial(
-            _executor_of_qaoa_maxcut_energy, G=G, noise_model=None, shots=shots),
-    )
+    
+    if ignore_miti:
+        miti = 0
+    else:
+        miti = execute_with_zne(
+            circuit.copy(),
+            executor=partial(
+                _executor_of_qaoa_maxcut_energy, G=G, noise_model=noise_model, shots=shots),
+        )
     # print(miti)
 
     return ideal, unmiti, miti
@@ -796,8 +802,8 @@ def _executor_of_qaoa_maxcut_energy(qc, G, noise_model, shots) -> float:
     # return expval
 
 
-def _get_ideal_unmiti_miti_value_for_one_point_p1_wrapper_for_concurrency(param):
-    return _get_ideal_unmiti_miti_value_for_one_point_p1(*param)
+def _get_ideal_unmiti_miti_value_for_one_point_wrapper_for_concurrency(param):
+    return _get_ideal_unmiti_miti_value_for_one_point(*param)
 
 
 def one_D_CS_p1_recon_with_given_landscapes_and_varing_sampling_frac(
@@ -930,8 +936,8 @@ def gen_p1_landscape(
         for beta in full_range['beta']:
             param = (
                 G.copy(),
-                beta,
-                gamma,
+                [beta],
+                [gamma],
                 n_shots,
                 copy.deepcopy(noise_model)
             )
@@ -948,7 +954,7 @@ def gen_p1_landscape(
         #     *params[0]
         # )
         futures = executor.map(
-            _get_ideal_unmiti_miti_value_for_one_point_p1_wrapper_for_concurrency, params
+            _get_ideal_unmiti_miti_value_for_one_point_wrapper_for_concurrency, params
         )
     print("end time: ", get_curr_formatted_timestamp())
     end_time = time.time()
@@ -1535,7 +1541,6 @@ def two_D_CS_p1_recon_with_given_landscapes(
 
 
 def two_D_CS_p1_recon_with_distributed_landscapes(
-    ideal: np.ndarray,
     origins: List[np.ndarray],
     # full_range: dict,
     # n_pts: dict,
@@ -1547,7 +1552,7 @@ def two_D_CS_p1_recon_with_distributed_landscapes(
     # ! Convention: First beta, Last gamma
     
     print('start: solve l1 norm')
-    ny, nx = ideal.shape
+    ny, nx = origins[0].shape
 
     # extract small sample of signal
     k = round(nx * ny * sampling_frac)
@@ -1681,6 +1686,136 @@ def _vis_p1_params_path(
     # plt.subtitle(title)
     fig.savefig(save_path)
     plt.close('all')
+
+
+# =============================== 4D cs =================================
+
+
+def gen_p2_landscape(
+    G: nx.Graph,
+    p: int,
+    figdir: str,
+    beta_opt: np.array, # converted
+    gamma_opt: np.array, # converted
+    noise_model: NoiseModel,
+    params_path: list,
+    C_opt: float,
+    bounds = {'beta': [-np.pi/4, np.pi/4],
+                'gamma': [-np.pi, np.pi]},
+    n_shots: int=2048,
+    n_pts_per_unit: int=36
+):
+    # ! Convention: First beta, Last gamma
+    
+    # hyper parameters
+    # n_shots = 2
+    # n_pts_per_unit = 2     # num. of original points per unit == 4096, i.e. resolution rate = 1 / n
+    
+    # beta first, gamma later
+    # bounds = {'beta': [-np.pi/4, np.pi/4],
+    #           'gamma': [-np.pi, np.pi]}
+
+    n_pts = {}
+    # n_samples = {}
+    for label, bound in bounds.items():
+        bound_len = bound[1] - bound[0]
+        n_pts[label] = np.floor(n_pts_per_unit * bound_len).astype(int)
+        # n_samples[label] = np.ceil(n_pts_per_unit * bound_len * sampling_frac).astype(int)
+    
+    print('bounds: ', bounds)
+    print('n_pts: ', n_pts)
+    # print('n_samples: ', n_samples)
+    # print('alpha: ', alpha)
+    print('n_pts_per_unit: ', n_pts_per_unit)
+    # sample P points from N randomly
+
+    _LABELS = ['mitis', 'unmitis', 'ideals']
+    origin = {label: [] for label in _LABELS}
+
+    full_range = {
+        'gamma': np.linspace(bounds['gamma'][0], bounds['gamma'][1], n_pts['gamma']),
+        'beta': np.linspace(bounds['beta'][0], bounds['beta'][1], n_pts['beta'])
+    }
+
+    # in order of beta1 beta2 gamma1 gamma2
+    full_ranges = []
+    for ip in range(p):
+        full_ranges.append(full_range['beta'].copy())
+    
+    for ip in range(p):
+        full_ranges.append(full_range['gamma'].copy())
+
+    # full_ranges = [
+    #     full_range['beta'].copy(),
+    #     full_range['beta'].copy(),
+    #     full_range['gamma'].copy(),
+    #     full_range['gamma'].copy()
+    # ]
+
+    params = []
+    # former 2 are betas, latter 2 are gammas
+    for beta2_gamma2 in itertools.product(*full_ranges):
+        param = (
+            G.copy(),
+            beta2_gamma2[:p], # beta
+            beta2_gamma2[p:], # gamma
+            n_shots,
+            copy.deepcopy(noise_model),
+            True
+        )
+        params.append(param)
+    
+    print('totally number of points need to calculate energies:', len(params))
+
+    start_time = time.time()
+    print("start time: ", get_curr_formatted_timestamp())
+    with concurrent.futures.ProcessPoolExecutor() as executor:
+        # ! submit will shows exception, while map does not
+        # future = executor.submit(
+        #     _get_ideal_unmiti_miti_value_for_one_point_p1_wrapper_for_concurrency,
+        #     *params[0]
+        # )
+        futures = executor.map(
+            _get_ideal_unmiti_miti_value_for_one_point_wrapper_for_concurrency, params
+        )
+    print("end time: ", get_curr_formatted_timestamp())
+    end_time = time.time()
+
+    print(f"full landscape time usage: {(end_time - start_time) / 3600} h")
+
+    for f in futures:
+        # print(f)
+        origin['ideals'].append(f[0])
+        origin['unmitis'].append(f[1])
+        origin['mitis'].append(f[2])
+
+    shape = []
+    for ip in range(p):
+        shape.append(n_pts['gamma'])
+    for ip in range(p):
+        shape.append(n_pts['beta'])
+
+    for label, arr in origin.items():
+        origin[label] = np.array(arr).reshape(*shape)
+        print(origin[label].shape)
+
+    np.savez_compressed(f"{figdir}/data",
+        # landscapes
+        origin=origin,
+
+        # parameters
+        shape=shape,
+        n_pts=n_pts,
+        full_range=full_range,
+        full_ranges=full_ranges,
+        bounds=bounds,
+        n_shots=n_shots,
+        n_pts_per_unit=n_pts_per_unit,
+
+        C_opt=C_opt)
+
+    print('generated landscapes data is saved')
+    return
 
 
 # ------------------------- helper functions
