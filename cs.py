@@ -1,3 +1,4 @@
+from sqlite3 import Timestamp
 import networkx as nx
 import matplotlib.pyplot as plt
 import numpy as np
@@ -930,8 +931,11 @@ def compare_with_original_grad_top():
     pass
 
 def CS_on_google_data():
-    data_types = ['sk', '3reg', 'grid']
-    # data_types = ['grid, sk, 3reg']
+    # data_types = ['sk', '3reg', 'grid']
+    # data_types = ['sk']
+    # data_types = ['3reg']
+    data_types = ['grid']
+    timestamp = get_curr_formatted_timestamp()
     for data_type in data_types:
         data_path = f"google_data/Google_Data/google_{data_type}.npz"
 
@@ -949,7 +953,9 @@ def CS_on_google_data():
         landscape = np.array(df)
         print("landscape shape: ", landscape.shape)
 
-        figdir = "./google_data"
+        figdir = f"./google_data/{timestamp}"
+        if not os.path.exists(figdir):
+            os.makedirs(figdir)
         # print(np.linspace(bounds['beta'][0], bounds['beta'][1], landscape.shape[1]))
         full_range = {
             "beta": np.linspace(bounds['beta'][0], 
@@ -1291,7 +1297,7 @@ if __name__ == "__main__":
     # count_optima_of_fixed_angles_3reg_graphs()
     # count_optima_of_fixed_angles_3reg_graphs_one_variable_CS()
     # count_optima_of_fixed_angles_3reg_graphs_one_variable_CS_sampling_frac()
-    one_D_CS_p1_generate_landscapes()
+    # one_D_CS_p1_generate_landscapes()
     # one_D_CS_p1_recon_with_given_landscapes_top()
     # two_D_CS_p1_recon_with_given_landscapes_top()
 
@@ -1302,4 +1308,4 @@ if __name__ == "__main__":
 
     # CS_on_google_data()
 
-    compare_two_BPs_top()
+    # compare_two_BPs_top()
