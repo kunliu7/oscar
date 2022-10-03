@@ -123,11 +123,12 @@ from QAOAKit.compressed_sensing import (
     CS_and_one_landscape_and_cnt_optima_and_mitiq_and_one_variable,
     multi_landscapes_and_cnt_optima_and_mitiq_and_MP_and_one_variable_and_CS,
     one_D_CS_p1_generate_landscape,
+    gen_p1_landscape,
     one_D_CS_p1_recon_with_given_landscapes_and_varing_sampling_frac,
     two_D_CS_p1_recon_with_given_landscapes,
     _vis_one_D_p1_recon,
     p1_generate_grad,
-    _mitiq_executor_of_qaoa_maxcut_energy
+    _executor_of_qaoa_maxcut_energy
 )
 from QAOAKit.optimizer_wrapper import (
     wrap_qiskit_optimizer_to_landscape_optimizer,
@@ -980,8 +981,10 @@ def get_grid_points(bounds, n_samples_along_axis):
     # from qaoa format to angles to qiskit format
     xs = []
     qaoa_angles = []
-    for gamma in np.linspace(bounds['gamma'][0], bounds['gamma'][1], 10):
-        for beta in np.linspace(bounds['beta'][0], bounds['beta'][1], 20):
+    # for gamma in np.linspace(bounds['gamma'][0], bounds['gamma'][1], 10):
+    #     for beta in np.linspace(bounds['beta'][0], bounds['beta'][1], 10):
+    for beta in np.linspace(bounds['beta'][0], bounds['beta'][1], 10):
+        for gamma in np.linspace(bounds['gamma'][0], bounds['gamma'][1], 10):
             qaoa_angles.append({
                 'gamma': [gamma],
                 'beta': [beta]
@@ -995,10 +998,102 @@ def get_grid_points(bounds, n_samples_along_axis):
             xs.append(x)
 
     xs = np.array(xs)
+    # print(xs.shape)
+    # print("var of points: ", np.var(xs, axis=0))
     return xs, qaoa_angles
 
 
-def compare_two_BPs():
+def get_one_BP_value(points, jac):
+    # total_norm = 0
+    # grads_ideal = []
+    grads_appro = []
+    for i in range(len(points)):
+        x = points[i]
+        # print("x", x)
+
+        # optimizer.approximate_fun_value(x)
+
+        grad_appro = jac(x)
+        grads_appro.append(grad_appro)
+
+        # assert grad_ideal[0] < 10 and grad_ideal[1] < 10
+        # assert grad_appro[0] < 10 and grad_appro[1] < 10
+        # print(grad_ideal.dtype)
+
+        # print(np.linalg.norm(grad_ideal), np.linalg.norm(grad_appro))
+        # print(grad_ideal, grad_appro)
+        # norm = ((grad_ideal - grad_appro)**2).mean()
+
+        # norm = cosine(grad_ideal, grad_appro)
+        # print(f"norm={norm}")
+        # total_norm += norm
+
+    # grads_ideal = np.array(grads_ideal)
+    # print(grads_ideal.shape)
+    grads_appro = np.array(grads_appro)
+    print(grads_appro.shape)
+
+    # var_ideal = np.var(grads_ideal, axis=0)
+    var_appro = np.var(grads_appro, axis=0)
+
+    # mean_ideal = np.mean(grads_ideal, axis=0)
+    mean_appro = np.mean(grads_appro, axis=0)
+
+    # total_norm /= len(grad_ideal)
+    # print("var of ideal: ", var_ideal)
+    print("var of appro: ", var_appro)
+    # print("mean of ideal: ", mean_ideal)
+    print("mean of appro: ", mean_appro)
+    return var_appro
+
+
+def get_BP_value(points, jac_ideal, jac_appro):
+    total_norm = 0
+    grads_ideal = []
+    grads_appro = []
+    for i in range(len(points)):
+        x = points[i]
+        # print("x", x)
+
+        # optimizer.approximate_fun_value(x)
+
+        grad_ideal = jac_ideal(x)
+        grad_appro = jac_appro(x)
+        grads_ideal.append(grad_ideal)
+        grads_appro.append(grad_appro)
+
+        # assert grad_ideal[0] < 10 and grad_ideal[1] < 10
+        # assert grad_appro[0] < 10 and grad_appro[1] < 10
+        # print(grad_ideal.dtype)
+
+        # print(np.linalg.norm(grad_ideal), np.linalg.norm(grad_appro))
+        # print(grad_ideal, grad_appro)
+        # norm = ((grad_ideal - grad_appro)**2).mean()
+
+        norm = cosine(grad_ideal, grad_appro)
+        print(f"norm={norm}")
+        total_norm += norm
+
+    grads_ideal = np.array(grads_ideal)
+    print(grads_ideal.shape)
+    grads_appro = np.array(grads_appro)
+    print(grads_appro.shape)
+
+    var_ideal = np.var(grads_ideal, axis=0)
+    var_appro = np.var(grads_appro, axis=0)
+
+    mean_ideal = np.mean(grads_ideal, axis=0)
+    mean_appro = np.mean(grads_appro, axis=0)
+
+    total_norm /= len(grad_ideal)
+    print("var of ideal: ", var_ideal)
+    print("var of appro: ", var_appro)
+    print("mean of ideal: ", mean_ideal)
+    print("mean of appro: ", mean_appro)
+    return var_ideal, var_appro, total_norm
+
+
+def compare_two_BPs_top():
     # compare two places of BPs, and visualize
     reg3_dataset_table = get_3_reg_dataset_table()
 
@@ -1044,24 +1139,12 @@ def compare_two_BPs():
         # landscape=recon['mitis'],
         fun_type='INTERPOLATE'
     )
-
-    # left, right, down, up, in qaoa format
-    # box1 = [-0.25, 0.25, 0.6, 1.1]
-    # box2 = [-0.25, 0.25, 0.1, 0.6]
-
-    # box1_bounds = {
-    #     'gamma': [box1[2], box1[3]],
-    #     'beta': [box1[0], box1[1]]
-    # }
-
-    # box2_bounds = {
-    #     'gamma': [box2[2], box2[3]],
-    #     'beta': [box2[0], box2[1]]
-    # }
-
+    
+    # box in qaoa format
     box1_bounds = {
         'gamma': [0.7, 0.9],
         # 'beta': [-0.25, 0.25]
+        # 'beta': [0, 0.25]
         'beta': bounds_dict['beta']
         # 'beta': [0, 0.25]
         # 'beta': [-0.5, 0.5]
@@ -1072,6 +1155,7 @@ def compare_two_BPs():
     box2_bounds = {
         'gamma': [0.2, 0.4],
         # 'beta': [-0.25, 0.25]
+        # 'beta': [0, 0.25]
         'beta': bounds_dict['beta']
         # 'beta': [0, 0.25]
         # 'beta': [-0.5, 0.5]
@@ -1088,7 +1172,8 @@ def compare_two_BPs():
 
     # eps = 1e-10
     # eps = 0.001
-    eps = 0.01
+    # eps = 0.01
+    eps = 0.005
     # eps = 0.1
     noise_model = get_depolarizing_error_noise_model(p1Q=0.001, p2Q=0.005) # ! base noise model
 
@@ -1107,15 +1192,12 @@ def compare_two_BPs():
         energy = noisy_qaoa_maxcut_energy(G=G, gamma=x[:p], beta=x[p:], noise_model=None)
         return -energy
         
-    jac_appro = get_numerical_derivative(
-        optimizer.approximate_fun_value, eps
-    )
 
     jac_ideal = get_numerical_derivative(
         _get_ideal_energy_by_qc, eps
     )
 
-    if False:
+    if True:
         box1_points, qaoa_angles1 = get_grid_points(box1_bounds, n_samples_along_axis)
         print(len(box1_points))
         box2_points, qaoa_angles2 = get_grid_points(box2_bounds, n_samples_along_axis)
@@ -1130,61 +1212,53 @@ def compare_two_BPs():
         qaoa_angles1 = xs['qaoa_angles1']
         qaoa_angles2 = xs['qaoa_angles2']
 
-    recon_var_dict = { 
+    recon_var_dict1 = { 
         label: {'gamma': 0.0, 'beta': 0.0} 
         for label in origin.keys() 
     }
-    print(recon_var_dict)
+    recon_var_dict2 = { 
+        label: {'gamma': 0.0, 'beta': 0.0} 
+        for label in origin.keys() 
+    }
+    # recon_var_dict1['sv'] = {'gamma': 0.0, 'beta': 0.0}
+    # recon_var_dict2['sv'] = {'gamma': 0.0, 'beta': 0.0}
+    # print(recon_var_dict)
 
-    def get_norm(points):
-        total_norm = 0
-        grads_ideal = []
-        grads_appro = []
-        for i in range(len(points)):
-            x = points[i]
-            # print("x", x)
+    var_ideal1 = get_one_BP_value(box1_points, jac_ideal)
+    var_ideal2 = get_one_BP_value(box2_points, jac_ideal)
+    recon_var_dict1['sv'] = {'gamma': var_ideal1[0], 'beta': var_ideal1[1]}
+    recon_var_dict2['sv'] = {'gamma': var_ideal2[0], 'beta': var_ideal2[1]}
 
-            # optimizer.approximate_fun_value(x)
+    for label in recon.keys():
+        print(f"=========== work on {label} =============")
+        optimizer = wrap_qiskit_optimizer_to_landscape_optimizer(
+            # SPSA
+            ADAM
+            # L_BFGS_B
+        #     # COBYLA
+        )(
+            bounds=bounds, 
+            # landscape=origin['ideals'],
+            landscape=recon[label],
+            # landscape=recon['unmitis'],
+            # landscape=recon['mitis'],
+            fun_type='INTERPOLATE'
+        )
 
-            grad_ideal = jac_ideal(x)
-            grad_appro = jac_appro(x)
-            grads_ideal.append(grad_ideal)
-            grads_appro.append(grad_appro)
+        jac_appro = get_numerical_derivative(
+            optimizer.approximate_fun_value, eps
+        )
 
-            # assert grad_ideal[0] < 10 and grad_ideal[1] < 10
-            # assert grad_appro[0] < 10 and grad_appro[1] < 10
-            # print(grad_ideal.dtype)
+        var1 = get_one_BP_value(box1_points, jac_appro)
+        var2 = get_one_BP_value(box2_points, jac_appro)
+        recon_var_dict1[label]['gamma'] = var1[0]
+        recon_var_dict1[label]['beta'] = var1[1]
 
-            # print(np.linalg.norm(grad_ideal), np.linalg.norm(grad_appro))
-            # print(grad_ideal, grad_appro)
-            # norm = ((grad_ideal - grad_appro)**2).mean()
+        recon_var_dict2[label]['gamma'] = var2[0]
+        recon_var_dict2[label]['beta'] = var2[1]
 
-            norm = cosine(grad_ideal, grad_appro)
-            print(f"norm={norm}")
-            total_norm += norm
-
-        grads_ideal = np.array(grads_ideal)
-        print(grads_ideal.shape)
-        grads_appro = np.array(grads_appro)
-        print(grads_appro.shape)
-
-        var_ideal = np.var(grads_ideal, axis=0)
-        var_appro = np.var(grads_appro, axis=0)
-
-        mean_ideal = np.mean(grads_ideal, axis=0)
-        mean_appro = np.mean(grads_appro, axis=0)
-
-        total_norm /= len(grad_ideal)
-        print("var of ideal: ", var_ideal)
-        print("var of appro: ", var_appro)
-        print("mean of ideal: ", mean_ideal)
-        print("mean of appro: ", mean_appro)
-        return total_norm
-
-    box1_norm = get_norm(box1_points)
-    box2_norm = get_norm(box2_points)
-
-    print(box1_norm, box2_norm)
+    np.savez_compressed(f'{figdir}/recon_var',
+        recon_var_dict1=recon_var_dict1, recon_var_dict2=recon_var_dict2)
     
     vis_two_BPs_p1_recon(
         origin_dict=origin,
@@ -1193,12 +1267,12 @@ def compare_two_BPs():
         bounds=data['bounds'].tolist(),
         box1=box1_bounds,
         box2=box2_bounds,
-        box1_points=qaoa_angles1,
-        box2_points=qaoa_angles2,
-        # box1_points=None,
-        # box2_points=None,
+        # box1_points=qaoa_angles1,
+        # box2_points=qaoa_angles2,
+        box1_points=None,
+        box2_points=None,
         title=f'BP with sampling fraction {sf:.3f}',
-        save_path=f'{figdir}/two_BPs_recon_sf{sf:.3f}.png'
+        save_path=f'{figdir}/two_BPs_recon_sf{sf:.3f}_1.png'
     )
 
     return
@@ -1217,7 +1291,7 @@ if __name__ == "__main__":
     # count_optima_of_fixed_angles_3reg_graphs()
     # count_optima_of_fixed_angles_3reg_graphs_one_variable_CS()
     # count_optima_of_fixed_angles_3reg_graphs_one_variable_CS_sampling_frac()
-    # one_D_CS_p1_generate_landscapes()
+    one_D_CS_p1_generate_landscapes()
     # one_D_CS_p1_recon_with_given_landscapes_top()
     # two_D_CS_p1_recon_with_given_landscapes_top()
 
@@ -1228,4 +1302,4 @@ if __name__ == "__main__":
 
     # CS_on_google_data()
 
-    compare_two_BPs()
+    compare_two_BPs_top()
