@@ -1,3 +1,88 @@
+from QAOAKit.vis import (
+    vis_landscape,
+    vis_landscape_heatmap,
+    vis_landscape_heatmap_multi_p,
+    vis_landscape_multi_p,
+    vis_landscape_multi_p_and_and_count_optima,
+    vis_landscape_multi_p_and_and_count_optima_MP,
+    vis_multi_landscape_and_count_optima_and_mitiq_MP,
+    vis_multi_landscapes_and_count_optima_and_mitiq_MP_and_one_variable,
+    vis_two_BPs_p1_recon
+)
+from qiskit.algorithms.minimum_eigen_solvers.qaoa import QAOAAnsatz
+from QAOAKit.interpolate import (
+    approximate_fun_value_by_2D_interpolation
+)
+from QAOAKit.optimizer_wrapper import (
+    wrap_qiskit_optimizer_to_landscape_optimizer,
+    get_numerical_derivative
+)
+from QAOAKit.compressed_sensing import (
+    CS_and_one_landscape_and_cnt_optima_and_mitiq_and_one_variable,
+    multi_landscapes_and_cnt_optima_and_mitiq_and_MP_and_one_variable_and_CS,
+    one_D_CS_p1_generate_landscape,
+    gen_p1_landscape,
+    one_D_CS_p1_recon_with_given_landscapes_and_varing_sampling_frac,
+    two_D_CS_p1_recon_with_given_landscapes,
+    _vis_one_D_p1_recon,
+    p1_generate_grad,
+    _executor_of_qaoa_maxcut_energy
+)
+from QAOAKit.parameter_optimization import get_median_pre_trained_kde
+from QAOAKit.examples_utils import get_20_node_erdos_renyi_graphs
+from QAOAKit.qiskit_interface import (
+    get_maxcut_qaoa_qiskit_circuit,
+    goemans_williamson,
+    get_maxcut_qaoa_qiskit_circuit_unbinded_parameters
+)
+from QAOAKit.qaoa import get_maxcut_qaoa_circuit
+from QAOAKit.classical import thompson_parekh_marwaha
+from QAOAKit.utils import (
+    angles_from_qaoa_format,
+    beta_shift_sector,
+    gamma_shift_sector,
+    get_curr_formatted_timestamp,
+    load_partial_qaoa_dataset_table,
+    obj_from_statevector,
+    precompute_energies,
+    maxcut_obj,
+    isomorphic,
+    load_weights_into_dataframe,
+    load_weighted_results_into_dataframe,
+    get_adjacency_matrix,
+    brute_force,
+    get_pynauty_certificate,
+    get_full_weighted_qaoa_dataset_table,
+    save_partial_qaoa_dataset_table,
+    shift_parameters
+)
+from QAOAKit import (
+    opt_angles_for_graph,
+    get_fixed_angles,
+    get_graph_id,
+    get_graph_from_id,
+    angles_to_qaoa_format,
+    beta_to_qaoa_format,
+    gamma_to_qaoa_format,
+    angles_to_qiskit_format,
+    angles_to_qtensor_format,
+    get_3_reg_dataset_table,
+    get_3_reg_dataset_table_row,
+    get_full_qaoa_dataset_table_row,
+    get_full_qaoa_dataset_table,
+    get_fixed_angle_dataset_table,
+    get_fixed_angle_dataset_table_row,
+    qaoa_maxcut_energy,
+    noisy_qaoa_maxcut_energy,
+    angles_from_qiskit_format,
+
+)
+from QAOAKit.noisy_params_optim import (
+    get_pauli_error_noise_model,
+    optimize_under_noise,
+    get_depolarizing_error_noise_model,
+    compute_expectation
+)
 import networkx as nx
 import matplotlib.pyplot as plt
 import numpy as np
@@ -41,7 +126,8 @@ from pathlib import Path
 import copy
 from itertools import groupby
 import timeit
-import sys, os
+import sys
+import os
 from scipy.optimize import minimize
 from scipy.spatial.distance import (
     cosine
@@ -50,97 +136,9 @@ from qiskit.quantum_info import Statevector
 # from QAOAKit import vis
 
 sys.path.append('..')
-from QAOAKit.noisy_params_optim import (
-    get_pauli_error_noise_model,
-    optimize_under_noise,
-    get_depolarizing_error_noise_model,
-    compute_expectation
-)
 
-from QAOAKit.vis import(
-    vis_landscape,
-    vis_landscape_heatmap,
-    vis_landscape_heatmap_multi_p,
-    vis_landscape_multi_p,
-    vis_landscape_multi_p_and_and_count_optima,
-    vis_landscape_multi_p_and_and_count_optima_MP,
-    vis_multi_landscape_and_count_optima_and_mitiq_MP,
-    vis_multi_landscapes_and_count_optima_and_mitiq_MP_and_one_variable,
-    vis_two_BPs_p1_recon
-)
-
-from QAOAKit import (
-    opt_angles_for_graph,
-    get_fixed_angles,
-    get_graph_id,
-    get_graph_from_id,
-    angles_to_qaoa_format,
-    beta_to_qaoa_format,
-    gamma_to_qaoa_format,
-    angles_to_qiskit_format,
-    angles_to_qtensor_format,
-    get_3_reg_dataset_table,
-    get_3_reg_dataset_table_row,
-    get_full_qaoa_dataset_table_row,
-    get_full_qaoa_dataset_table,
-    get_fixed_angle_dataset_table,
-    get_fixed_angle_dataset_table_row,
-    qaoa_maxcut_energy,
-    noisy_qaoa_maxcut_energy,
-    angles_from_qiskit_format,
-
-)
-from QAOAKit.utils import (
-    angles_from_qaoa_format,
-    beta_shift_sector,
-    gamma_shift_sector,
-    get_curr_formatted_timestamp,
-    load_partial_qaoa_dataset_table,
-    obj_from_statevector,
-    precompute_energies,
-    maxcut_obj,
-    isomorphic,
-    load_weights_into_dataframe,
-    load_weighted_results_into_dataframe,
-    get_adjacency_matrix,
-    brute_force,
-    get_pynauty_certificate,
-    get_full_weighted_qaoa_dataset_table,
-    save_partial_qaoa_dataset_table,
-    shift_parameters
-)
-
-from QAOAKit.classical import thompson_parekh_marwaha
-from QAOAKit.qaoa import get_maxcut_qaoa_circuit
-from QAOAKit.qiskit_interface import (
-    get_maxcut_qaoa_qiskit_circuit,
-    goemans_williamson,
-    get_maxcut_qaoa_qiskit_circuit_unbinded_parameters
-)
-from QAOAKit.examples_utils import get_20_node_erdos_renyi_graphs
-from QAOAKit.parameter_optimization import get_median_pre_trained_kde
-from QAOAKit.compressed_sensing import (
-    CS_and_one_landscape_and_cnt_optima_and_mitiq_and_one_variable,
-    multi_landscapes_and_cnt_optima_and_mitiq_and_MP_and_one_variable_and_CS,
-    one_D_CS_p1_generate_landscape,
-    gen_p1_landscape,
-    one_D_CS_p1_recon_with_given_landscapes_and_varing_sampling_frac,
-    two_D_CS_p1_recon_with_given_landscapes,
-    _vis_one_D_p1_recon,
-    p1_generate_grad,
-    _executor_of_qaoa_maxcut_energy
-)
-from QAOAKit.optimizer_wrapper import (
-    wrap_qiskit_optimizer_to_landscape_optimizer,
-    get_numerical_derivative
-)
-
-from QAOAKit.interpolate import (
-    approximate_fun_value_by_2D_interpolation
-)
 
 # from qiskit_optimization import QuadraticProgram
-from qiskit.algorithms.minimum_eigen_solvers.qaoa import QAOAAnsatz
 
 test_utils_folder = Path(__file__).parent
 
@@ -148,6 +146,8 @@ test_utils_folder = Path(__file__).parent
 def optimize_on_p1_reconstructed_landscape():
     """Find use cases. Use CS to reconstruct landscape, and judge
     the reason of slow convergence is barren plateaus or not.
+
+    Full and reconstructed landscapes are generated.
     """
     # data_dir = "figs/cnt_opt_miti/2022-08-08_19:48:31"
     # data_dir = "figs/cnt_opt_miti/2022-08-09_16:49:38/G30_nQ8_p1"
@@ -213,10 +213,11 @@ def optimize_on_p1_reconstructed_landscape():
 
     # obj_val = -(sv1.expectation_value(C) + offset)
     opt_cut = row["C_opt"]
-    
+
     counts = []
     values = []
     params = []
+
     def cb_store_intermediate_result(eval_count, parameters, mean, std):
         # print('fuck')
         counts.append(eval_count)
@@ -245,14 +246,14 @@ def optimize_on_p1_reconstructed_landscape():
                 SPSA
                 # ADAM
                 # L_BFGS_B
-            #     # COBYLA
+                #     # COBYLA
             )(
-                bounds=bounds, 
+                bounds=bounds,
                 landscape=landscape,
                 fun_type='INTERPOLATE'
                 # fun_type='None'
             )
-            
+
             # optimizer = L_BFGS_B()
 
             optimizer_name = 'SPSA'
@@ -288,10 +289,11 @@ def optimize_on_p1_reconstructed_landscape():
                 #     {"gamma": row["gamma"],
                 #     "beta": row["beta"]}
                 # ),
-                initial_point=angles_to_qiskit_format(angles_from_qaoa_format(**initial_angles)),
+                initial_point=angles_to_qiskit_format(
+                    angles_from_qaoa_format(**initial_angles)),
                 quantum_instance=backend,
                 # callback=cb_store_intermediate_result
-                )
+            )
             result = qaoa.compute_minimum_eigenvalue(C)
             # print(qaoa.optimal_params)
             print("opt_cut                     :", opt_cut)
@@ -314,14 +316,14 @@ def optimize_on_p1_reconstructed_landscape():
 
             if label_type == 'origin':
                 origin_params_path_dict[label] = params
-            else: 
+            else:
                 recon_params_path_dict[label] = params
 
     true_optima = np.concatenate([
         gamma_to_qaoa_format(row["gamma"]),
         beta_to_qaoa_format(row["beta"]),
     ])
-    
+
     true_optima = shift_parameters(true_optima, bounds)
 
     _vis_one_D_p1_recon(
@@ -365,9 +367,9 @@ def CS_on_google_data():
             os.makedirs(figdir)
         # print(np.linspace(bounds['beta'][0], bounds['beta'][1], landscape.shape[1]))
         full_range = {
-            "beta": np.linspace(bounds['beta'][0], 
-                bounds['beta'][1],
-                landscape.shape[1]),
+            "beta": np.linspace(bounds['beta'][0],
+                                bounds['beta'][1],
+                                landscape.shape[1]),
             "gamma": np.linspace(bounds['gamma'][0], bounds['gamma'][1], landscape.shape[0]),
         }
 
@@ -387,7 +389,7 @@ def CS_on_google_data():
             recons.append(recon)
 
         np.savez_compressed(f"{figdir}/recons_{data_type}",
-            recons=recons, origin=landscape, times=times)
+                            recons=recons, origin=landscape, times=times)
 
 
 def get_grid_points(bounds, n_samples_along_axis):
