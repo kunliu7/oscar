@@ -79,10 +79,16 @@ def wrap_qiskit_optimizer_to_landscape_optimizer(QiskitOptimizer):
 
         Dynamic inheritance: https://stackoverflow.com/a/21060094/13392267
         """
-        def __init__(self, bounds, landscape, fun_type, **kwargs) -> None:
+        def __init__(self, bounds=None, landscape=None, fun_type='FUN', fun=None, **kwargs) -> None:
             # https://blog.csdn.net/sunny_happy08/article/details/82588749
             print("kwargs", kwargs)
             super(LandscapeOptimizer, self).__init__(**kwargs)
+            self.fun_type = fun_type
+            self.params_path = []
+            if self.fun_type == 'FUN':
+                self.fun = fun
+                return
+            
             self.bounds = bounds
             self.landscape = - landscape
             self.landscape_shape = np.array(landscape.shape)
@@ -92,9 +98,7 @@ def wrap_qiskit_optimizer_to_landscape_optimizer(QiskitOptimizer):
             print('bound_lens', bound_lens)
             self.grid_lens = bound_lens / self.landscape_shape # element-wise
             print("grid_lens", self.grid_lens)
-            self.params_path = []
 
-            self.fun_type = fun_type
 
         # def minimize(self, 
         #     fun: Callable[[POINT], float], 
@@ -102,7 +106,10 @@ def wrap_qiskit_optimizer_to_landscape_optimizer(QiskitOptimizer):
         #     jac: Optional[Callable[[POINT], POINT]] = None,
         #     bounds: Optional[List[Tuple[float, float]]] = None):
         #     return super().minimize(fun, x0, jac, bounds)
-        def qiskit_format_to_qaoa_format_arr(self, x: POINT):
+
+        # def qiskit_format_to_qaoa_format_arr(self, x: POINT):
+        @staticmethod
+        def qiskit_format_to_qaoa_format_arr(x: POINT):
             angles = angles_from_qiskit_format(x)
             angles = angles_to_qaoa_format(angles)
 
@@ -124,6 +131,14 @@ def wrap_qiskit_optimizer_to_landscape_optimizer(QiskitOptimizer):
             # print("appro", val)
             return val[0]
 
+        def _fun(self, x: POINT) -> float:
+            x = self.qiskit_format_to_qaoa_format_arr(x)
+            # angles = angles_from_qiskit_format(x)
+            # angles = angles_to_qaoa_format(angles)
+
+            val = self.fun(x)
+            self.params_path.append(x)
+            return val
 
         def minimize(self, 
             fun: Callable[[POINT], float], 
@@ -168,6 +183,8 @@ def wrap_qiskit_optimizer_to_landscape_optimizer(QiskitOptimizer):
             
             if self.fun_type == 'INTERPOLATE':
                 res = super().minimize(self.approximate_fun_value, x0, jac, bounds)
+            elif self.fun_type == 'FUN':
+                res = super().minimize(self._fun, x0, jac, bounds)
             else:
                 res = super().minimize(query_fun_value_from_landscape, x0, jac, bounds)
             print('res', res)
