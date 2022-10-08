@@ -682,6 +682,309 @@ def debug_existing_BP_top_2():
     )
 
 
+def debug_existing_BP_top_3():
+    """Find use cases. Use CS to reconstruct landscape, and judge
+    the reason of slow convergence is barren plateaus or not.
+
+    Full and reconstructed landscapes are generated.
+    """
+    # derive origin full landscapes
+    # data_dir = "figs/cnt_opt_miti/2022-08-08_19:48:31"
+    # data_dir = "figs/cnt_opt_miti/2022-08-09_16:49:38/G30_nQ8_p1"
+    data_dir = "figs/cnt_opt_miti/2022-08-10_10:14:03/G40_nQ8_p1"
+    data = np.load(f"{data_dir}/data.npz", allow_pickle=True)
+    origin = data['origin'].tolist()
+    
+    # derive reconstructed landscape
+    recon_path = f"{data_dir}/2D_CS_recon.npz"
+    recon = np.load(recon_path, allow_pickle=True)['recon'].tolist()
+
+    # prepare figdir
+    timestamp = get_curr_formatted_timestamp()
+    figdir = f"{data_dir}/use_cases/{timestamp}"
+    if not os.path.exists(figdir):
+        os.makedirs(figdir)
+
+    # get problem instance info from QAOAKit
+    reg3_dataset_table = get_3_reg_dataset_table()
+    n_qubits = 8
+    p = 1
+    sf = 0.05
+    df = reg3_dataset_table.reset_index()
+    df = df[(df["n"] == n_qubits) & (df["p_max"] == p)]
+    for row_id, row in df.iloc[1:2].iterrows():
+        pass
+
+    assert row_id == 40
+
+    print("============================")
+    angles1 = opt_angles_for_graph(row["G"], row["p_max"])
+    G = row["G"]
+    print('row_id:', row_id)
+    qc1, C, offset = get_maxcut_qaoa_qiskit_circuit_unbinded_parameters(
+        G, p
+    )
+
+    # get_maxcut_qaoa_circuit(G, beta)
+    
+    noise_model = get_depolarizing_error_noise_model(0.001, 0.005)
+    qinst = AerSimulator(method="statevector") 
+    # qinst = QuantumInstance(
+    #     backend=AerSimulator(),
+    #     noise_model=noise_model,
+    #     shots=2048
+    # )
+    # sv1 = Statevector(backend.run(qc1).result().get_statevector())
+    # angles2 = angles_to_qaoa_format(
+    #     opt_angles_for_graph(row["G"], row["p_max"])
+    # )
+    # qc2 = get_maxcut_qaoa_circuit(row["G"], angles2["beta"], angles2["gamma"])
+    # sv2 = Statevector(backend.run(qc2).result().get_statevector())
+
+    bounds = data['bounds'].tolist()
+    bounds = np.array([bounds['gamma'], bounds['beta']])
+
+    print(bounds)
+    print(recon['ideals'].shape)
+
+    # t = np.arange(2500)
+    # # print(t[:10])
+    # recon = np.sin(t).reshape(50, 50)
+    # print(recon)
+
+    # obj_val = -(sv1.expectation_value(C) + offset)
+    opt_cut = row["C_opt"]
+    
+    counts = []
+    values = []
+    params = []
+    def cb_store_intermediate_result(eval_count, parameters, mean, std):
+        # print('fuck')
+        counts.append(eval_count)
+        values.append(mean)
+        params.append(parameters)
+
+    initial_angles = {
+        "gamma": np.array([np.random.uniform(bounds[0][0], bounds[0][1])]),
+        "beta": np.array([np.random.uniform(bounds[1][0], bounds[1][1])])
+    }
+    
+    initial_angles = {
+        "gamma": np.array([1.403]),
+        "beta": np.array([0.679])
+    }
+    
+    initial_angles = {
+        "gamma": np.array([1.45]),
+        "beta": np.array([0.679])
+    }
+    
+    initial_angles = {
+        "gamma": np.array([1.57]),
+        "beta": np.array([0.679])
+    }
+    
+    initial_angles = {
+        "gamma": np.array([1.62]),
+        "beta": np.array([0.679])
+    }
+    
+    initial_angles = {
+        "gamma": np.array([1.62]),
+        "beta": np.array([0.78])
+    }
+    
+    initial_angles = {
+        "gamma": np.array([1.62]),
+        "beta": np.array([0.0])
+    }
+    
+    initial_angles = {
+        "gamma": np.array([1.62]),
+        "beta": np.array([-0.5])
+    }
+    
+    initial_angles = {
+        "gamma": np.array([-1.62]),
+        "beta": np.array([0.5])
+    }
+    
+    # lr=1e-2
+    initial_angles = {
+        "gamma": np.array([-1.62]),
+        "beta": np.array([0.4])
+    }
+    
+    initial_angles = {
+        "gamma": np.array([-0.7]),
+        "beta": np.array([-0.45])
+    }
+    
+
+    print(initial_angles)
+
+    label = 'unmitis'
+    recon_params_path_dict = {}
+    origin_params_path_dict = {label: []}
+
+    # find the case that CS reconstructed landscape will display BP
+    # when slow convergence
+    
+    # optimizer = SPSA()
+    # optimizer = ADAM()
+
+    def _partial_qaoa_energy(x):
+        # angles = angles_from_qiskit_format(x)
+        # angles = angles_to_qaoa_format(angles)
+
+        # x = np.concatenate([angles['gamma'], angles['beta']])
+        # print("!!!", x)
+        return -noisy_qaoa_maxcut_energy(
+            G=G, beta=[x[1]], gamma=[x[0]], precomputed_energies=None, noise_model=None
+        )
+
+    optimizer = wrap_qiskit_optimizer_to_landscape_optimizer(
+        # SPSA
+        ADAM
+        # L_BFGS_B
+    #     # COBYLA
+    )(
+        bounds=None,
+        landscape=None,
+        fun_type='FUN',
+        fun=_partial_qaoa_energy,
+        
+        # parameter of raw optimizer
+        maxiter=1000,
+        # tol=1e-7,
+        # lr=5e-2,
+        lr=1e-2,
+        # beta_1=0.9,
+        # beta_2=0.99,
+        # noise_factor=1e-8,
+        # eps=1e-10,
+        # eps=1e-3,
+        # amsgrad=True
+    )
+
+    # optimizer = L_BFGS_B()
+    # optimizer = AQGD()
+    # optimizer = GradientDescent()
+    # opts = [ADAM,
+    # AQGD,
+    # CG,
+    # COBYLA,
+    # L_BFGS_B,
+    # GSLS,
+    # GradientDescent,
+    # NELDER_MEAD,
+    # NFT,
+    # P_BFGS,
+    # POWELL,
+    # SLSQP,
+    # SPSA,
+    # QNSPSA,
+    # TNC,
+    # SciPyOptimizer]
+    
+    optimizer_name = optimizer.__class__.__name__
+
+    # initial_point = np.hstack([[1.0 for _ in range(p)], [-1.0 for _ in range(p)]])
+
+    # true QAOA and true optimizer on real quantum circuits
+    # qaoa = VQE(
+    #     ansatz=qc1,
+    #     optimizer=optimizer,
+    #     initial_point=angles_to_qiskit_format(
+    #         {"gamma": row["gamma"],
+    #         "beta": row["beta"]}
+    #     ),
+    #     # initial_point=angles_to_qiskit_format(angles_from_qaoa_format(**initial_angles)),
+    #     quantum_instance=qinst,
+    #     callback=cb_store_intermediate_result
+    # )
+    qaoa_angles = angles_to_qaoa_format(
+        {"gamma": row["gamma"],
+        "beta": row["beta"]}
+    )
+
+    qaoa = QAOA(
+        optimizer=optimizer,
+        reps=p,
+        # initial_point=angles_to_qiskit_format(
+        #     {"gamma": row["gamma"],
+        #     "beta": row["beta"]}
+        # ),
+        initial_point=angles_to_qiskit_format(angles_from_qaoa_format(**initial_angles)),
+        quantum_instance=qinst,
+        callback=cb_store_intermediate_result
+    )
+
+    qaoa.print_settings()
+
+    # I = Operator(np.eye(2**n_qubits)) # , input_dims=n_qubits)
+    # I = Pauli("I" * n_qubits)
+    # print(C)
+    # I = PrimitiveOp(I)
+    # print(I)
+    # result = qaoa.compute_minimum_eigenvalue(I)
+    result = qaoa.compute_minimum_eigenvalue(C)
+
+    params = optimizer.params_path
+    # print(params[0], angles_from_qiskit_format(params[0]))
+    # print(counts)
+    # print(qaoa.optimal_params)
+    print("opt_cut                     :", opt_cut)
+    print("recon landscape minimum     :", result.eigenvalue)
+    print("QAOA energy + offset        :", - (result.eigenvalue + offset))
+    print("len of params:", len(params))
+    
+    shifted_params = []
+    for _param in params:
+        # _param = angles_from_qiskit_format(_param)
+
+        # _param = angles_to_qaoa_format(_param)
+
+        _param = shift_parameters(
+            np.array([_param[0], _param[1]]), # gamma, beta
+            bounds # bounds = np.array([bounds['gamma'], bounds['beta']])
+        )
+        # _param = [_param['gamma'][0], _param['beta'][0]]
+
+        shifted_params.append(_param)
+    
+    params = shifted_params
+    origin_params_path_dict[label] = params 
+    print(len(params))
+    # print(params)
+
+    # record parameters
+    np.savez_compressed(f"{figdir}/use_case_data",
+        # initial_point=initial_angles,
+        initial_angles=initial_angles,
+        params_path=params
+    )
+
+    true_optima = np.concatenate([
+        gamma_to_qaoa_format(row["gamma"]),
+        beta_to_qaoa_format(row["beta"]),
+    ])
+    
+    true_optima = shift_parameters(true_optima, bounds)
+
+    _vis_one_D_p1_recon(
+        origin_dict=origin,
+        recon_dict=recon,
+        full_range=data['full_range'].tolist(),
+        bounds=data['bounds'].tolist(),
+        true_optima=true_optima,
+        title=f'{optimizer_name} with sampling fraction {sf:.3f}',
+        save_path=f'{figdir}/origin_and_2D_recon_sf{sf:.3f}_{optimizer_name}.png',
+        recon_params_path_dict=recon_params_path_dict,
+        origin_params_path_dict=origin_params_path_dict
+    )
+
+
 def optimize_on_p1_reconstructed_landscape():
     # data_dir = "figs/cnt_opt_miti/2022-08-08_19:48:31"
     # data_dir = "figs/cnt_opt_miti/2022-08-09_16:49:38/G30_nQ8_p1"
@@ -875,4 +1178,5 @@ def optimize_on_p1_reconstructed_landscape():
 
 if __name__ == "__main__":
     # debug_existing_BP_top()
-    debug_existing_BP_top_2()
+    # debug_existing_BP_top_2()
+    debug_existing_BP_top_3()
