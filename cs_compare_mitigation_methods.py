@@ -1,3 +1,4 @@
+from tkinter.messagebox import NO
 import networkx as nx
 import matplotlib.pyplot as plt
 import numpy as np
@@ -9,6 +10,10 @@ from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, execute
 from qiskit.quantum_info.operators import Operator, Pauli
 from qiskit.opflow import PrimitiveOp
 from qiskit.algorithms.optimizers.optimizer import POINT
+from mitiq.zne.zne import execute_with_zne
+from mitiq.zne.inference import (
+    LinearFactory
+)
 from typing import Callable, List, Optional, Tuple
 from qiskit.algorithms.optimizers import (
     ADAM,
@@ -70,7 +75,8 @@ from QAOAKit.vis import(
     vis_landscape_multi_p_and_and_count_optima_MP,
     vis_multi_landscape_and_count_optima_and_mitiq_MP,
     vis_multi_landscapes_and_count_optima_and_mitiq_MP_and_one_variable,
-    vis_two_BPs_p1_recon
+    vis_two_BPs_p1_recon,
+    vis_landscapes
 )
 
 from QAOAKit import (
@@ -132,7 +138,8 @@ from QAOAKit.compressed_sensing import (
     two_D_CS_p1_recon_with_given_landscapes,
     _vis_one_D_p1_recon,
     p1_generate_grad,
-    _executor_of_qaoa_maxcut_energy
+    _executor_of_qaoa_maxcut_energy,
+    cal_recon_error
 )
 from QAOAKit.optimizer_wrapper import (
     wrap_qiskit_optimizer_to_landscape_optimizer,
@@ -533,17 +540,27 @@ def debug_existing_BP_top_2():
     
     # optimizer = SPSA()
     # optimizer = ADAM()
+    shots = 2048
 
-    def _partial_qaoa_energy(x):
+    def _partial_qaoa_energy(x): # qaoa angles
         # angles = angles_from_qiskit_format(x)
         # angles = angles_to_qaoa_format(angles)
 
         # x = np.concatenate([angles['gamma'], angles['beta']])
         # print("!!!", x)
-        
-        return -noisy_qaoa_maxcut_energy(
-            G=G, beta=[x[1]], gamma=[x[0]], precomputed_energies=None, noise_model=None
+
+        circuit = get_maxcut_qaoa_circuit(
+        G, beta=[x[1]], gamma=[x[0]],
+        # transpile_to_basis=True, save_state=False)
+        transpile_to_basis=False, save_state=False)
+
+        miti = execute_with_zne(
+            circuit,
+            executor=partial(
+                _executor_of_qaoa_maxcut_energy, G=G, noise_model=noise_model, shots=shots),
         )
+        
+        return miti
 
     optimizer = wrap_qiskit_optimizer_to_landscape_optimizer(
         # SPSA
@@ -557,7 +574,7 @@ def debug_existing_BP_top_2():
         fun=_partial_qaoa_energy,
         
         # parameter of raw optimizer
-        lr=1e-2,
+        # lr=1e-2,
         # beta_1=0.9,
         # beta_2=0.99,
         # noise_factor=1e-8,
@@ -1177,10 +1194,180 @@ def optimize_on_p1_reconstructed_landscape():
     )
 
 
+def gen_p1_landscape_with_other_miti_top():
+    """Qiskit==0.37.2, mitiq==0.18.0.
 
+        https://mitiq.readthedocs.io/en/stable/changelog.html
+    """
+
+    MAX_NUM_GRAPHS_PER_NUM_QUBITS = 10
+    reg3_dataset_table = get_3_reg_dataset_table()
+    print("read 3 reg dataset OK")
+    print("use fixed angles to calculate n_optima")
+    signature = get_curr_formatted_timestamp()
+    
+    for n_qubits in range(8, 9, 2): # [1, 16]
+    # for n_qubits in range(4, 5): # [1, 16]
+        for p in range(1, 2): # [1, 11]
+            start_time = time.time()
+            df = reg3_dataset_table.reset_index()
+            df = df[(df["n"] == n_qubits) & (df["p_max"] == p)]
+            df = df.iloc[1: 2] # row_id = 40
+
+
+            # df = df.iloc[0: MAX_NUM_GRAPHS_PER_NUM_QUBITS]
+            # df = df.iloc[MAX_NUM_GRAPHS_PER_NUM_QUBITS:2*MAX_NUM_GRAPHS_PER_NUM_QUBITS]
+            
+            print(f"n_qubits={n_qubits}")
+            print(f"num of graphs={len(df)}")
+            print(f"p={p}")
+
+            p1Q = 0.001
+            p2Q = 0.005
+
+            # p1Q = 0.003
+            # p2Q = 0.007
+
+            print(f"depolarizing error, p1Q={p1Q}, p2Q={p2Q}")
+            noise_model = get_depolarizing_error_noise_model(p1Q=p1Q, p2Q=p2Q)
+            for row_id, row in df.iterrows():
+                
+                print(f"handling graph with row_id={row_id}")
+                angles = angles_to_qaoa_format(get_fixed_angles(d=3, p=p))
+
+                # print(row["beta"])
+                # print(row["gamma"])
+                # print(angles)
+                # print(row["p_max"])
+                # print(row["C_opt"], row["C_{true opt}"], row["C_fixed"])
+
+                C_opt = row["C_fixed"]
+                print("C_fixed", C_opt)
+                G = row["G"]
+
+                figdir = f'figs/gen_p1_landscape/{signature}/G{row_id}_nQ{n_qubits}_p{p}_depolar{p1Q}_{p2Q}_zneLinear'
+                
+                if not os.path.exists(figdir):
+                    os.makedirs(figdir)
+
+                nx.draw_networkx(G)
+                plt.title(f"")
+                plt.savefig(f"{figdir}/G{row_id}.png")
+                plt.cla()
+
+                mitigation_params = {
+                    'factory': LinearFactory(scale_factors=[1.0, 2.0])
+                }
+
+                print(mitigation_params)
+
+                gen_p1_landscape(
+                    G=G,
+                    p=p,
+                    figdir=figdir, 
+                    # beta_opt=beta_to_qaoa_format(angles["beta"]),
+                    # gamma_opt=gamma_to_qaoa_format(angles["gamma"]),
+                    beta_opt=angles["beta"],
+                    gamma_opt=angles["gamma"],
+                    noise_model=noise_model,
+                    params_path=[],
+                    C_opt=C_opt,
+                    mitigation_params=mitigation_params,
+                    # n_shots=2048,
+                    # n_pts_per_unit=2
+                )
+
+                print(" ================ ")
+
+            end_time = time.time()
+            print(f"for p={p}, nQ={n_qubits}, it takes {end_time-start_time} s")
+
+    return
+
+
+def cal_multi_errors(a, b):
+    diff = {}
+    a = a.reshape(-1)
+    b = b.reshape(-1)
+    diff['MSE'] = np.linalg.norm(a - b)
+    diff['NCC'] = 1 - cal_recon_error(a, b, "CROSS_CORRELATION")
+    diff['COV'] = cosine(a, b)
+    return diff
+
+
+def vis_case_compare_mitigation_method():
+    is_reconstructed = True
+
+    # derive origin full landscape
+    data_dir = "figs/cnt_opt_miti/2022-08-10_10:14:03/G40_nQ8_p1"
+    data = np.load(f"{data_dir}/data.npz", allow_pickle=True)
+    origin = data['origin'].tolist()
+    full_range = data['full_range'].tolist()
+    miti1 = origin['mitis']
+
+    # ----------- tmp start
+    # sf = 0.05
+    # miti1_recon = two_D_CS_p1_recon_with_given_landscapes(
+    #     figdir=None,
+    #     origin=origin,
+    #     full_range=None,
+    #     sampling_frac=sf
+    # )
+    # recon1_path = f"{data_dir}/2D_CS_recon_sf{sf:.3f}"
+    # np.savez_compressed(recon1_path, recon=miti1_recon)
+
+    # return
+
+    # ----------- tmp end
+
+    # derive reconstructed landscape
+    sf = 0.05
+    recon_path = f"{data_dir}/2D_CS_recon_sf{sf:.3f}.npz"
+    recon = np.load(recon_path, allow_pickle=True)['recon'].tolist()
+    miti1_recon = recon['mitis']
+
+    data2_dir = "figs/gen_p1_landscape/2022-10-08_16:52:53/G40_nQ8_p1_depolar0.001_0.005_zneLinear"
+    miti2 = np.load(f"{data2_dir}/data.npz", allow_pickle=True)['origin'].tolist()['mitis']
+
+    if not is_reconstructed:
+        miti2_recon = two_D_CS_p1_recon_with_given_landscapes(
+            figdir=None,
+            origin={ "mitis": miti2 },
+            full_range=None,
+            sampling_frac=sf
+        )
+        recon2_path = f"{data2_dir}/2D_CS_recon_sf{sf:.3f}"
+        np.savez_compressed(recon2_path, recon=miti2_recon, sampling_frac=sf)
+        miti2_recon = miti2_recon['mitis']
+    else:
+        recon2_path = f"{data2_dir}/2D_CS_recon_sf{sf:.3f}.npz"
+        miti2_recon = np.load(recon2_path, allow_pickle=True)['recon'].tolist()['mitis']
+
+    # --------------- compare MSE, NCC and Cosine distance -----------
+
+    # metrics = ['MSE', 'NCC', 'COS']
+    # metrics = {"MSE": 0, "NCC": 0, "COS": 0}
+
+    diff1 = cal_multi_errors(miti1, miti1_recon)
+    diff2 = cal_multi_errors(miti2, miti2_recon)
+    print(diff1)
+    print(diff2)
+
+    vis_landscapes(
+        # landscapes=[origin['unmitis'], miti1, miti2, miti1_recon, miti2_recon],
+        landscapes=[miti1, miti2, miti1_recon, miti2_recon],
+        labels=["ZNE RichardsonFactory", "ZNE LinearFactory", "ZNE RichardsonFactory Recon", "ZNE LinearFactory Recon"],
+        full_range=full_range,
+        true_optima=None,
+        title="Compare different ZNE configs and reconstruction",
+        save_path="paper_figs/case3.png",
+        params_paths=[None, None, None, None]
+    )
 
 
 if __name__ == "__main__":
     # debug_existing_BP_top()
     # debug_existing_BP_top_2()
-    debug_existing_BP_top_3()
+    # debug_existing_BP_top_3()
+    # gen_p1_landscape_with_other_miti_top()
+    vis_case_compare_mitigation_method()
