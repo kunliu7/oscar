@@ -122,6 +122,7 @@ from QAOAKit.qiskit_interface import (
 from QAOAKit.examples_utils import get_20_node_erdos_renyi_graphs
 from QAOAKit.parameter_optimization import get_median_pre_trained_kde
 from QAOAKit.compressed_sensing import (
+    cal_recon_error,
     gen_p1_landscape,
     gen_p2_landscape,
     two_D_CS_p1_recon_with_distributed_landscapes,
@@ -213,9 +214,9 @@ def gen_p2_landscape_top():
                     noise_model=noise_model,
                     params_path=[],
                     C_opt=C_opt,
-                    n_pts_per_unit=10, # test
+                    n_pts_per_unit=36, # test
                     n_shots=1024,
-                    bounds = {'beta': [-np.pi/4, np.pi/4], 'gamma': [-np.pi/4, np.pi/4]},
+                    bounds = {'beta': [-np.pi/8, np.pi/8], 'gamma': [-np.pi/8, np.pi/8]},
                 )
 
                 print(" ================ ")
@@ -230,7 +231,7 @@ def gen_p2_landscape_top():
 # ================== 2-D CS =================
 
 def two_D_CS_p1_recon_with_given_landscapes_top():
-    data_dir = "figs/cnt_opt_miti/2022-08-08_19:48:31"
+    data_dir = "figs/gen_p2_landscape/2022-10-01_16:15:33/G41_nQ8_p2_depolar0.001_0.005"
     data = np.load(f"{data_dir}/data.npz", allow_pickle=True)
 
     figdir = f"{data_dir}/2D_CS_recon"
@@ -239,182 +240,76 @@ def two_D_CS_p1_recon_with_given_landscapes_top():
 
     for sf in np.arange(0.05, 0.5, 0.03):
         recon = two_D_CS_p1_recon_with_given_landscapes(
-            figdir=figdir,
             origin=data['origin'].tolist(),
             sampling_frac=sf
         )
 
 
-def reconstruct_by_distributed_landscapes_top():
-    # 6944.407839, 5891.432676, 5011.566536, 4321.232713, 3659.859955, 2980.218758, 2523.759679, 2140.338593, 1727.501286,
-    # 1371.053043, 1069.624135, 812.519126, 588.600523, 
-
-    noisy_data1 = np.load("figs/cnt_opt_miti/2022-08-08_19:48:31/data.npz", allow_pickle=True)
-    ideal = noisy_data1['origin'].tolist()['ideals']
-    full_range = noisy_data1['full_range'].tolist()
-
-    # depolarizing 0.001 and 0.005, one-qubit gate error and two-qubit gate error
-    noisy1 = noisy_data1['origin'].tolist()['unmitis']
-
-    noisy_data_dir2 = "figs/gen_p1_landscape/2022-09-29_00:31:54/G40_nQ8_p1_depolar0.003_0.007"
-    noisy_data2 = np.load(
-        "figs/gen_p1_landscape/2022-09-29_00:31:54/G40_nQ8_p1_depolar0.003_0.007/data.npz",
-        allow_pickle=True)
-
-    # depolarizing 0.003 and 0.007, one-qubit gate error and two-qubit gate error
-    noisy2 = noisy_data2['origin'].tolist()['unmitis']
-
-    datas = [
-        ideal,
-        noisy1,
-        noisy2
-    ]
-
-    for data in datas:
-        print(data.shape)
-
-    # --------- data prepared OK -----------
-
-    sfs = np.arange(0.05, 0.5, 0.03)
-
-    errors = []
-    for sf in sfs:
-
-        if True:
-            recon = two_D_CS_p1_recon_with_distributed_landscapes(
-                ideal=ideal.copy(),
-                origins=datas,
-                sampling_frac=sf
-            )
-            
-            np.savez_compressed(f"{noisy_data_dir2}/recon_by_{len(datas)}_landscapes_sf{sf:.3f}", recon)
-        else:
-            recon = np.load(f"{noisy_data_dir2}/recon_by_{len(datas)}_landscapes_sf{sf:.3f}.npz")['arr_0']
-
-        _vis_recon_distributed_landscape(
-            landscapes=datas + [recon],
-            labels=['ideal', 'depolarizing, 0.001, 0.005', 'depolarizing, 0.003, 0.007', 'reconstructed by 1/3 of each'],
-            full_range=full_range,
-            bounds=None,
-            true_optima=None,
-            title=f'reconstruct distributed landscapes, sampling fraction: {sf:.3f}',
-            save_path=f'{noisy_data_dir2}/recon_by_{len(datas)}_landscapes.png'
-        )
-
-        error = np.linalg.norm(ideal - recon)
-        errors.append(error)
-        print("reconstruct error: ", error)
-    
-    print(errors)
-
-    return
-
-
-def reconstruct_by_distributed_landscapes_two_noisy_simulations_top():
+def reconstruct_p2_landscape_top():
     """Reconstructed with two noisy simulations
     """
 
-    is_existing_recon = True
+    is_existing_recon = True 
+    data_dir = "figs/gen_p2_landscape/2022-10-01_16:15:33/G41_nQ8_p2_depolar0.001_0.005"
+    data = np.load(f"{data_dir}/data.npz", allow_pickle=True)
+    origin = data['origin'].tolist()
 
-    noisy_data_dir1 = "figs/cnt_opt_miti/2022-08-08_19:48:31"
-    noisy_data1 = np.load(f"{noisy_data_dir1}/data.npz", allow_pickle=True)
-    ideal = noisy_data1['origin'].tolist()['ideals']
-    full_range = noisy_data1['full_range'].tolist()
+    print(origin['ideals'].shape)
 
-    # depolarizing 0.001 and 0.005, one-qubit gate error and two-qubit gate error
-    noisy1 = noisy_data1['origin'].tolist()['unmitis']
-
-    noisy_data_dir2 = "figs/gen_p1_landscape/2022-09-29_00:31:54/G40_nQ8_p1_depolar0.003_0.007"
-    noisy_data2 = np.load(
-        f"{noisy_data_dir2}/data.npz",
-        allow_pickle=True)
-
-    # depolarizing 0.003 and 0.007, one-qubit gate error and two-qubit gate error
-    noisy2 = noisy_data2['origin'].tolist()['unmitis']
-
-    datas = [
-        # ideal,
-        noisy1,
-        noisy2
-    ]
-
-    for data in datas:
-        print(data.shape)
+    # return
 
     if not is_existing_recon:
         signature = get_curr_formatted_timestamp()
-        recon_dir = f"figs/recon_distributed_landscape/{signature}"
+        recon_dir = f"figs/recon_p2_landscape/{signature}"
         if not os.path.exists(recon_dir):
             os.makedirs(recon_dir)
     else:
-        recon_dir = "figs/recon_distributed_landscape/2022-09-30_14:34:08"
+        # recon_dir = "figs/recon_distributed_landscape/2022-09-30_14:34:08"
+        # recon_dir = "figs/recon_p2_landscape/2022-10-01_19:15:39" # 0.01
+        recon_dir = "figs/recon_p2_landscape/2022-10-01_19:50:01" # 0.05
 
     # --------- data prepared OK -----------
 
-    sfs = np.arange(0.05, 0.42, 0.03)
+    # sfs = np.arange(0.05, 0.011, 0.05)
+    sfs = [0.05]
 
-    errors1 = []
-    errors2 = []
+    errors = []
     for sf in sfs:
+        landscape = origin['ideals']
 
         if not is_existing_recon:
-            recon = two_D_CS_p1_recon_with_distributed_landscapes(
-                origins=datas,
+            recon = recon_4D_landscape_by_2D(
+                origin=landscape,
                 sampling_frac=sf
             )
             
-            np.savez_compressed(f"{recon_dir}/recon_by_{len(datas)}_landscapes_sf{sf:.3f}", recon)
+            np.savez_compressed(f"{recon_dir}/recon_p2_landscape_sf{sf:.3f}", recon)
         else:
-            recon = np.load(f"{recon_dir}/recon_by_{len(datas)}_landscapes_sf{sf:.3f}.npz")['arr_0']
+            recon = np.load(f"{recon_dir}/recon_p2_landscape_sf{sf:.3f}.npz")['arr_0']
+            print(recon.shape)
+
+        origin_2d = landscape.reshape(landscape.shape[0] * landscape.shape[1],
+            landscape.shape[2] * landscape.shape[3])
+        recon_2d = recon.reshape(recon.shape[0] * recon.shape[1],
+            recon.shape[2] * recon.shape[3])
 
         _vis_recon_distributed_landscape(
-            landscapes=datas + [recon],
-            labels=['depolarizing, 0.001, 0.005', 'depolarizing, 0.003, 0.007', 'reconstructed by 1/3 of each'],
-            full_range=full_range,
+            landscapes=[origin_2d, recon_2d],
+            labels=['full', 'recon'],
+            full_range={'beta': range(225), 'gamma': range(225)},
             bounds=None,
             true_optima=None,
-            title=f'reconstruct distributed landscapes, sampling fraction: {sf:.3f}',
-            save_path=f'{recon_dir}/recon_by_{len(datas)}_landscapes_{sf:.3f}.png'
+            title=f'reconstruct landscape, sampling fraction: {sf:.3f}',
+            save_path=f'{recon_dir}/recon_p2_landscape_{sf:.3f}.png'
         )
 
-        error1 = np.linalg.norm(noisy1 - recon)
-        errors1.append(error1)
-
-        error2 = np.linalg.norm(noisy2 - recon)
-        errors2.append(error2)
-
-        print(f"reconstruct error 1: {error1}; error 2: {error2}")
-    
-    print(errors1)
-    print(errors2)
+        # error = np.linalg.norm(recon - origin['ideals'])
+        error1 = cal_recon_error(recon.reshape(-1), origin['ideals'].reshape(-1), "MSE")
+        error2 = cosine(recon.reshape(-1), origin['ideals'].reshape(-1))
+        print(f"============ error for {sf:.3f}: MSE={error1:.3f}, Cosine={error2:.3f} =============")
+        errors.append((error1, error2))
 
     return
-
-
-def get_grid_points(bounds, n_samples_along_axis):
-    # from qaoa format to angles to qiskit format
-    xs = []
-    qaoa_angles = []
-    # for gamma in np.linspace(bounds['gamma'][0], bounds['gamma'][1], 10):
-    #     for beta in np.linspace(bounds['beta'][0], bounds['beta'][1], 10):
-    for beta in np.linspace(bounds['beta'][0], bounds['beta'][1], 10):
-        for gamma in np.linspace(bounds['gamma'][0], bounds['gamma'][1], 10):
-            qaoa_angles.append({
-                'gamma': [gamma],
-                'beta': [beta]
-            })
-            angles = angles_from_qaoa_format(
-                gamma=np.array([gamma]),
-                beta=np.array([beta])
-            )
-            # print(angles)
-            x = angles_to_qiskit_format(angles)
-            xs.append(x)
-
-    xs = np.array(xs)
-    # print(xs.shape)
-    # print("var of points: ", np.var(xs, axis=0))
-    return xs, qaoa_angles
 
 
 def test_4D_CS():
@@ -435,4 +330,5 @@ if __name__ == "__main__":
     # reconstruct_by_distributed_landscapes_top()
     # reconstruct_by_distributed_landscapes_two_noisy_simulations_top()
     # test_4D_CS()
-    gen_p2_landscape_top()
+    # gen_p2_landscape_top()
+    reconstruct_p2_landscape_top()
