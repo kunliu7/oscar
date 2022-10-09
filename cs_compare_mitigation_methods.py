@@ -1289,10 +1289,19 @@ def cal_multi_errors(a, b):
     diff = {}
     a = a.reshape(-1)
     b = b.reshape(-1)
-    diff['MSE'] = np.linalg.norm(a - b)
-    diff['NCC'] = 1 - cal_recon_error(a, b, "CROSS_CORRELATION")
-    diff['COV'] = cosine(a, b)
+    diff['L2-norm'] = np.linalg.norm(a - b)
+    diff['MSE'] = cal_recon_error(a, b, 'MSE')
+    diff['1-NCC'] = 1 - cal_recon_error(a, b, "CROSS_CORRELATION")
+    diff['COS'] = cosine(a, b)
     return diff
+
+
+def cal_gap(C_opt, full, recon):
+    min_full = np.max(full)
+    min_recon = np.max(recon)
+    print("C_opt: ", C_opt)
+    print(f"min_full: {min_full}, C_opt - min_full: {C_opt - min_full}")
+    print(f"min_miti_recon: {min_recon}, C_opt - min_recon: {C_opt - min_recon}")
 
 
 def vis_case_compare_mitigation_method():
@@ -1304,6 +1313,7 @@ def vis_case_compare_mitigation_method():
     origin = data['origin'].tolist()
     full_range = data['full_range'].tolist()
     miti1 = origin['mitis']
+    C_opt = data['C_opt']
 
     # ----------- tmp start
     # sf = 0.05
@@ -1352,6 +1362,27 @@ def vis_case_compare_mitigation_method():
     diff2 = cal_multi_errors(miti2, miti2_recon)
     print(diff1)
     print(diff2)
+
+    # --------------- gap ------------
+    # min_miti = np.min(miti1)
+    # min_miti_recon = np.min(miti1_recon)
+    # print("C_opt: ", C_opt)
+    # print(f"min_miti: {min_miti}, C_opt - min_miti: {C_opt - min_miti}")
+    # print(f"min_miti_recon: {min_miti_recon}", C_opt - min_miti_recon)
+
+    cal_gap(C_opt, miti1, miti1_recon)
+    cal_gap(C_opt, miti2, miti2_recon)
+
+    # reg3_dataset_table = get_3_reg_dataset_table()
+    # df = reg3_dataset_table.reset_index()
+    # n_qubits = 8
+    # p = 1
+    # sf = 0.05
+    # df = df[(df["n"] == n_qubits) & (df["p_max"] == p)]
+    # for row_id, row in df.iloc[1:2].iterrows():
+    #     pass
+    # assert row_id == 40
+
 
     vis_landscapes(
         # landscapes=[origin['unmitis'], miti1, miti2, miti1_recon, miti2_recon],
