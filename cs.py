@@ -507,8 +507,13 @@ def optimize_on_p1_reconstructed_landscape():
     data_dir = "figs/cnt_opt_miti/2022-08-10_10:14:03/G40_nQ8_p1"
     data = np.load(f"{data_dir}/data.npz", allow_pickle=True)
     origin = data['origin'].tolist()
+    existed = True
+    # existed = False
+    # if not existed:
+    timestamp = get_curr_formatted_timestamp()
+    recon_dir = f"{data_dir}/2D_CS_recon"
 
-    figdir = f"{data_dir}/2D_CS_recon"
+    figdir = f"figs/opt_on_recon_landscape/{timestamp}"
     if not os.path.exists(figdir):
         os.makedirs(figdir)
 
@@ -524,7 +529,7 @@ def optimize_on_p1_reconstructed_landscape():
     # np.savez_compressed(f'{figdir}', recon=recon)
 
     # return
-    recon = np.load(f'{figdir}.npz', allow_pickle=True)['recon'].tolist()
+    recon = np.load(f'{recon_dir}.npz', allow_pickle=True)['recon'].tolist()
     # print(recon)
 
     df = reg3_dataset_table.reset_index()
@@ -577,6 +582,16 @@ def optimize_on_p1_reconstructed_landscape():
         "gamma": np.array([np.random.uniform(bounds[0][0], bounds[0][1])]),
         "beta": np.array([np.random.uniform(bounds[1][0], bounds[1][1])])
     }
+
+    print("initial_angles =", initial_angles)
+
+    initial_angles = {'gamma': np.array([0.71527626]), 'beta': np.array([-0.34245097])}
+    
+    # initial_angles = {
+    #     "gamma": np.array([1.62]),
+    #     "beta": np.array([0.78])
+    # }
+
     recon_params_path_dict = {}
     origin_params_path_dict = {}
 
@@ -591,22 +606,26 @@ def optimize_on_p1_reconstructed_landscape():
             values = []
             params = []
 
+            # raw_optimizer = SPSA
+            raw_optimizer = ADAM 
             optimizer = wrap_qiskit_optimizer_to_landscape_optimizer(
-                # SPSA
-                ADAM
+                raw_optimizer
+                # ADAM
                 # L_BFGS_B
             #     # COBYLA
             )(
                 bounds=bounds, 
                 landscape=landscape,
-                fun_type='INTERPOLATE'
+                fun_type='INTERPOLATE',
+                fun=None,
+                lr=1e-2
                 # fun_type='None'
             )
             
             # optimizer = L_BFGS_B()
 
-            # optimizer_name = 'SPSA'
-            optimizer_name = "ADAM"
+            optimizer_name = raw_optimizer.__class__.__name__
+            # optimizer_name = "ADAM"
             # optimizer_name = "L_BFGS_B"
             # optimizer_name = "COBYLA"
 
@@ -673,6 +692,13 @@ def optimize_on_p1_reconstructed_landscape():
     ])
     
     true_optima = shift_parameters(true_optima, bounds)
+
+    np.savez_compressed(f"{figdir}/use_case_data",
+        # initial_point=initial_angles,
+        initial_angles=initial_angles,
+        origin_params_path_dict=origin_params_path_dict,
+        recon_params_path_dict=recon_params_path_dict
+    )
 
     _vis_one_D_p1_recon(
         origin_dict=origin,
@@ -930,11 +956,12 @@ def compare_with_original_grad_top():
 
     pass
 
+
 def CS_on_google_data():
-    # data_types = ['sk', '3reg', 'grid']
+    data_types = ['sk', '3reg', 'grid']
     # data_types = ['sk']
     # data_types = ['3reg']
-    data_types = ['grid']
+    # data_types = ['grid']
     timestamp = get_curr_formatted_timestamp()
     for data_type in data_types:
         data_path = f"google_data/Google_Data/google_{data_type}.npz"
@@ -1297,11 +1324,11 @@ if __name__ == "__main__":
     # count_optima_of_fixed_angles_3reg_graphs()
     # count_optima_of_fixed_angles_3reg_graphs_one_variable_CS()
     # count_optima_of_fixed_angles_3reg_graphs_one_variable_CS_sampling_frac()
-    # one_D_CS_p1_generate_landscapes()
+    one_D_CS_p1_generate_landscapes()
     # one_D_CS_p1_recon_with_given_landscapes_top()
     # two_D_CS_p1_recon_with_given_landscapes_top()
 
-    # optimize_on_p1_reconstructed_landscape()
+    optimize_on_p1_reconstructed_landscape()
     # compare_with_original_grad_top()
     # p1_generate_grad_top()
     # approximate_grad_by_2D_interpolation_top()
