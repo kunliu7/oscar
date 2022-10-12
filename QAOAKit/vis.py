@@ -1033,7 +1033,17 @@ def _vis_recon_distributed_landscape(
 
     # plt.figure
     plt.rc('font', size=28)
-    fig, axs = plt.subplots(nrows=2, ncols=2, figsize=(30, 30))
+    if len(landscapes) == 2:
+        fig, axs = plt.subplots(nrows=1, ncols=2, figsize=(30, 22))
+        # fig.suptitle(title, y=0.8)
+    elif len(landscapes) == 3:
+        fig, axs = plt.subplots(nrows=1, ncols=3, figsize=(30, 22))
+        # fig.suptitle(title, y=0.92)
+    elif len(landscapes) == 4:
+        fig, axs = plt.subplots(nrows=2, ncols=2, figsize=(30, 30))
+        fig.suptitle(title, y=0.92)
+    else:
+        assert False
     fig.suptitle(title, y=0.92)
     axs = axs.reshape(-1)
 
@@ -1047,9 +1057,70 @@ def _vis_recon_distributed_landscape(
         axs[idx].set_xlabel('beta')
         axs[idx].set_ylabel('gamma')
 
-    plt.legend()
+    # plt.legend()
     fig.colorbar(im, ax=[axs[i] for i in range(len(landscapes))])
     # plt.title(title)
     # plt.subtitle(title)
-    fig.savefig(save_path)
+    fig.savefig(save_path, bbox_inches='tight')
+    plt.close('all')
+
+
+def vis_landscapes(
+        landscapes, # list of np.ndarray
+        labels, # list of labels of correlated landscapes
+        full_range, # dict, 
+        true_optima,
+        title,
+        save_path, # figure save path
+        params_paths, # list of list of parameters correlated to landscapes
+        recon_params_path_dict=None,
+        origin_params_path_dict=None
+    ):
+
+    assert len(landscapes) == len(labels)
+    assert len(landscapes) == len(params_paths)
+
+    # plt.figure
+    plt.rc('font', size=28)
+    if len(landscapes) == 2:
+        fig, axs = plt.subplots(nrows=1, ncols=2, figsize=(30, 22))
+    elif len(landscapes) == 3:
+        fig, axs = plt.subplots(nrows=1, ncols=3, figsize=(30, 10))
+    elif len(landscapes) == 4:
+        fig, axs = plt.subplots(nrows=2, ncols=2, figsize=(30, 30))
+    else:
+        assert False
+
+    fig.suptitle(title)
+    axs = axs.reshape(-1)
+
+    # TODO Check ij and xy
+    X, Y = np.meshgrid(full_range['beta'], full_range['gamma'])
+
+    # c = ax.pcolormesh(X, Y, Z, cmap='viridis', vmin=Z.min(), vmax=Z.max())
+    for idx, landscape in enumerate(landscapes):
+        im = axs[idx].pcolormesh(X, Y, landscape) #, cmap='viridis', vmin=origin.min(), vmax=origin.max())
+        axs[idx].set_title(labels[idx])
+        axs[idx].set_xlabel('beta')
+        axs[idx].set_ylabel('gamma')
+        if isinstance(true_optima, list) or isinstance(true_optima, np.ndarray):
+            axs[idx].plot(true_optima[1], true_optima[0], marker="o", color='red', markersize=7, label="true optima")
+
+        params = params_paths[idx]
+        if isinstance(params, list) or isinstance(params, np.ndarray):
+            xs = [] # beta
+            ys = [] # gamma
+            for param in params:
+                xs.append(param[1])
+                ys.append(param[0])
+
+            axs[idx].plot(xs, ys, marker="o", color='purple', markersize=5, label="optimization path")
+            axs[idx].plot(xs[0], ys[0], marker="o", color='white', markersize=9, label="initial point")
+            axs[idx].plot(xs[-1], ys[-1], marker="s", color='white', markersize=12, label="last point")
+
+
+    fig.colorbar(im, ax=[axs[i] for i in range(len(landscapes))])
+    plt.legend()
+    fig.savefig(save_path, bbox_inches='tight')
+    # plt.show()
     plt.close('all')
