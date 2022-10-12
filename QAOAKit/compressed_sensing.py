@@ -27,6 +27,9 @@ from qiskit.providers.aer.noise import NoiseModel
 import concurrent.futures
 from mitiq import zne, Observable, PauliString
 from mitiq.zne.zne import execute_with_zne
+from mitiq.zne.inference import (
+    LinearFactory
+)
 from mitiq.interface.mitiq_qiskit.qiskit_utils import (
     execute,
     execute_with_noise,
@@ -673,9 +676,11 @@ def _vis_one_D_p1_recon(
         origin_params_path_dict=None
     ):
 
+    old_labels = ['ideals', 'unmitis', 'mitis']
+    new_labels = ['ideal', 'unmitigated', 'mitigated']
     # plt.figure
     plt.rc('font', size=28)
-    fig, axs = plt.subplots(nrows=2, ncols=3, figsize=(30, 30))
+    fig, axs = plt.subplots(nrows=2, ncols=3, figsize=(40, 30))
     fig.suptitle(title, y=0.92)
     axs = axs.reshape(-1)
 
@@ -684,7 +689,9 @@ def _vis_one_D_p1_recon(
 
     # c = ax.pcolormesh(X, Y, Z, cmap='viridis', vmin=Z.min(), vmax=Z.max())
     idx = 0
-    for label, origin in origin_dict.items():
+    # for label, origin in origin_dict.items():
+    for ilabel, label in enumerate(old_labels):
+        origin = origin_dict[label]
         recon = recon_dict[label]
         # axs[idx]
         # Z = np.array(Z).T
@@ -692,8 +699,8 @@ def _vis_one_D_p1_recon(
         
         # im = axs[idx].imshow(origin)
         im = axs[idx].pcolormesh(X, Y, origin) #, cmap='viridis', vmin=origin.min(), vmax=origin.max())
-        axs[idx].set_title(f"origin, {label}")
-        if true_optima:
+        axs[idx].set_title(f"full, {new_labels[ilabel]}")
+        if true_optima.all() != None:
             axs[idx].plot(true_optima[1], true_optima[0], marker="o", color='red', markersize=7, label="true optima")
         axs[idx].set_xlabel('beta')
         axs[idx].set_ylabel('gamma')
@@ -703,8 +710,8 @@ def _vis_one_D_p1_recon(
 
         # im = axs[idx + 3].imshow(recon)
         im = axs[idx + 3].pcolormesh(X, Y, recon)
-        axs[idx + 3].set_title(f"recon, {label}")
-        if true_optima:
+        axs[idx + 3].set_title(f"reconstructed, {new_labels[ilabel]}")
+        if true_optima.all() != None:
             axs[idx + 3].plot(true_optima[1], true_optima[0], marker="o", color='red', markersize=7, label="true optima")
         axs[idx + 3].set_xlabel('beta')
         axs[idx + 3].set_ylabel('gamma')
@@ -741,7 +748,8 @@ def _vis_one_D_p1_recon(
     fig.colorbar(im, ax=[axs[i] for i in range(6)])
     # plt.title(title)
     # plt.subtitle(title)
-    fig.savefig(save_path)
+    # fig.savefig(save_path, dpi=600, bbox_inches='tight')
+    fig.savefig(save_path, bbox_inches='tight')
     plt.close('all')
 
 
@@ -751,7 +759,10 @@ def _get_ideal_unmiti_miti_value_for_one_point(
     gamma: list,
     shots: int,
     noise_model,
-    ignore_miti: int=False
+    ignore_miti: bool=False,
+    ignore_unmiti: bool=False,
+    ignore_ideal: bool=False,
+    mitigation_params: dict=None
 ):
     """Generate ideal, unmitigated and mitigated energy for given one point.
     """
@@ -760,18 +771,32 @@ def _get_ideal_unmiti_miti_value_for_one_point(
         # transpile_to_basis=True, save_state=False)
         transpile_to_basis=False, save_state=False)
 
-    ideal = _executor_of_qaoa_maxcut_energy(
-        circuit.copy(), G, noise_model=None, shots=shots)
-    unmiti = _executor_of_qaoa_maxcut_energy(
-        circuit.copy(), G, noise_model=copy.deepcopy(noise_model), shots=shots)
+    print("!")
+    if ignore_ideal:
+        ideal = 0
+    else:
+        ideal = _executor_of_qaoa_maxcut_energy(
+            circuit.copy(), G, noise_model=None, shots=shots)
+    
+    if ignore_unmiti:
+        unmiti = 0
+    else:
+        unmiti = _executor_of_qaoa_maxcut_energy(
+            circuit.copy(), G, noise_model=copy.deepcopy(noise_model), shots=shots)
     
     if ignore_miti:
         miti = 0
     else:
+        if isinstance(mitigation_params, dict):
+            factory = mitigation_params['factory']
+        else:
+            factory = None
+
         miti = execute_with_zne(
             circuit.copy(),
             executor=partial(
                 _executor_of_qaoa_maxcut_energy, G=G, noise_model=noise_model, shots=shots),
+            factory=factory
         )
     # print(miti)
 
@@ -894,6 +919,7 @@ def gen_p1_landscape(
         noise_model: NoiseModel,
         params_path: list,
         C_opt: float,
+        mitigation_params: dict=None,
         bounds = {'beta': [-np.pi/4, np.pi/4],
                  'gamma': [-np.pi, np.pi]},
         n_shots: int=2048,
@@ -939,7 +965,11 @@ def gen_p1_landscape(
                 [beta],
                 [gamma],
                 n_shots,
-                copy.deepcopy(noise_model)
+                copy.deepcopy(noise_model),
+                False,
+                True,
+                True,
+                copy.deepcopy(mitigation_params)
             )
             params.append(param)
     
@@ -1542,22 +1572,38 @@ def two_D_CS_p1_recon_with_given_landscapes(
 
 def two_D_CS_p1_recon_with_distributed_landscapes(
     origins: List[np.ndarray],
-    # full_range: dict,
-    # n_pts: dict,
-    sampling_frac: float
-):
+    sampling_frac: float,
+    ratios: list=None,
+    ri: np.ndarray=None,
+) -> None:
     """Reconstruct landscapes by sampling on distributed landscapes.
+
+    Args:
+        origins (List[np.ndarray]): List of full landscapes.
+        sampling_frac (float): sampling fraction
+        ratios (list, optional): Ratios of samples coming from each original landscapes. Defaults to None.
+        ri (np.ndarray, optional): Random indices of original landscapes to do compressed sensing. Defaults to None.
 
     """
     # ! Convention: First beta, Last gamma
+    if not isinstance(ratios, list):
+        ratios = [1.0 / len(origins) for _ in range(len(origins))]
+    else:
+        assert len(ratios) == len(origins)
+    assert np.isclose(sum(ratios), 1.0)
     
     print('start: solve l1 norm')
     ny, nx = origins[0].shape
 
     # extract small sample of signal
-    k = round(nx * ny * sampling_frac)
     
-    ri = np.random.choice(nx * ny, k, replace=False) # random sample of indices
+    k = round(nx * ny * sampling_frac)
+    if not isinstance(ri, np.ndarray):
+        ri = np.random.choice(nx * ny, k, replace=False) # random sample of indices
+    else:
+        assert len(ri.shape) == 1 and ri.shape[0] == k
+    
+    print(f"ratios: {ratios}, k: {k}")
     # b = np.expand_dims(b, axis=1)
 
     # create dct matrix operator using kron (memory errors for large ny*nx)
@@ -1570,18 +1616,20 @@ def two_D_CS_p1_recon_with_distributed_landscapes(
     # b = X.T.flat[ri]
 
     b = np.zeros(k)
-    origins_T = [
+    origins_T = np.array([
         o.T for o in origins
-    ]
-    n_origins = len(origins)
+    ])
+    # n_origins = len(origins)
+    # for ik in range(k):
+    #     which_origin = ik % n_origins
+    #     b[ik] = origins_T[which_origin].flat[ri[ik]]
+    
     for ik in range(k):
-        which_origin = ik % n_origins
+        # which_origin = ik % n_origins
+        which_origin = np.random.choice(len(origins), 1, p=ratios)[0]
         b[ik] = origins_T[which_origin].flat[ri[ik]]
 
     recon = recon_2D_by_cvxpy(nx, ny, A, b)
-
-    # if figdir:
-        
 
     print('end: solve l1 norm')
     return recon
@@ -1829,14 +1877,17 @@ def cal_recon_error(x, x_recon, residual_type):
     x = x.reshape(-1)
     x_recon = x_recon.reshape(-1)
 
+    assert x.shape[0] == x_recon.shape[0]
+
     diff = x - x_recon
 
     if residual_type == 'MIN_MAX':
         res = np.sqrt((diff ** 2).mean()) / (x.max() - x.min())
     elif residual_type == 'MEAN':
         res = np.sqrt((diff ** 2).mean()) / x.mean()
-    elif residual_type == 'MSE':
+    elif residual_type == 'MSE': # ! RMSE, Sqrt MSE, just let it be
         res = np.sqrt((diff ** 2).mean())
+        # res = (diff ** 2).mean()
     elif residual_type == 'CROSS_CORRELATION':
         res = np.correlate(x_recon, x, mode='valid')
         # print(res)
@@ -1854,6 +1905,6 @@ def cal_recon_error(x, x_recon, residual_type):
         res = 0
         # res = np.sum((x_recon - x_recon.mean()) * (x - x.mean())) / np.sqrt(x_recon.var() * x.var())
     else:
-        assert f"Invalid residual_type {residual_type}"
+        assert False, f"Invalid residual_type {residual_type}"
 
     return res
