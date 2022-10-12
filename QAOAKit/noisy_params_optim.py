@@ -105,7 +105,7 @@ def compute_expectation(counts, G):
 
 
 # Finally we write a function that executes the circuit on the chosen backend
-def get_expectation(G, noise_model, num_shots=512):
+def get_expectation(G, noise_model, num_shots):
     
     """
     Runs parametrized circuit
@@ -117,7 +117,7 @@ def get_expectation(G, noise_model, num_shots=512):
     """
     
     backend = Aer.get_backend('aer_simulator')
-    noise_model = get_depolarizing_error_noise_model(0.001, 0.02)
+    # noise_model = get_depolarizing_error_noise_model(0.001, 0.02)
     # backend.shots = num_shots
     
     def execute_circ(beta_gamma):
@@ -133,17 +133,26 @@ def get_expectation(G, noise_model, num_shots=512):
             noise_model=noise_model
         ).result().get_counts()
         
-        return compute_expectation(counts, G)
+        return -compute_expectation(counts, G)
     
     return execute_circ
 
 
 def optimize_under_noise(G: nx.Graph, init_beta_gamma, noise_model, num_shots, opt_method):
     expectation = get_expectation(G, noise_model, num_shots)
+    params_path = []
+
+    def cb(xk):
+        params_path.append(xk)
 
     rst = minimize(expectation, 
                 init_beta_gamma, 
                 # method='COBYLA')
-                method=opt_method)
-    # print(res)
-    return rst
+                method=opt_method,
+                callback=cb)
+    print(rst)
+    eigenstate = rst.x
+    eigenvalue = rst.fun
+
+
+    return eigenstate, eigenvalue, params_path
