@@ -140,6 +140,40 @@ def wrap_qiskit_optimizer_to_landscape_optimizer(QiskitOptimizer):
             self.params_path.append(x)
             return val
 
+
+        def query_fun_value_from_landscape(self, x: POINT) -> float:        
+            angles = angles_from_qiskit_format(x)
+            angles = angles_to_qaoa_format(angles)
+
+            x = np.concatenate([angles['gamma'], angles['beta']])
+            print('transformed x', x)
+            # assert x.shape == self.grid_shapes.shape
+            # print(type(bounds))
+            relative_indices = np.around((x - self.bounds[:, 0]) / self.grid_lens).astype(int)
+            normalized_indices = relative_indices.copy()
+
+            for axis, size in enumerate(self.landscape_shape):
+                # print(axis, size)
+                relative_index = relative_indices[axis]
+                if relative_index >= size:
+                    normalized_indices[axis] = relative_index % size
+                elif relative_index < 0:
+                    normalized_indices[axis] = relative_index + ((-relative_index - 1) // size + 1) * size
+
+                if normalized_indices[axis] < 0 or normalized_indices[axis] >= size:
+                    print(axis, size, relative_index, normalized_indices[axis])
+                    assert False
+
+            # print(normalized_indices)
+            # print(self.landscape_shape)
+            # obj = *(list(normalized_indices))
+            approximate_point = self.landscape[tuple(normalized_indices)]
+
+            # print(approximate_point)
+            self.params_path.append(x) # Qiskit format
+            return approximate_point
+
+
         def minimize(self, 
             fun: Callable[[POINT], float], 
             x0: POINT, 
@@ -186,6 +220,7 @@ def wrap_qiskit_optimizer_to_landscape_optimizer(QiskitOptimizer):
             elif self.fun_type == 'FUN':
                 res = super().minimize(self._fun, x0, jac, bounds)
             else:
+                # TODO replace query_fun_value_from_landscape by self.query_fun_value_from_landscape, and test
                 res = super().minimize(query_fun_value_from_landscape, x0, jac, bounds)
             print('res', res)
             print(jac)
