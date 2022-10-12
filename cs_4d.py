@@ -145,6 +145,8 @@ from QAOAKit.interpolate import (
 # from qiskit_optimization import QuadraticProgram
 from qiskit.algorithms.minimum_eigen_solvers.qaoa import QAOAAnsatz
 
+from scipy import interpolate
+
 test_utils_folder = Path(__file__).parent
 
 
@@ -347,7 +349,7 @@ def test_4D_CS():
     print(error)
 
 
-def vis_p2_landscape_by_PCA(params, loss_function, opt_paths: list):
+def vis_p2_landscape_by_PCA(loss_function, opt_paths: list):
     from orqviz.pca import get_pca, perform_2D_pca_scan, plot_pca_landscape, plot_optimization_trajectory_on_pca
     
     fig, axes = plt.subplots(nrows=1, ncols=2)
@@ -362,7 +364,7 @@ def vis_p2_landscape_by_PCA(params, loss_function, opt_paths: list):
     
         axes[i].legend()
 
-    plt.savefig("paper_figs/p2_landscape.png", bbox_inches='tight')
+    plt.savefig("paper_figs/p2_recon_landscape.png", bbox_inches='tight')
 
 
 def vis_p2_landscape(loss_function, opt_paths):
@@ -394,22 +396,22 @@ def vis_p2_landscape(loss_function, opt_paths):
     }
 
     # in order of beta1 beta2 gamma1 gamma2
-    full_ranges = []
-    for ip in range(p):
-        full_ranges.append(full_range['beta'].copy())
+    # full_ranges = []
+    # for ip in range(p):
+    #     full_ranges.append(full_range['beta'].copy())
     
-    for ip in range(p):
-        full_ranges.append(full_range['gamma'].copy())
+    # for ip in range(p):
+    #     full_ranges.append(full_range['gamma'].copy())
 
-    params = []
-    # former 2 are betas, latter 2 are gammas
-    for beta2_gamma2 in itertools.product(*full_ranges):
-        param = beta2_gamma2
-        params.append(param)
+    # params = []
+    # # former 2 are betas, latter 2 are gammas
+    # for beta2_gamma2 in itertools.product(*full_ranges):
+    #     param = beta2_gamma2
+    #     params.append(param)
 
-    params = np.array(params)
-    print("all params: ", params.shape)
-    vis_p2_landscape_by_PCA(params, loss_function, opt_paths)
+    # params = np.array(params)
+    # print("all params: ", params.shape)
+    vis_p2_landscape_by_PCA(loss_function, opt_paths)
 
 
 def vis_p2_landscape_top():
@@ -537,7 +539,8 @@ def vis_p2_landscape_top():
         # "figs/opt_on_p2_landscape/2022-10-11_15:51:47/SPSA.npz",
         # "figs/opt_on_p2_landscape/2022-10-11_16:01:42/ADAM.npz",
         # "figs/opt_on_p2_landscape/2022-10-11_16:10:48/ADAM.npz", 
-        "figs/opt_on_p2_landscape/2022-10-11_16:25:32/ADAM.npz", # initial points:  {'gamma': array([0.31962453, 0.47234702]), 'beta': array([0.20990108, 0.68302982])}
+        # "figs/opt_on_p2_landscape/2022-10-11_16:25:32/ADAM.npz", # initial points:  {'gamma': array([0.31962453, 0.47234702]), 'beta': array([0.20990108, 0.68302982])}
+        "figs/opt_on_p2_landscape/2022-10-11_19:06:12/ADAM.npz",
         allow_pickle=True)['params_path'].tolist()
 
     opt_paths = [opt_path1, opt_path2]
@@ -603,6 +606,21 @@ def opt_on_p2_landscape_top():
     initial_angles = {
         'gamma': np.array([0.31962453, 0.47234702]),
         'beta': np.array([0.20990108, 0.68302982])
+    }
+    
+    initial_angles = {
+        'gamma': np.array([-0.31962453, 0.47234702]),
+        'beta': np.array([-0.20990108, 0.68302982])
+    }
+
+    initial_angles = {
+        'gamma': np.array([-1, -1]),
+        'beta': np.array([-1, -1])
+    }
+
+    initial_angles = {
+        'gamma': np.array([0.5, 0.5]),
+        'beta': np.array([0.5, 0.5])
     }
     
     # initial_angles = {
@@ -711,12 +729,186 @@ def opt_on_p2_landscape_top():
     if not os.path.exists(figdir):
         os.makedirs(figdir)
 
+    print("save to ", figdir)
+    # opt_path_save_path = f"{}"
     np.savez_compressed(f"{figdir}/{optimizer_name}",
         # initial_point=initial_angles,
         initial_angles=initial_angles,
         params_path=params
     )
 
+    return 
+
+
+def vis_p2_recon_landscape_top():
+    sf = 0.05
+    data_dir = "figs/gen_p2_landscape/2022-10-01_16:15:33/G41_nQ8_p2_depolar0.001_0.005"
+    data = np.load(f"{data_dir}/data.npz", allow_pickle=True)
+    origin = data['origin'].tolist()
+    full_ranges: list = data['full_ranges'].tolist()
+    bounds = data['bounds'].tolist()
+    n_pts_per_unit = data['n_pts_per_unit']
+
+    recon_dir = "figs/recon_p2_landscape/2022-10-01_19:50:01" # 0.05
+    recon = np.load(f"{recon_dir}/recon_p2_landscape_sf{sf:.3f}.npz")['arr_0']
+
+    # get problem instance info from QAOAKit
+    reg3_dataset_table = get_3_reg_dataset_table()
+    n_qubits = 8
+    p = 2
+    sf = 0.05
+    df = reg3_dataset_table.reset_index()
+    df = df[(df["n"] == n_qubits) & (df["p_max"] == p)]
+    for row_id, row in df.iloc[1:2].iterrows():
+        pass
+
+    assert row_id == 41
+
+    print("============================")
+    angles1 = opt_angles_for_graph(row["G"], row["p_max"])
+    G = row["G"]
+    print('row_id:', row_id)
+    qc1, C, offset = get_maxcut_qaoa_qiskit_circuit_unbinded_parameters(
+        G, p
+    )
+
+    # get_maxcut_qaoa_circuit(G, beta)
+    
+    # noise_model = get_depolarizing_error_noise_model(0.001, 0.005)
+    noise_model = None
+    shots = 2048
+    qinst = AerSimulator(method="statevector") 
+
+    bounds = data['bounds'].tolist()
+    bounds_arr = np.array([bounds['gamma'], bounds['gamma'], bounds['beta'], bounds['beta']])
+
+    print(bounds)
+    print(recon.shape)
+
+    opt_cut = row["C_opt"]
+    
+    # initial_angles = {
+    #     "gamma": np.array(np.random.uniform(bounds[0][0], bounds[0][1], p)),
+    #     "beta": np.array(np.random.uniform(bounds[1][0], bounds[1][1], p))
+    # }
+
+    initial_angles = {
+        "gamma": np.array([.0, .0]),
+        "beta": np.array([.0, .0])
+    }
+
+    initial_angles = {
+        'gamma': np.array([0.31962453, 0.47234702]),
+        'beta': np.array([0.20990108, 0.68302982])
+    }
+    
+    # initial_angles = {
+    #     "gamma": np.array([1.0, 1.0]),
+    #     "beta": np.array([1.0, 1.0])
+    # }
+    
+    print("initial_angles: ", initial_angles)
+
+    # find the case that CS reconstructed landscape will display BP
+    # when slow convergence
+
+
+    # raw_optimizer_clazz = SPSA
+    raw_optimizer_clazz = ADAM
+    optimizer = wrap_qiskit_optimizer_to_landscape_optimizer(
+        raw_optimizer_clazz
+    )(
+        bounds=bounds_arr,
+        landscape=origin['ideals'],
+        # fun_type='NONE',
+        fun_type='INTERPOLATE',
+        # fun=_partial_qaoa_energy,
+        
+        # parameter of raw optimizer
+        # lr=1e-3,
+        # lr=1e-2,
+        maxiter=1000,
+        # beta_1=0.9,
+        # beta_2=0.99,
+        # noise_factor=1e-8,
+        # eps=1e-10,
+        # eps=1e-3,
+    )
+
+    optimizer_name = raw_optimizer_clazz.__name__
+
+    # x1, x2, x3, x4 = \
+    #     np.meshgrid(*full_ranges, indexing='ij') #, sparse=True)
+
+    # print(x1.shape)
+    # print(origin['ideals'].shape)
+
+    # print(tuple(full_ranges))
+    # print(x1)
+    interp = interpolate.RegularGridInterpolator(
+        points=tuple(full_ranges),
+        values=origin['ideals'],
+        bounds_error=False,
+        fill_value=0.0,
+        method="linear"
+    )
+
+    def _partial_qaoa_energy(x):
+
+        # interpolate.interpn(
+        #     points=None,
+        #     values=None,
+        # )
+        # print(x)
+        # print(x.shape)
+        _x = np.array([x])
+        # print(_x)
+        val = interp(_x)
+        # print(val)
+        return -val[0]
+
+        # angles = angles_from_qiskit_format(x)
+        # angles = angles_to_qaoa_format(angles)
+
+        # x = np.concatenate([angles['gamma'], angles['beta']])
+        # circuit = get_maxcut_qaoa_circuit(
+        #     G, beta=[x[1]], gamma=[x[0]],
+        #     # transpile_to_basis=True, save_state=False)
+        #     transpile_to_basis=False, save_state=False)
+
+        # return _executor_of_qaoa_maxcut_energy(
+        #     qc=circuit, G=G, noise_model=noise_model, shots=shots
+        # )
+        # print(x)
+        # return -noisy_qaoa_maxcut_energy(
+        #     G=G, beta=x[:p], gamma=x[p:], precomputed_energies=None, noise_model=noise_model
+        # )
+
+    optimizer_name = raw_optimizer_clazz.__name__
+
+    # opt path for ADAM
+    opt_path1 = np.load(
+        # "figs/opt_on_p2_landscape/2022-10-11_15:51:03/ADAM.npz",
+        "figs/opt_on_p2_landscape/2022-10-11_16:27:29/ADAM.npz", # 0.0.0.0
+        allow_pickle=True)['params_path'].tolist()
+
+    # opt_path_SPSA = np.load(
+    opt_path2 = np.load(
+        # "figs/opt_on_p2_landscape/2022-10-11_15:51:47/SPSA.npz",
+        # "figs/opt_on_p2_landscape/2022-10-11_16:01:42/ADAM.npz",
+        # "figs/opt_on_p2_landscape/2022-10-11_16:10:48/ADAM.npz", 
+        # "figs/opt_on_p2_landscape/2022-10-11_16:25:32/ADAM.npz", # initial points:  {'gamma': array([0.31962453, 0.47234702]), 'beta': array([0.20990108, 0.68302982])}
+        # "figs/opt_on_p2_landscape/2022-10-11_18:54:00/ADAM.npz",
+        # "figs/opt_on_p2_landscape/2022-10-11_18:58:32/ADAM.npz",
+        # "figs/opt_on_p2_landscape/2022-10-11_19:03:04/ADAM.npz",
+        "figs/opt_on_p2_landscape/2022-10-11_19:06:12/ADAM.npz",
+        allow_pickle=True)['params_path'].tolist()
+
+    opt_paths = [opt_path1, opt_path2]
+    # print("opt path len: ", len(opt_path))
+
+    vis_p2_landscape(_partial_qaoa_energy, opt_paths)
+    
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -732,5 +924,7 @@ if __name__ == "__main__":
         opt_on_p2_landscape_top()
     elif args.aim == 'vis':
         vis_p2_landscape_top()
+    elif args.aim == 'vis_recon':
+        vis_p2_recon_landscape_top()
     else:
         assert False
