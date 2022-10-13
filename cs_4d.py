@@ -1,5 +1,6 @@
 import argparse
 import itertools
+from lib2to3.pgen2.token import CIRCUMFLEX
 from sqlite3 import paramstyle
 import networkx as nx
 import matplotlib.pyplot as plt
@@ -51,6 +52,7 @@ from scipy.spatial.distance import (
     cosine
 )
 from qiskit.quantum_info import Statevector
+from qiskit.opflow import PrimitiveOp, PauliSumOp
 from QAOAKit.n_dim_cs import recon_4D_landscape, recon_4D_landscape_by_2D
 # from QAOAKit import vis
 
@@ -127,6 +129,7 @@ from QAOAKit.qiskit_interface import (
 from QAOAKit.examples_utils import get_20_node_erdos_renyi_graphs
 from QAOAKit.parameter_optimization import get_median_pre_trained_kde
 from QAOAKit.compressed_sensing import (
+    _executor_of_qaoa_maxcut_energy,
     cal_recon_error,
     gen_p1_landscape,
     gen_p2_landscape,
@@ -908,6 +911,160 @@ def vis_p2_recon_landscape_top():
     # print("opt path len: ", len(opt_path))
 
     vis_p2_landscape(_partial_qaoa_energy, opt_paths)
+
+
+def _get_min_given_init_pt(
+    G, 
+    p,
+    C,
+    initial_point: dict  # ! QAOA format
+) -> float:
+
+    noise_model = None
+    qinst = AerSimulator(method="statevector")
+    shots = 2048
+    _, C, offset = get_maxcut_qaoa_qiskit_circuit_unbinded_parameters(
+        G, p
+    )
+
+    def _partial_qaoa_energy(x):
+        # TODO use unbinded circuit to speed up if necessary
+        # by shots
+        circuit = get_maxcut_qaoa_circuit(
+            G, beta=x[:p], gamma=x[p:],
+            transpile_to_basis=False, save_state=False)
+
+        return -_executor_of_qaoa_maxcut_energy(
+            qc=circuit, G=G, noise_model=noise_model, shots=shots
+        )
+
+        # by statevector
+        # return -noisy_qaoa_maxcut_energy(
+        #     G=G, beta=x[:p], gamma=x[p:], precomputed_energies=None, noise_model=noise_model
+        # )
+
+    # print(p)
+    raw_optimizer_clazz = SPSA
+    # raw_optimizer_clazz = ADAM 
+    
+    optimizer = wrap_qiskit_optimizer_to_landscape_optimizer(
+        raw_optimizer_clazz
+    )(
+        bounds=None,
+        landscape=None,
+        fun_type='FUN',
+        fun=_partial_qaoa_energy,
+        
+        # parameter of raw optimizer
+        # lr=1e-3,
+        # lr=1e-2,
+        # maxiter=1000,
+    )
+
+    init_pt_qiskit = angles_to_qiskit_format(angles_from_qaoa_format(**initial_point))
+    print(init_pt_qiskit)
+    qaoa = QAOA(
+        optimizer=optimizer,
+        reps=p,
+        initial_point=init_pt_qiskit,
+        quantum_instance=qinst,
+    )
+
+    # I = Operator(np.eye(2**n_qubits))
+    # I = Pauli("I" * n_qubits)
+    # print(C)
+    # optimizer.minimize(fun=None, x0=)
+    # I = PrimitiveOp(I)
+    # I = PauliSumOp.from_list([("I" * (4 * p), 1.0)])
+    # result = qaoa.compute_minimum_eigenvalue(I) # useless
+    result = qaoa.compute_minimum_eigenvalue(C)
+
+    # eigenstate, eigenvalue, params_path = optimize_under_noise(
+    #     G=G, init_beta_gamma=initial_point, noise_model=None, num_shots=shots, opt_method='L-BFGS-B'
+    # )
+
+    eigenvalue = result.eigenvalue
+    # params = optimizer.params_path
+    # print(params[0], angles_from_qiskit_format(params[0]))
+    # print(counts)
+    # print(qaoa.optimal_params)
+    # print("opt_cut                     :", opt_cut)
+    print("minimum:", eigenvalue)
+    print("QAOA energy + offset        :", - (result.eigenvalue + offset))
+    # print("len of params:", len(params))
+    return eigenvalue
+
+
+def find_good_initial_points_on_recon_LS_and_verify_top():
+    """Find good initial points on recon landscapes.
+
+    This is to verify that recon. will give us correct information / intuition.
+    """
+    sf = 0.05
+    data_dir = "figs/gen_p2_landscape/2022-10-01_16:15:33/G41_nQ8_p2_depolar0.001_0.005"
+    data = np.load(f"{data_dir}/data.npz", allow_pickle=True)
+    origin = data['origin'].tolist()
+    full_ranges: list = data['full_ranges'].tolist()
+    bounds = data['bounds'].tolist()
+    n_pts_per_unit = data['n_pts_per_unit']
+    C_opt = data['C_opt']
+
+    recon_dir = "figs/recon_p2_landscape/2022-10-01_19:50:01" # 0.05
+    recon = np.load(f"{recon_dir}/recon_p2_landscape_sf{sf:.3f}.npz")['arr_0']
+
+    # get problem instance info from QAOAKit
+    reg3_dataset_table = get_3_reg_dataset_table()
+    n_qubits = 8
+    p = 2
+    sf = 0.05
+    df = reg3_dataset_table.reset_index()
+    df = df[(df["n"] == n_qubits) & (df["p_max"] == p)]
+    for row_id, row in df.iloc[1:2].iterrows():
+        pass
+
+    G = row['G']
+
+    assert row_id == 41
+
+    print("============= origin and recon 4-D LS are loaded ===============")
+    print(f"shape of recon LS: {recon.shape}")
+    
+    # find, say 100 points that are \epsilon-close to minimum value of recon landscape
+    
+    recon = -recon
+    C_opt = -C_opt
+    eps = 0.2 # 4
+    min_recon = np.min(recon)
+    print(f"minimum recon: {min_recon:.5f}")
+    print(f"C_opt: {C_opt:.5f}")
+
+    mask = np.abs(recon - min_recon) < eps
+    print(mask)
+    print(np.sum(mask == True))
+
+    ids = np.argwhere(mask == True) # return tuples
+    # print(ids)
+
+    # landscape.shape = (beta, beta, gamma, gamma)
+    # randomly sample some points within eps as initial points
+    # print(full_ranges)
+    # full_ranges = np.array(full_ranges)
+    print(ids)
+    for idx in ids: # idx: tuples
+        # print(idx, recon[idx[0], idx[1], idx[2], idx[3]])
+        # continue
+        init_beta_gamma = [0 for _ in range(2*p)]
+        for i in range(2*p):
+            init_beta_gamma[i] = full_ranges[i][idx[i]]
+        initial_point = {
+            'beta': np.array(init_beta_gamma[:p]),
+            'gamma': np.array(init_beta_gamma[p:]),
+        }
+
+        print(initial_point)
+        min_energy = _get_min_given_init_pt(G=G, p=p, C=None, initial_point=initial_point)
+
+        print(min_energy)
     
 
 if __name__ == "__main__":
@@ -926,5 +1083,7 @@ if __name__ == "__main__":
         vis_p2_landscape_top()
     elif args.aim == 'vis_recon':
         vis_p2_recon_landscape_top()
+    elif args.aim == 'find':
+        find_good_initial_points_on_recon_LS_and_verify_top()
     else:
-        assert False
+        assert False, f"Invalid aim: {args.aim}"
