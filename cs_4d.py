@@ -115,6 +115,7 @@ from QAOAKit.utils import (
     brute_force,
     get_pynauty_certificate,
     get_full_weighted_qaoa_dataset_table,
+    qaoa_format_to_qiskit_format,
     save_partial_qaoa_dataset_table,
     shift_parameters
 )
@@ -151,6 +152,226 @@ from qiskit.algorithms.minimum_eigen_solvers.qaoa import QAOAAnsatz
 from scipy import interpolate
 
 test_utils_folder = Path(__file__).parent
+
+
+def check_QAOAAnsatz_bound_p1():
+    p = 1
+    # n_pts_per_unit = 16 # 15 * 15
+    n_pts_per_unit = {
+        "beta": 16,
+        "gamma": 16
+    }
+    
+    # p == 2
+    bounds = {'beta': np.array([-np.pi/4, np.pi/4]),
+              'gamma': np.array([-np.pi/2, np.pi/2])}
+    
+    n_pts = {}
+    for label, bound in bounds.items():
+        bound_len = bound[1] - bound[0]
+        n_pts[label] = np.floor(n_pts_per_unit[label] * bound_len).astype(int)
+    
+    print('bounds: ', bounds)
+    print('n_pts: ', n_pts)
+    print('n_pts_per_unit: ', n_pts_per_unit)
+
+    full_range = {
+        'gamma': np.linspace(bounds['gamma'][0], bounds['gamma'][1], n_pts['gamma']),
+        'beta': np.linspace(bounds['beta'][0], bounds['beta'][1], n_pts['beta'])
+    }
+
+    # in order of beta1 beta2 gamma1 gamma2
+    full_ranges = []
+    for _ in range(p):
+        full_ranges.append(full_range['beta'].copy())
+    
+    for _ in range(p):
+        full_ranges.append(full_range['gamma'].copy())
+
+    params = []
+    # Input : arr1 = [1, 2, 3] 
+    # arr2 = [5, 6, 7] 
+    # Output : [(1, 5), (1, 6), (1, 7), (2, 5), (2, 6), (2, 7), (3, 5), (3, 6), (3, 7)] 
+    for betas_gammas in itertools.product(*full_ranges):
+        param = (
+            betas_gammas[:p], # beta
+            betas_gammas[p:] # gamma
+        )
+        params.append(param)
+
+    # ----------- use meshgrid ------------
+
+    x1, x2 = np.meshgrid(*full_ranges, sparse=False, indexing='ij') # 行优先meshgrid
+    x1 = x1.reshape(-1) # 行优先reshape
+    x2 = x2.reshape(-1)
+    for i in range(x1.shape[0]):
+        assert x1[i] == params[i][0][0]
+        assert x2[i] == params[i][1][0]
+
+    print('num points for p = 1: ', len(full_range['beta']) * len(full_range['gamma']))
+
+
+def check_QAOAAnsatz_bound_p2():
+    p = 2
+    # n_pts_per_unit = 16 # 15 * 15
+    n_pts_per_unit = {
+        "beta": 16,
+        "gamma": 10
+    }
+    
+    # p == 2
+    bounds = {'beta': np.array([-np.pi/8, np.pi/8]),
+              'gamma': np.array([-np.pi/4, np.pi/4])}
+    
+    n_pts = {}
+    for label, bound in bounds.items():
+        bound_len = bound[1] - bound[0]
+        n_pts[label] = np.floor(n_pts_per_unit[label] * bound_len).astype(int)
+    
+    print('bounds: ', bounds)
+    print('n_pts: ', n_pts)
+    print('n_pts_per_unit: ', n_pts_per_unit)
+
+    full_range = {
+        'gamma': np.linspace(bounds['gamma'][0], bounds['gamma'][1], n_pts['gamma']),
+        'beta': np.linspace(bounds['beta'][0], bounds['beta'][1], n_pts['beta'])
+    }
+
+    # in order of beta1 beta2 gamma1 gamma2
+    full_ranges = []
+    for _ in range(p):
+        full_ranges.append(full_range['beta'].copy())
+    
+    for _ in range(p):
+        full_ranges.append(full_range['gamma'].copy())
+
+    params = []
+    # Input : arr1 = [1, 2, 3] 
+    # arr2 = [5, 6, 7] 
+    # Output : [(1, 5), (1, 6), (1, 7), (2, 5), (2, 6), (2, 7), (3, 5), (3, 6), (3, 7)] 
+    for beta2_gamma2 in itertools.product(*full_ranges):
+        param = (
+            beta2_gamma2[:p], # beta
+            beta2_gamma2[p:] # gamma
+        )
+        params.append(param)
+    
+    # -------- check with meshgrid ---------
+    x0, x1, x2, x3 = np.meshgrid(*full_ranges, sparse=False, indexing='ij')
+    x0 = x0.reshape(-1)
+    x1 = x1.reshape(-1)
+    x2 = x2.reshape(-1)
+    x3 = x3.reshape(-1)
+
+    for i in range(x1.shape[0]):
+        # beta
+        assert x0[i] == params[i][0][0]
+        assert x1[i] == params[i][0][1]
+
+        # gamma
+        assert x2[i] == params[i][1][0]
+        assert x3[i] == params[i][1][1]
+
+    # print(full_ranges)
+    n_pts = (len(full_range['beta']) ** 2) * (len(full_range['gamma']) ** 2)
+    print('num points: ', n_pts)
+
+
+def check_QAOAAnsatz_bound():
+    p = 2
+    # n_pts_per_unit = 16 # 15 * 15
+    n_pts_per_unit = {
+        "beta": 16,
+        "gamma": 16
+    }
+    n_shots = 1024
+
+    # qaoa bounds
+    # bounds_qaoa = {'beta': np.array([-np.pi/8, np.pi/4]),
+    #           'gamma': np.array([-np.pi/2, np.pi/1])}
+    # bounds_qaoa = {'beta': np.array([-np.pi/8, np.pi/4]),
+    #           'gamma': np.array([-np.pi/2, np.pi/1])}
+    # bounds_qaoa = {'beta': np.array([-np.pi/4, np.pi/4]),
+    #                'gamma': np.array([-np.pi/4, np.pi/4])}
+    
+    # p == 2
+    bounds_qaoa = {'beta': np.array([-np.pi/8, np.pi/8]),
+                   'gamma': np.array([-np.pi/8, np.pi/8])}
+    
+    bounds_qiskit = {
+        'beta': np.array([-np.pi/4, np.pi/4]), # do not change beta for p == 1
+        'gamma': np.array([-np.pi/8, np.pi/8])
+    }
+
+    # bounds_qaoa = {'beta': np.array([-np.pi/8, np.pi/])}
+    
+    # qiskit bounds
+    # bounds_qiskit = {'beta': np.array([-np.pi/8, np.pi/8]),
+    #           'gamma': np.array([-np.pi/4, np.pi/4])}
+
+    # print(angles_from_qaoa_format)
+    print(bounds_qaoa)
+    qiskit1 = qaoa_format_to_qiskit_format(gamma=bounds_qaoa['gamma'], beta=bounds_qaoa['beta'])
+    qiskit2 = angles_to_qiskit_format(angles_from_qaoa_format(gamma=bounds_qaoa['gamma'], beta=bounds_qaoa['beta']))
+
+    # bounds_qiskit = qaoa_format_to_qiskit_format()
+    # print(bounds_qiskit)
+
+    assert (qiskit1 == qiskit2).all()
+    print(qiskit1)
+    print(qiskit2)
+
+    print(angles_to_qaoa_format(angles_from_qiskit_format(qiskit1)))
+
+    # bounds = bounds_qiskit
+    bounds = bounds_qaoa
+
+    n_pts = {}
+    for label, bound in bounds.items():
+        bound_len = bound[1] - bound[0]
+        n_pts[label] = np.floor(n_pts_per_unit[label] * bound_len).astype(int)
+    
+    print('bounds: ', bounds)
+    print('n_pts: ', n_pts)
+    print('n_pts_per_unit: ', n_pts_per_unit)
+
+    full_range = {
+        'gamma': np.linspace(bounds['gamma'][0], bounds['gamma'][1], n_pts['gamma']),
+        'beta': np.linspace(bounds['beta'][0], bounds['beta'][1], n_pts['beta'])
+    }
+
+    # in order of beta1 beta2 gamma1 gamma2
+    full_ranges = []
+    for _ in range(p):
+        full_ranges.append(full_range['beta'].copy())
+    
+    for _ in range(p):
+        full_ranges.append(full_range['gamma'].copy())
+
+    params = []
+    for beta2_gamma2 in itertools.product(*full_ranges):
+        param = (
+            beta2_gamma2[:p], # beta
+            beta2_gamma2[p:] # gamma
+        )
+        params.append(param)
+    
+    # -------- check with meshgrid ---------
+    x0, x1, x2, x3 = np.meshgrid(*full_ranges, sparse=False, indexing='ij')
+    print(x1.shape)
+    for i in range(x1.shape[1]):
+        # beta
+        assert x0[0][i] == params[i][0][0]
+        assert x1[0][i] == params[i][0][1]
+
+        # gamma
+        assert x2[0][i] == params[i][1][0]
+        assert x3[0][i] == params[i][1][1]
+
+    # print(full_ranges)
+    n_pts = (len(full_range['beta']) ** 2) * (len(full_range['gamma']) ** 2)
+    print('num points: ', n_pts)
+
 
 
 def gen_p2_landscape_top():
@@ -945,7 +1166,7 @@ def _get_min_given_init_pt(
 
     # print(p)
     raw_optimizer_clazz = SPSA
-    # raw_optimizer_clazz = ADAM 
+    # raw_optimizer_clazz = ADAM
     
     optimizer = wrap_qiskit_optimizer_to_landscape_optimizer(
         raw_optimizer_clazz
@@ -1018,6 +1239,7 @@ def find_good_initial_points_on_recon_LS_and_verify_top():
     p = 2
     sf = 0.05
     df = reg3_dataset_table.reset_index()
+    # print(df['p_max'].value_counts())
     df = df[(df["n"] == n_qubits) & (df["p_max"] == p)]
     for row_id, row in df.iloc[1:2].iterrows():
         pass
@@ -1029,20 +1251,25 @@ def find_good_initial_points_on_recon_LS_and_verify_top():
     print("============= origin and recon 4-D LS are loaded ===============")
     print(f"shape of recon LS: {recon.shape}")
     
+    # print(df['p_max'])
+    # return
+    
     # find, say 100 points that are \epsilon-close to minimum value of recon landscape
     
     recon = -recon
     C_opt = -C_opt
     eps = 0.2 # 4
+    eps = 0.3
+    # eps = 0.4 # 63
     min_recon = np.min(recon)
     print(f"minimum recon: {min_recon:.5f}")
     print(f"C_opt: {C_opt:.5f}")
 
     mask = np.abs(recon - min_recon) < eps
-    print(mask)
+    # print(mask)
     print(np.sum(mask == True))
-
-    ids = np.argwhere(mask == True) # return tuples
+    # return
+    ids = np.argwhere(mask == True) # return indices of points where mask == True
     # print(ids)
 
     # landscape.shape = (beta, beta, gamma, gamma)
@@ -1050,6 +1277,7 @@ def find_good_initial_points_on_recon_LS_and_verify_top():
     # print(full_ranges)
     # full_ranges = np.array(full_ranges)
     print(ids)
+    min_energies = []
     for idx in ids: # idx: tuples
         # print(idx, recon[idx[0], idx[1], idx[2], idx[3]])
         # continue
@@ -1061,10 +1289,23 @@ def find_good_initial_points_on_recon_LS_and_verify_top():
             'gamma': np.array(init_beta_gamma[p:]),
         }
 
-        print(initial_point)
+        # print(initial_point)
         min_energy = _get_min_given_init_pt(G=G, p=p, C=None, initial_point=initial_point)
 
-        print(min_energy)
+        min_energies.append(min_energy)
+
+    timestamp = get_curr_formatted_timestamp()
+    save_dir = f"figs/find_init_pts_by_recon/{timestamp}"
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+    np.savez_compressed(
+        f"{save_dir}/G{row_id}_nQ{n_qubits}_p{p}",
+        ids=ids,
+        min_energies=min_energies, # one to one correspondence to ids
+        min_recon=min_recon,
+        eps=eps,
+        C_opt=C_opt,
+    )
     
 
 if __name__ == "__main__":
@@ -1085,5 +1326,11 @@ if __name__ == "__main__":
         vis_p2_recon_landscape_top()
     elif args.aim == 'find':
         find_good_initial_points_on_recon_LS_and_verify_top()
+    elif args.aim == 'check':
+        check_QAOAAnsatz_bound()
+    elif args.aim == 'check1':
+        check_QAOAAnsatz_bound_p1()
+    elif args.aim == 'check2':
+        check_QAOAAnsatz_bound_p2()
     else:
         assert False, f"Invalid aim: {args.aim}"
