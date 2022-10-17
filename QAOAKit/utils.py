@@ -306,7 +306,7 @@ def angles_to_qaoa_format(angles):
 def angles_from_qaoa_format(gamma, beta):
     res = {}
     res["beta"] = beta / np.pi
-    res["gamma"] = gamma / np.pi
+    res["gamma"] = gamma / (-np.pi/2)
     return res
 
 
@@ -343,6 +343,24 @@ def angles_from_qiskit_format(angles):
     res["gamma"] = list(x / (-np.pi) for x in angles[::2])
     res["beta"] = list(x / np.pi for x in angles[1::2])
     return res
+
+
+def qiskit_format_to_qaoa_format_arr(arr: np.ndarray) -> np.ndarray:
+    """Converts from format used by Qiskit's QAOAAnsatz
+    to QAOA format used by qaoa.py, in an array where
+    [:p] are gammas and [p:] are betas.
+
+    Args:
+        arr (np.array): Qiskit format
+
+    Returns:
+        np.ndarray: [:p] are gammas and [p:] are betas
+    """
+    angles = angles_from_qiskit_format(arr)
+    angles = angles_to_qaoa_format(angles)
+
+    arr = np.concatenate([angles['gamma'], angles['beta']])
+    return arr
 
 
 def angles_to_qtensor_format(angles):
@@ -808,6 +826,7 @@ def shift_parameters(x: np.ndarray, bounds: np.ndarray):
         bound_len = bound[1] - bound[0]
         
         relative = _x[axis]
+        # assert relative >= 0 and relative < bound_len
         if relative >= bound_len:
             shifted[axis] = relative % bound_len
         elif relative < 0:
