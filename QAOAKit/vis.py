@@ -1095,8 +1095,8 @@ def vis_landscapes(
     axs = axs.reshape(-1)
 
     # TODO Check ij and xy
-    X, Y = np.meshgrid(full_range['beta'], full_range['gamma'])
-
+    X, Y = np.meshgrid(full_range['beta'], full_range['gamma'], indexing='ij')
+    
     # c = ax.pcolormesh(X, Y, Z, cmap='viridis', vmin=Z.min(), vmax=Z.max())
     for idx, landscape in enumerate(landscapes):
         im = axs[idx].pcolormesh(X, Y, landscape) #, cmap='viridis', vmin=origin.min(), vmax=origin.max())
