@@ -12,6 +12,7 @@ from qiskit.providers.aer import AerSimulator
 import json
 import re
 import warnings
+import os
 
 import time
 
@@ -343,6 +344,12 @@ def angles_from_qiskit_format(angles):
     res["gamma"] = list(x / (-np.pi) for x in angles[::2])
     res["beta"] = list(x / np.pi for x in angles[1::2])
     return res
+
+
+def qaoa_format_to_qiskit_format(gamma, beta) -> np.ndarray:
+    return np.concatenate(
+        [[2*g, b] for g, b in zip(gamma, beta)]
+    )
 
 
 def qiskit_format_to_qaoa_format_arr(arr: np.ndarray) -> np.ndarray:
@@ -866,3 +873,8 @@ def load_partial_qaoa_dataset_table(n_qubits: int):
         )
 
     return df
+
+
+def makedir(dir: str) -> None:
+    if not os.path.exists(dir):
+        os.makedirs(dir)
