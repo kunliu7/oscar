@@ -192,13 +192,16 @@ def recon_large_qubits_p1_landscape_top():
         for sf in np.arange(0.01, 0.11, 0.02):
         # for sf in [0.05]:
             if not is_recon:
+                seed = beta_steps
+                np.random.seed(seed)
                 recon = recon_p1_landscape(
                     origin=origin,
                     sampling_frac=sf
                 )
 
                 np.savez_compressed(f"{fig_dir}/sf{sf:.3f}_bs{bs}",
-                    recon=recon
+                    recon=recon,
+                    seed=seed
                 )
             else:
                 recon = np.load(f"{fig_dir}/sf{sf:.3f}_bs{bs}.npz",
