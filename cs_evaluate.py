@@ -331,6 +331,177 @@ def recon_large_qubits_p2_landscape_top():
         )
 
 
+def CS_by_BPDN_p1():
+    is_recon = False
+    # data_dir = "figs/cnt_opt_miti/2022-08-08_19:48:31"
+    # data_dir = "figs/cnt_opt_miti/2022-08-09_16:49:38/G30_nQ8_p1"
+    data_dir = "figs/cnt_opt_miti/2022-08-10_10:14:03/G40_nQ8_p1"
+    data = np.load(f"{data_dir}/data.npz", allow_pickle=True)
+
+    timestamp = get_curr_formatted_timestamp()
+    # fig_dir = f"{data_dir}/2D_CS_recon_BPDN"
+    # label = "unmitis"
+    label = "mitis"
+    method = "BPDN"
+    # method = "BP"
+    if is_recon:
+        # fig_dir = f"figs/comp_cs_methods/2022-10-25_16:34:04_{method}_{label}"
+        # fig_dir = "figs/comp_cs_methods/2022-10-25_16:42:04_BP_unmitis"
+        pass
+    else:
+        fig_dir = f"figs/comp_cs_methods/{timestamp}_{method}_{label}_p1"
+
+    if not os.path.exists(fig_dir):
+        os.makedirs(fig_dir)
+
+    origin = data['origin'].tolist()[label]
+    full_range = data['full_range'].tolist()
+
+    mses = []
+    coss = []
+    for sf in np.arange(0.05, 0.5, 1):
+        
+        if not is_recon:
+            seed = 42
+            np.random.seed(seed)
+            start = time.time()
+            recon = recon_p1_landscape(
+                origin=origin,
+                sampling_frac=sf,
+                method=method
+            )
+
+            end = time.time()
+            print("time usage:", end - start)
+            np.savez_compressed(f"{fig_dir}/sf{sf:.3f}",
+                recon=recon,
+                seed=seed,
+                time_usage=end-start,
+                sampling_frac=sf,
+            )
+        else:
+            recon = np.load(f"{fig_dir}/sf{sf:.3f}.npz",
+                allow_pickle=True
+            )['recon']
+
+            # print(recon.shape)
+            
+        mse = cal_recon_error(origin.reshape(-1), recon.reshape(-1), "MSE")
+        # ncc = cal_recon_error(landscape.reshape(-1), recon.reshape(-1), "CROSS_CORRELATION")
+        cos = cosine(origin.reshape(-1), recon.reshape(-1))
+        mses.append(mse)
+        coss.append(cos)
+
+        # ncc = cal_recon_error()
+        print("RMSE: ", mse)
+        print("Cosine: ", cos)
+        
+        vis_landscapes(
+            landscapes=[origin.transpose(), recon.transpose()],
+            labels=["origin", "recon"],
+            full_range={
+                "beta": full_range['beta'],
+                "gamma": full_range['gamma'] 
+            },
+            true_optima=None,
+            title="Origin and recon",
+            save_path=f'{fig_dir}/origin_and_2D_recon_sf{sf:.3f}_mse{mse:.3f}_cos{cos:.3f}.png',
+            params_paths=[None, None]
+        )
+
+    print("mse", mses)
+    print("cos", coss)
+
+
+def CS_by_BPDN_p2():
+    is_recon = False
+    # data_dir = "figs/cnt_opt_miti/2022-08-08_19:48:31"
+    # data_dir = "figs/cnt_opt_miti/2022-08-09_16:49:38/G30_nQ8_p1"
+    data_dir = "figs/cnt_opt_miti/2022-08-10_10:14:03/G40_nQ8_p1"
+
+    data_dir = "figs/gen_p2_landscape/2022-10-01_16:15:33/G41_nQ8_p2_depolar0.001_0.005"
+    data = np.load(f"{data_dir}/data.npz", allow_pickle=True)
+
+    timestamp = get_curr_formatted_timestamp()
+    # fig_dir = f"{data_dir}/2D_CS_recon_BPDN"
+    label = "unmitis"
+    # label = "mitis"
+    method = "BPDN"
+    # method = "BP"
+    if is_recon:
+        # fig_dir = f"figs/comp_cs_methods/2022-10-25_16:34:04_{method}_{label}"
+        # fig_dir = "figs/comp_cs_methods/2022-10-25_16:42:04_BP_unmitis"
+        pass
+    else:
+        fig_dir = f"figs/comp_cs_methods/{timestamp}_{method}_{label}_p2"
+
+    if not os.path.exists(fig_dir):
+        os.makedirs(fig_dir)
+
+    origin = data['origin'].tolist()[label]
+    full_range = data['full_range'].tolist()
+
+    mses = []
+    coss = []
+    for sf in np.arange(0.05, 0.5, 1):
+        
+        if not is_recon:
+            seed = 42
+            np.random.seed(seed)
+            start = time.time()
+            recon = recon_4D_landscape_by_2D(
+                origin=origin,
+                sampling_frac=sf,
+                method=method
+            )
+
+            end = time.time()
+            print("time usage:", end - start)
+            np.savez_compressed(f"{fig_dir}/sf{sf:.3f}",
+                recon=recon,
+                seed=seed,
+                time_usage=end-start,
+                sampling_frac=sf,
+            )
+        else:
+            recon = np.load(f"{fig_dir}/sf{sf:.3f}.npz",
+                allow_pickle=True
+            )['recon']
+
+            # print(recon.shape)
+            
+        mse = cal_recon_error(origin.reshape(-1), recon.reshape(-1), "MSE")
+        # ncc = cal_recon_error(landscape.reshape(-1), recon.reshape(-1), "CROSS_CORRELATION")
+        cos = cosine(origin.reshape(-1), recon.reshape(-1))
+        mses.append(mse)
+        coss.append(cos)
+
+        origin_2d = origin.reshape(origin.shape[0] * origin.shape[1],
+            origin.shape[2] * origin.shape[3])
+        recon_2d = recon.reshape(recon.shape[0] * recon.shape[1],
+            recon.shape[2] * recon.shape[3])
+
+        # ncc = cal_recon_error()
+        print("RMSE: ", mse)
+        print("Cosine: ", cos)
+        
+        vis_landscapes(
+            landscapes=[origin_2d, recon_2d],
+            labels=["origin", "recon"],
+            full_range={
+                "beta": origin_2d.shape[0],
+                "gamma": origin_2d.shape[1] 
+            },
+            true_optima=None,
+            title="Origin and recon",
+            save_path=f'{fig_dir}/origin_and_2D_recon_sf{sf:.3f}_mse{mse:.3f}_cos{cos:.3f}.png',
+            params_paths=[None, None]
+        )
+
+    print("mse", mses)
+    print("cos", coss)
+    
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--aim', type=str, help="Your aims, vis, opt", required=True)
@@ -340,5 +511,9 @@ if __name__ == "__main__":
         recon_large_qubits_p1_landscape_top()
     elif args.aim == 'large2':
         recon_large_qubits_p2_landscape_top()
+    elif args.aim == 'comp1':
+        CS_by_BPDN_p1()
+    elif args.aim == 'comp2':
+        CS_by_BPDN_p2()
     else:
         assert False, f"Invalid aim: {args.aim}"
