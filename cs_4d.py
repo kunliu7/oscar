@@ -1259,8 +1259,10 @@ def find_good_initial_points_on_recon_LS_and_verify_top():
     recon = -recon
     C_opt = -C_opt
     eps = 0.2 # 4
-    eps = 0.3
-    # eps = 0.4 # 63
+    eps = 0.3 # 22
+    eps = 0.4 # 63
+    eps = 0.5 #
+    
     min_recon = np.min(recon)
     print(f"minimum recon: {min_recon:.5f}")
     print(f"C_opt: {C_opt:.5f}")
@@ -1306,7 +1308,101 @@ def find_good_initial_points_on_recon_LS_and_verify_top():
         eps=eps,
         C_opt=C_opt,
     )
+
+
+def recon_large_qubits_p2_landscape_top():
+    is_recon = True
+    data_dir = "figs/gen_p2_landscape/2022-10-18_15:50:00_n6_p2_ideal"
+    data = np.load(f"{data_dir}/sv-aer-gpu-n=16-p=2-seed=0-12-15.npz", allow_pickle=True)
+
+    timestamp = get_curr_formatted_timestamp()
+    bounds = {
+        'beta': data['beta_bound'],
+        'gamma': data['gamma_bound']
+    }
+
+    # n_pts_per_unit = {
+    #     'beta': data['beta_bound'],
+    #     'gamma': data['gamma_bound']
+    # }
+
+    # n_pts = {}
+    # for label, bound in bounds.items():
+    #     bound_len = bound[1] - bound[0]
+    #     n_pts[label] = np.floor(n_pts_per_unit[label] * bound_len).astype(int)
     
+    # print('bounds: ', bounds)
+    # print('n_pts: ', n_pts)
+    # print('n_pts_per_unit: ', n_pts_per_unit)
+
+    # full_range = {
+    #     'gamma': np.linspace(bounds['gamma'][0], bounds['gamma'][1], n_pts['gamma']),
+    #     'beta': np.linspace(bounds['beta'][0], bounds['beta'][1], n_pts['beta'])
+    # }
+
+    landscape = data['data']
+    print(landscape.shape)
+
+    # landscape = landscape.reshape(25, 50)
+
+    full_range = {
+        'beta': np.linspace(- bounds['beta'], bounds['beta'], landscape.shape[0]),
+        'gamma': np.linspace(- bounds['gamma'], bounds['gamma'], landscape.shape[2])
+    }
+    print(full_range)
+
+    # origin = {'ideals': landscape}
+    # recon_dir = f"figs/recon/{timestamp}"
+    figdir = f"{data_dir}/2D_CS_recon"
+    if not os.path.exists(figdir):
+        os.makedirs(figdir)
+
+    # for sf in np.arange(0.05, 0.5, 0.03):
+    for sf in [0.05]:
+        # recon = two_D_CS_p1_recon_with_given_landscapes(
+        #     figdir=None,
+        #     origin=origin,
+        #     full_range=None,
+        #     sampling_frac=sf
+        # )
+
+        if not is_recon:
+            recon = recon_4D_landscape_by_2D(
+                origin=landscape,
+                sampling_frac=sf
+            )
+            np.savez_compressed(f"{figdir}_sf{sf:.3f}",
+                recon=recon
+            )
+        else:
+            recon = np.load(f"{figdir}_sf{sf:.3f}.npz",
+                allow_pickle=True
+            )['recon']
+            
+        mse = cal_recon_error(landscape.reshape(-1), recon.reshape(-1), "MSE")
+        # ncc = cal_recon_error(landscape.reshape(-1), recon.reshape(-1), "CROSS_CORRELATION")
+        cos = cosine(landscape.reshape(-1), recon.reshape(-1))
+        # ncc = cal_recon_error()
+        print("RMSE: ", mse)
+        print("Cosine: ", cos)
+        origin_2d = landscape.reshape(landscape.shape[0] * landscape.shape[1],
+            landscape.shape[2] * landscape.shape[3])
+        recon_2d = recon.reshape(recon.shape[0] * recon.shape[1],
+            recon.shape[2] * recon.shape[3])
+
+        vis_landscapes(
+            landscapes=[origin_2d, recon_2d],
+            labels=["origin", "recon"],
+            full_range={
+                "beta": range(origin_2d.shape[0]),
+                "gamma": range(origin_2d.shape[1])
+            },
+            true_optima=None,
+            title="Compare different ZNE configs and reconstruction",
+            save_path=f'{figdir}/origin_and_2D_recon_sf{sf:.3f}.png',
+            params_paths=[None, None]
+        )
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -1332,5 +1428,7 @@ if __name__ == "__main__":
         check_QAOAAnsatz_bound_p1()
     elif args.aim == 'check2':
         check_QAOAAnsatz_bound_p2()
+    elif args.aim == 'large':
+        recon_large_qubits_p2_landscape_top()
     else:
         assert False, f"Invalid aim: {args.aim}"
