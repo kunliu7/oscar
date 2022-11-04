@@ -138,6 +138,7 @@ from QAOAKit.interpolate import (
 
 # from qiskit_optimization import QuadraticProgram
 from qiskit.algorithms.minimum_eigen_solvers.qaoa import QAOAAnsatz
+from data_loader import load_grid_search_data
 
 test_utils_folder = Path(__file__).parent
 
@@ -308,33 +309,64 @@ def reconstruct_by_distributed_landscapes_top():
     return
 
 
-def reconstruct_by_distributed_landscapes_two_noisy_simulations_top():
+def reconstruct_by_distributed_landscapes_two_noisy_simulations_top(
+    n_qubits: int, p: int,
+):
     """Reconstructed with two noisy simulations
     """
+    if n_qubits == 8:
+        is_existing_recon = False
 
-    is_existing_recon = False
+        noisy_data_dir1 = "figs/cnt_opt_miti/2022-08-08_19:48:31"
+        noisy_data1 = np.load(f"{noisy_data_dir1}/data.npz", allow_pickle=True)
+        ideal = noisy_data1['origin'].tolist()['ideals']
+        full_range = noisy_data1['full_range'].tolist()
 
-    noisy_data_dir1 = "figs/cnt_opt_miti/2022-08-08_19:48:31"
-    noisy_data1 = np.load(f"{noisy_data_dir1}/data.npz", allow_pickle=True)
-    ideal = noisy_data1['origin'].tolist()['ideals']
-    full_range = noisy_data1['full_range'].tolist()
+        # depolarizing 0.001 and 0.005, one-qubit gate error and two-qubit gate error
+        noisy1 = noisy_data1['origin'].tolist()['unmitis']
 
-    # depolarizing 0.001 and 0.005, one-qubit gate error and two-qubit gate error
-    noisy1 = noisy_data1['origin'].tolist()['unmitis']
+        noisy_data_dir2 = "figs/gen_p1_landscape/2022-09-29_00:31:54/G40_nQ8_p1_depolar0.003_0.007"
+        noisy_data2 = np.load(
+            f"{noisy_data_dir2}/data.npz",
+            allow_pickle=True)
 
-    noisy_data_dir2 = "figs/gen_p1_landscape/2022-09-29_00:31:54/G40_nQ8_p1_depolar0.003_0.007"
-    noisy_data2 = np.load(
-        f"{noisy_data_dir2}/data.npz",
-        allow_pickle=True)
+        # depolarizing 0.003 and 0.007, one-qubit gate error and two-qubit gate error
+        noisy2 = noisy_data2['origin'].tolist()['unmitis']
 
-    # depolarizing 0.003 and 0.007, one-qubit gate error and two-qubit gate error
-    noisy2 = noisy_data2['origin'].tolist()['unmitis']
+        datas = [
+            # ideal,
+            noisy1,
+            noisy2
+        ]
+    elif n_qubits == 20:
+        is_existing_recon = False
+        method = 'sv'
+        problem = 'maxcut'
+        noise1 = 'depolar-0.001-0.005'
+        noise2 = 'depolar-0.003-0.007'
 
-    datas = [
-        # ideal,
-        noisy1,
-        noisy2
-    ]
+        noisy_data1 = load_grid_search_data(
+            n_qubits=n_qubits, p=p, problem=problem, method=method,
+            noise=noise1, beta_step=50, gamma_step=100, seed=0,
+        )
+
+        noisy_data2 = load_grid_search_data(
+            n_qubits=n_qubits, p=p, problem=problem, method=method,
+            noise=noise2, beta_step=50, gamma_step=100, seed=0,
+        )
+
+        full_range = noisy_data1['full_range']
+
+        # depolarizing 0.001 and 0.005, one-qubit gate error and two-qubit gate error
+        noisy1 = noisy_data1['data']
+
+        # depolarizing 0.003 and 0.007, one-qubit gate error and two-qubit gate error
+        noisy2 = noisy_data2['data'] 
+
+        datas = [noisy1, noisy2]
+
+    else:
+        assert False, "wrong number of qubits"
 
     for data in datas:
         print(data.shape)
@@ -372,20 +404,24 @@ def reconstruct_by_distributed_landscapes_two_noisy_simulations_top():
         ratios = [ratio, 1-ratio]
 
         if not is_existing_recon:
-            recon = two_D_CS_p1_recon_with_distributed_landscapes(
-                origins=datas,
-                sampling_frac=sf,
-                ratios=[ratio, 1-ratio],
-                ri=random_indices
-            )
+            if p == 1:
+                recon = two_D_CS_p1_recon_with_distributed_landscapes(
+                    origins=datas,
+                    sampling_frac=sf,
+                    ratios=[ratio, 1-ratio],
+                    ri=random_indices
+                )
+            elif p == 2:
+                raise NotImplementedError()
             
-            np.savez_compressed(f"{recon_dir}/recon_by_{len(datas)}_landscapes_sf{sf:.3f}_ratios{ratios}", recon)
+            np.savez_compressed(f"{recon_dir}/recon_by_{len(datas)}_landscapes_sf{sf:.3f}_ratios{ratios}",
+                recon = recon)
         else:
             recon = np.load(f"{recon_dir}/recon_by_{len(datas)}_landscapes_sf{sf:.3f}_ratios{ratios}.npz")['arr_0']
 
         _vis_recon_distributed_landscape(
             landscapes=datas + [recon],
-            labels=['depolarizing, 0.001, 0.005', 'depolarizing, 0.003, 0.007', f'recon. by {ratios} of each'],
+            labels=[noise1, noise2, f'recon. by {ratios} of each'],
             full_range=full_range,
             bounds=None,
             true_optima=None,
@@ -406,6 +442,13 @@ def reconstruct_by_distributed_landscapes_two_noisy_simulations_top():
     print('ratio cfg1: ', ratios_cfg1)
     print("MSE bet. recon. and cfg1: ", errors1)
     print("MSE bet. recon. and cfg2: ", errors2)
+
+    np.savez_compressed(
+        f"{recon_dir}/recon_errors",
+        errors1=errors1,
+        errors2=errors2,
+        ratios=ratios_cfg1
+    )
 
     return
 
@@ -452,5 +495,5 @@ def test_4D_CS():
 if __name__ == "__main__":
     # gen_p1_landscape_top()
     # reconstruct_by_distributed_landscapes_top()
-    reconstruct_by_distributed_landscapes_two_noisy_simulations_top()
+    reconstruct_by_distributed_landscapes_two_noisy_simulations_top(n_qubits=20, p=1)
     # test_4D_CS()
