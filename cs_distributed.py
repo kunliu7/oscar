@@ -47,7 +47,7 @@ from scipy.spatial.distance import (
     cosine
 )
 from qiskit.quantum_info import Statevector
-from QAOAKit.n_dim_cs import recon_4D_landscape
+from QAOAKit.n_dim_cs import recon_4D_landscape, recon_4D_landscape_by_2D
 # from QAOAKit import vis
 
 sys.path.append('..')
@@ -122,6 +122,7 @@ from QAOAKit.qiskit_interface import (
 from QAOAKit.examples_utils import get_20_node_erdos_renyi_graphs
 from QAOAKit.parameter_optimization import get_median_pre_trained_kde
 from QAOAKit.compressed_sensing import (
+    cal_recon_error,
     gen_p1_landscape,
     two_D_CS_p1_recon_with_distributed_landscapes,
     two_D_CS_p1_recon_with_given_landscapes,
@@ -297,7 +298,8 @@ def reconstruct_by_distributed_landscapes_top():
             save_path=f'{noisy_data_dir2}/recon_by_{len(datas)}_landscapes.png'
         )
 
-        error = np.linalg.norm(ideal - recon)
+        # error = np.linalg.norm(ideal - recon)
+        error = cal_recon_error(ideal.reshape(-1), recon.reshape(-1))
         errors.append(error)
         print("reconstruct error: ", error)
     
@@ -310,7 +312,7 @@ def reconstruct_by_distributed_landscapes_two_noisy_simulations_top():
     """Reconstructed with two noisy simulations
     """
 
-    is_existing_recon = True
+    is_existing_recon = False
 
     noisy_data_dir1 = "figs/cnt_opt_miti/2022-08-08_19:48:31"
     noisy_data1 = np.load(f"{noisy_data_dir1}/data.npz", allow_pickle=True)
@@ -347,42 +349,63 @@ def reconstruct_by_distributed_landscapes_two_noisy_simulations_top():
 
     # --------- data prepared OK -----------
 
-    sfs = np.arange(0.05, 0.42, 0.03)
+    # sfs = np.arange(0.05, 0.42, 0.03)
+    sfs = [0.10]
+
+    # ratios = [.0, 1.0]
+    # ratios = [0.25, 0.75]
+    # ratios = [0.75, 0.25]
+    # ratios = [1.0, 0.]
 
     errors1 = []
     errors2 = []
-    for sf in sfs:
+
+    ratios_cfg1 = [0.0, 0.25, 0.5, 0.75, 1.0]
+    sf = sfs[0]
+    
+    landscape_shape = datas[0].shape
+    n_pts = np.prod(landscape_shape)
+    k = round(sf * n_pts)
+    random_indices = np.random.choice(np.prod(n_pts), k, replace=False) # random sample of indices
+
+    for ratio in ratios_cfg1:
+        ratios = [ratio, 1-ratio]
 
         if not is_existing_recon:
             recon = two_D_CS_p1_recon_with_distributed_landscapes(
                 origins=datas,
-                sampling_frac=sf
+                sampling_frac=sf,
+                ratios=[ratio, 1-ratio],
+                ri=random_indices
             )
             
-            np.savez_compressed(f"{recon_dir}/recon_by_{len(datas)}_landscapes_sf{sf:.3f}", recon)
+            np.savez_compressed(f"{recon_dir}/recon_by_{len(datas)}_landscapes_sf{sf:.3f}_ratios{ratios}", recon)
         else:
-            recon = np.load(f"{recon_dir}/recon_by_{len(datas)}_landscapes_sf{sf:.3f}.npz")['arr_0']
+            recon = np.load(f"{recon_dir}/recon_by_{len(datas)}_landscapes_sf{sf:.3f}_ratios{ratios}.npz")['arr_0']
 
         _vis_recon_distributed_landscape(
             landscapes=datas + [recon],
-            labels=['depolarizing, 0.001, 0.005', 'depolarizing, 0.003, 0.007', 'reconstructed by 1/3 of each'],
+            labels=['depolarizing, 0.001, 0.005', 'depolarizing, 0.003, 0.007', f'recon. by {ratios} of each'],
             full_range=full_range,
             bounds=None,
             true_optima=None,
             title=f'reconstruct distributed landscapes, sampling fraction: {sf:.3f}',
-            save_path=f'{recon_dir}/recon_by_{len(datas)}_landscapes_{sf:.3f}.png'
+            save_path=f'{recon_dir}/recon_by_{len(datas)}_landscapes_sf{sf:.3f}_ratios{ratios}.png'
         )
 
-        error1 = np.linalg.norm(noisy1 - recon)
+        # error1 = np.linalg.norm(noisy1 - recon)
+        error1 = cal_recon_error(noisy1.reshape(-1), recon.reshape(-1), "MSE")
         errors1.append(error1)
 
-        error2 = np.linalg.norm(noisy2 - recon)
+        # error2 = np.linalg.norm(noisy2 - recon)
+        error2 = cal_recon_error(noisy2.reshape(-1), recon.reshape(-1), "MSE")
         errors2.append(error2)
 
         print(f"reconstruct error 1: {error1}; error 2: {error2}")
     
-    print(errors1)
-    print(errors2)
+    print('ratio cfg1: ', ratios_cfg1)
+    print("MSE bet. recon. and cfg1: ", errors1)
+    print("MSE bet. recon. and cfg2: ", errors2)
 
     return
 
@@ -416,14 +439,13 @@ def get_grid_points(bounds, n_samples_along_axis):
 def test_4D_CS():
     t = np.linspace(0, 1, 10000)
     origin = np.cos(2 * 97 * t * np.pi).reshape(10, 10, 10, 10)
-    recon = recon_4D_landscape(
-        figdir=None,
+    recon = recon_4D_landscape_by_2D(
         origin=origin,
-        full_range=None,
         sampling_frac=0.05
     )
 
     error = np.linalg.norm(origin - recon)
+
     print(error)
 
 
