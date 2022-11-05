@@ -1,6 +1,13 @@
 
 import numpy as np
+from typing import Tuple
 
+def hello() -> Tuple[dict, str, str]:
+    """_summary_
+
+    Returns:
+        Tuple[dict, str, str]: _description_
+    """
 
 def load_grid_search_data(
     n_qubits: int,
@@ -11,14 +18,22 @@ def load_grid_search_data(
     beta_step: int,
     gamma_step: int,
     seed: int,
-):
+) -> Tuple[dict, str, str]:
+    """Load grid search landscape data.
+
+    Returns:
+        Tuple[dict, str, str]: data; data filename; data directory.
+    """
     # abbv.
     nq = n_qubits
     bs = beta_step
     gs = gamma_step
 
-    data_dir = f"figs/grid_search/{problem}/{method}-{noise}"
-    fname = f"{method}-{noise}-n={nq}-p={p}-seed={seed}-{bs}-{gs}.npz"
+    data_dir = f"figs/grid_search/{problem}/{method}-{noise}-p={p}"
+    if noise == 'depolar-0.001-0.02':
+        fname = f"{problem}-{method}-{noise}-n={nq}-p={p}-seed={seed}-{bs}-{gs}.npz"
+    else:
+        fname = f"{method}-{noise}-n={nq}-p={p}-seed={seed}-{bs}-{gs}.npz"
 
     data_path = f"{data_dir}/{fname}"
     print("read data from ", data_path)
@@ -61,5 +76,5 @@ def load_grid_search_data(
     )
     """
 
-    return data
+    return data, fname, data_dir
 
