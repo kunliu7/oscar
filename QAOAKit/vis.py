@@ -1048,7 +1048,7 @@ def _vis_recon_distributed_landscape(
     axs = axs.reshape(-1)
 
     # TODO Check ij and xy
-    X, Y = np.meshgrid(full_range['beta'], full_range['gamma'])
+    X, Y = np.meshgrid(full_range['beta'], full_range['gamma'], indexing='ij')
 
     # c = ax.pcolormesh(X, Y, Z, cmap='viridis', vmin=Z.min(), vmax=Z.max())
     for idx, landscape in enumerate(landscapes):
@@ -1062,6 +1062,7 @@ def _vis_recon_distributed_landscape(
     # plt.title(title)
     # plt.subtitle(title)
     fig.savefig(save_path, bbox_inches='tight')
+    print('figure saved to ', save_path)
     plt.close('all')
 
 

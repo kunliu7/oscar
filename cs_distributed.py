@@ -341,8 +341,8 @@ def reconstruct_by_distributed_landscapes_two_noisy_simulations_top(
 
         datas = [
             # ideal,
-            noisy1,
-            noisy2
+            noisy1.transpose(), # to compatible with n>=16 landscapes
+            noisy2.transpose()
         ]
     elif n_qubits >= 16:
         is_existing_recon = False
