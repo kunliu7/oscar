@@ -338,19 +338,20 @@ def reconstruct_by_distributed_landscapes_two_noisy_simulations_top(
             noisy1,
             noisy2
         ]
-    elif n_qubits == 20:
+    elif n_qubits in [12, 16, 20]:
         is_existing_recon = False
         method = 'sv'
         problem = 'maxcut'
         noise1 = 'depolar-0.001-0.005'
-        noise2 = 'depolar-0.003-0.007'
+        # noise2 = 'depolar-0.003-0.007'
+        noise2 = 'depolar-0.001-0.02'
 
-        noisy_data1 = load_grid_search_data(
+        noisy_data1, _, _ = load_grid_search_data(
             n_qubits=n_qubits, p=p, problem=problem, method=method,
             noise=noise1, beta_step=50, gamma_step=100, seed=0,
         )
 
-        noisy_data2 = load_grid_search_data(
+        noisy_data2, _, _ = load_grid_search_data(
             n_qubits=n_qubits, p=p, problem=problem, method=method,
             noise=noise2, beta_step=50, gamma_step=100, seed=0,
         )
@@ -439,12 +440,14 @@ def reconstruct_by_distributed_landscapes_two_noisy_simulations_top(
 
         print(f"reconstruct error 1: {error1}; error 2: {error2}")
     
-    print('ratio cfg1: ', ratios_cfg1)
-    print("MSE bet. recon. and cfg1: ", errors1)
-    print("MSE bet. recon. and cfg2: ", errors2)
+    print('ratio cfg: ', ratios_cfg1)
+    print("Sqrt MSE between recon and noise1's original: ", errors1)
+    print("Sqrt MSE between recon and noise2's original: ", errors2)
 
+    save_path = f"{recon_dir}/distributed_LS_errors-n={n_qubits}-p={p}-noise1={noise1}-noise2={noise2}"
+    print(f"recon errors save to {save_path}")
     np.savez_compressed(
-        f"{recon_dir}/recon_errors",
+        save_path,
         errors1=errors1,
         errors2=errors2,
         ratios=ratios_cfg1
@@ -495,5 +498,6 @@ def test_4D_CS():
 if __name__ == "__main__":
     # gen_p1_landscape_top()
     # reconstruct_by_distributed_landscapes_top()
-    reconstruct_by_distributed_landscapes_two_noisy_simulations_top(n_qubits=20, p=1)
+    for nq in [12, 16, 20]:
+        reconstruct_by_distributed_landscapes_two_noisy_simulations_top(n_qubits=nq, p=1)
     # test_4D_CS()
