@@ -1,3 +1,4 @@
+import argparse
 import networkx as nx
 import matplotlib.pyplot as plt
 import numpy as np
@@ -315,6 +316,11 @@ def reconstruct_by_distributed_landscapes_two_noisy_simulations_top(
     """Reconstructed with two noisy simulations
     """
     if n_qubits == 8:
+        noise1 = 'depolar-0.001-0.005'
+        noise2 = 'depolar-0.003-0.007'
+        method = 'shots'
+        problem = 'maxcut'
+
         is_existing_recon = False
 
         noisy_data_dir1 = "figs/cnt_opt_miti/2022-08-08_19:48:31"
@@ -338,7 +344,7 @@ def reconstruct_by_distributed_landscapes_two_noisy_simulations_top(
             noisy1,
             noisy2
         ]
-    elif n_qubits in [12, 16, 20]:
+    elif n_qubits >= 16:
         is_existing_recon = False
         method = 'sv'
         problem = 'maxcut'
@@ -367,7 +373,7 @@ def reconstruct_by_distributed_landscapes_two_noisy_simulations_top(
         datas = [noisy1, noisy2]
 
     else:
-        assert False, "wrong number of qubits"
+        raise ValueError("Invalid number of qubits")
 
     for data in datas:
         print(data.shape)
@@ -418,7 +424,7 @@ def reconstruct_by_distributed_landscapes_two_noisy_simulations_top(
             np.savez_compressed(f"{recon_dir}/recon_by_{len(datas)}_landscapes_sf{sf:.3f}_ratios{ratios}",
                 recon = recon)
         else:
-            recon = np.load(f"{recon_dir}/recon_by_{len(datas)}_landscapes_sf{sf:.3f}_ratios{ratios}.npz")['arr_0']
+            recon = np.load(f"{recon_dir}/recon_by_{len(datas)}_landscapes_sf{sf:.3f}_ratios{ratios}.npz")['recon']
 
         _vis_recon_distributed_landscape(
             landscapes=datas + [recon],
@@ -496,8 +502,16 @@ def test_4D_CS():
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-n', type=int, help="Number of qubits", required=True)
+    parser.add_argument('-p', type=int, help="QAOA circuit depth", required=True)
+    # parser.add_argument('-n', type=int, help="Number of qubits", required=True)
+    # parser.add_argument('-p', type=str, help="QAOA layers")
+
+    args = parser.parse_args()
+    
     # gen_p1_landscape_top()
     # reconstruct_by_distributed_landscapes_top()
-    for nq in [12, 16, 20]:
-        reconstruct_by_distributed_landscapes_two_noisy_simulations_top(n_qubits=nq, p=1)
+    # for nq in [12, 16, 20]:
+    reconstruct_by_distributed_landscapes_two_noisy_simulations_top(n_qubits=args.n, p=args.p)
     # test_4D_CS()
