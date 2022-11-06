@@ -1,6 +1,5 @@
 import argparse
 import itertools
-from lib2to3.pgen2.token import CIRCUMFLEX
 from sqlite3 import paramstyle
 from tabnanny import check
 import networkx as nx
@@ -10,7 +9,9 @@ import pandas as pd
 import time
 import concurrent.futures
 import timeit
-import orqviz
+
+from qiskit.compiler import transpile, assemble
+
 from qiskit_optimization.algorithms import MinimumEigenOptimizer
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, execute
 from qiskit.algorithms.optimizers import (
@@ -44,7 +45,6 @@ from qiskit import Aer
 import qiskit
 from qiskit.providers.aer import AerSimulator
 from functools import partial
-from pathlib import Path
 import copy
 from itertools import groupby
 import timeit
@@ -60,26 +60,26 @@ from data_loader import load_grid_search_data
 # from QAOAKit import vis
 
 sys.path.append('..')
-from QAOAKit.noisy_params_optim import (
-    get_pauli_error_noise_model,
-    optimize_under_noise,
-    get_depolarizing_error_noise_model,
-    compute_expectation
-)
+# from QAOAKit.noisy_params_optim import (
+#     get_pauli_error_noise_model,
+#     optimize_under_noise,
+#     get_depolarizing_error_noise_model,
+#     compute_expectation
+# )
 
-from QAOAKit.vis import(
-    _vis_recon_distributed_landscape,
-    vis_landscape,
-    vis_landscape_heatmap,
-    vis_landscape_heatmap_multi_p,
-    vis_landscape_multi_p,
-    vis_landscape_multi_p_and_and_count_optima,
-    vis_landscape_multi_p_and_and_count_optima_MP,
-    vis_landscapes,
-    vis_multi_landscape_and_count_optima_and_mitiq_MP,
-    vis_multi_landscapes_and_count_optima_and_mitiq_MP_and_one_variable,
-    vis_two_BPs_p1_recon
-)
+# from QAOAKit.vis import(
+#     _vis_recon_distributed_landscape,
+#     vis_landscape,
+#     vis_landscape_heatmap,
+#     vis_landscape_heatmap_multi_p,
+#     vis_landscape_multi_p,
+#     vis_landscape_multi_p_and_and_count_optima,
+#     vis_landscape_multi_p_and_and_count_optima_MP,
+#     vis_landscapes,
+#     vis_multi_landscape_and_count_optima_and_mitiq_MP,
+#     vis_multi_landscapes_and_count_optima_and_mitiq_MP_and_one_variable,
+#     vis_two_BPs_p1_recon
+# )
 
 from QAOAKit import (
     opt_angles_for_graph,
@@ -145,9 +145,9 @@ from QAOAKit.optimizer_wrapper import (
     get_numerical_derivative
 )
 
-from QAOAKit.interpolate import (
-    approximate_fun_value_by_2D_interpolation
-)
+# from QAOAKit.interpolate import (
+#     approximate_fun_value_by_2D_interpolation
+# )
 
 # from qiskit_optimization import QuadraticProgram
 from qiskit.algorithms.minimum_eigen_solvers.qaoa import QAOAAnsatz
@@ -156,7 +156,64 @@ from scipy import interpolate
 from qiskit.opflow import AerPauliExpectation, PauliExpectation
 from qiskit_optimization.applications import Maxcut, SKModel, NumberPartition
 
-test_utils_folder = Path(__file__).parent
+# test_utils_folder = Path(__file__).parent
+
+
+def test_qiskit_qaoa_circuit():
+    full_qaoa_dataset_table = get_3_reg_dataset_table()
+    for n_qubits in [8]:
+        p = 1
+        df = full_qaoa_dataset_table.reset_index()
+        df = df[(df["n"] == n_qubits) & (df["p_max"] == p)]
+        for _, row in df.iterrows():
+            angles1 = opt_angles_for_graph(row["G"], row["p_max"])
+            G = row["G"]
+            C_opt = row['C_opt']
+
+            qiskit_angles = angles_to_qiskit_format(angles1)
+            qc1, C, offset = get_maxcut_qaoa_qiskit_circuit(
+                G, p, qiskit_angles
+            )
+            backend = AerSimulator(method="statevector")
+            
+            # ! why this is wrong? version issue? of QAOAAnsatz?
+            qc1_tran = transpile(qc1, backend)
+            # , optimization_level=0, basis_gates=["u1", "u2", "u3", "cx"])
+            # qobj = assemble(qc1_tran)
+            sv1 = Statevector(backend.run(qc1_tran).result().get_statevector())
+
+            # ! the inner function takes the following form:
+            inner_qaoa_angle = np.zeros_like(qiskit_angles)
+            inner_qaoa_angle[:p] = qiskit_angles[1::2]
+            inner_qaoa_angle[p:] = qiskit_angles[::2]
+
+            maxcut = Maxcut(G)
+            problem = maxcut.to_quadratic_program()
+            H, offset_ = problem.to_ising()
+            print(offset_)
+            assert H == C
+            assert np.isclose(offset_, offset)
+
+            get_energy = get_wrapper(p, C)
+            energy = get_energy(inner_qaoa_angle)
+            print(energy)
+
+            # --------------------------------
+
+            angles2 = angles_to_qaoa_format(
+                opt_angles_for_graph(row["G"], row["p_max"])
+            )
+            qc2 = get_maxcut_qaoa_circuit(row["G"], angles2["beta"], angles2["gamma"])
+            sv2 = Statevector(backend.run(qc2).result().get_statevector())
+
+            print(C_opt, offset)
+            obj_val1 = sv1.expectation_value(C) + offset
+            # print(obj_val1)
+            # obj_val1 = -(sv1.expectation_value(C) + offset)
+            obj_val2 = -(sv2.expectation_value(C) + offset)
+            print(obj_val1, obj_val2)
+            print("--------")
+            # assert sv1.equiv(sv2)
 
 
 def _get_min_e(
@@ -233,8 +290,8 @@ def _get_min_given_init_pt(
         energy = -_executor_of_qaoa_maxcut_energy(
             qc=circuit, G=G, noise_model=noise_model, shots=shots
         )
-        print(energy, x)
-        exit()
+        # print(energy, x)
+        # exit()
         return energy
 
         # by statevector
@@ -243,8 +300,8 @@ def _get_min_given_init_pt(
         # )
 
     # print(p)
-    # raw_optimizer_clazz = SPSA
-    raw_optimizer_clazz = ADAM
+    raw_optimizer_clazz = SPSA
+    # raw_optimizer_clazz = ADAM
     
     optimizer = wrap_qiskit_optimizer_to_landscape_optimizer(
         raw_optimizer_clazz
@@ -296,6 +353,51 @@ def _get_min_given_init_pt(
     return eigenvalue
 
 
+def get_wrapper(p, C):
+    backend = AerSimulator(method='statevector')
+    qinst = QuantumInstance(
+        backend=backend,
+        # seed_simulator=seed,
+        # seed_transpiler=seed,
+    )
+
+    algorithm = QAOA(
+        SPSA(),
+        reps=p,
+        quantum_instance=qinst,
+        # expectation=AerPauliExpectation() if args.aer else None,
+    )
+    algorithm._check_operator_ansatz(C)
+    energy_evaluation = algorithm.get_energy_evaluation(C)
+    return energy_evaluation
+
+
+def get_minimum_by_QAOA(G: nx.Graph, p: int, qiskit_init_pt: np.ndarray):
+    """Get minimum cost value by random initialization.
+    """
+    maxcut = Maxcut(G)
+    problem = maxcut.to_quadratic_program()
+    C, offset = problem.to_ising()
+
+    qinst = AerSimulator(shots=2048)
+    # shots = 2048
+    optimizer = SPSA()
+    qaoa = QAOA(
+        optimizer=optimizer,
+        reps=p,
+        initial_point=qiskit_init_pt,
+        quantum_instance=qinst,
+    )
+    result = qaoa.compute_minimum_eigenvalue(C)
+    eigenvalue = result.eigenvalue.real
+
+    print("offset                 :", offset)
+    print("QAOA minimum           :", eigenvalue)
+    print("Real minimum (+offset) :", eigenvalue + offset)
+
+    return eigenvalue
+
+
 def find_good_initial_points_on_recon_LS_and_verify_top(
     n_qubits: int, p: int, noise: str
 ):
@@ -320,13 +422,16 @@ def find_good_initial_points_on_recon_LS_and_verify_top(
         bs = 50
         gs = 100
     else:
-        raise ValueError()
+        raise ValueError("Invalid depth of QAOA")
 
-    data = load_grid_search_data(
+    data, data_fname, _ = load_grid_search_data(
         n_qubits=n_qubits, p=p, problem=problem, method=method,
         noise=noise, beta_step=bs, gamma_step=gs, seed=seed,
     )
     origin = data['data']
+    offset = data['offset']
+    full_ranges = data['full_ranges']
+    print("offset:", offset)
 
     algorithm_globals.massive = True
     algorithm_globals.random_seed = seed
@@ -336,9 +441,33 @@ def find_good_initial_points_on_recon_LS_and_verify_top(
     # n_pts_per_unit = data['n_pts_per_unit']
     # C_opt = data['C_opt']
 
-    offset = data['offset']
-    full_ranges = data['full_ranges']
-    print("offset:", offset)
+    G = nx.random_regular_graph(3, n_qubits, seed)
+    if n_qubits <= 16:
+        row = get_3_reg_dataset_table_row(G, p)
+        print(row)
+        C_opt = -row['C_opt']
+        print("QAOAKit has its minimum: ", C_opt)
+        # angles = {
+        #     'beta': row['beta'],
+        # }
+    else:
+        print("QAOAKit does not have true optima of this graph")
+        print("compared with random initialization")
+
+    # get_minimum_by_random_init(G, None, p)
+
+    # TODO: check
+    qaoakit_angles = opt_angles_for_graph(G, p)
+    qiskit_angles = angles_to_qiskit_format(qaoakit_angles)
+
+    # exit()
+    # check the largest n qubits
+    # reg3_dataset_table = get_3_reg_dataset_table()
+    # df = reg3_dataset_table.reset_index()
+    # print(df['n'].value_counts())
+    # df = df[(df["n"] == n_qubits) & (df["p_max"] == p)]
+
+    # exit()
 
     if p == 2:
         # ! old path
@@ -353,17 +482,18 @@ def find_good_initial_points_on_recon_LS_and_verify_top(
 
     # get problem instance info from QAOAKit
 
-    print("============= origin and recon 4-D LS are loaded ===============")
+    print("============= origin and recon LS are loaded ===============")
     print(f"shape of recon LS: {recon.shape}, origin LS: {origin.shape}")
     
     # find, say 100 points that are \epsilon-close to minimum value of recon landscape
     
     # recon = -recon
     # C_opt = -C_opt
-    eps = 0.2 # 4
+    # eps = 0.2 # 4
     # eps = 0.3 # 22
     # eps = 0.4 # 63
     # eps = 0.5 #
+    eps = 0.6
     
     min_recon = np.min(recon)
     print(f"minimum recon: {min_recon:.5f}, maximum recon: {np.max(recon)}")
@@ -371,7 +501,7 @@ def find_good_initial_points_on_recon_LS_and_verify_top(
 
     mask = np.abs(recon - min_recon) < eps
     # print(mask)
-    print(np.sum(mask == True))
+    print("number of points: ", np.sum(mask == True))
     # return
     ids = np.argwhere(mask == True) # return indices of points where mask == True
     # print(ids)
@@ -382,54 +512,38 @@ def find_good_initial_points_on_recon_LS_and_verify_top(
     # full_ranges = np.array(full_ranges)
     # print(ids)
 
-    G = nx.random_regular_graph(3, n_qubits, seed)
+    # G = nx.random_regular_graph(3, n_qubits, seed)
     maxcut = Maxcut(G)
     # print(maxcut.get_gset_result)
     problem = maxcut.to_quadratic_program()
     H, offset = problem.to_ising()
 
-    # QAOAKit' s method
-    obj = partial(maxcut_obj, w=get_adjacency_matrix(G))
-    opt_en = brute_force(obj, n_qubits)[0]
-    print(opt_en)
+    # brute force 1, but it is not the result of QAOA
+    if False:
+        obj = partial(maxcut_obj, w=get_adjacency_matrix(G))
+        opt_en = brute_force(obj, n_qubits)[0]
+        print(opt_en)
 
-    algo = NumPyMinimumEigensolver()
-    # _, C, offset = get_maxcut_qaoa_qiskit_circuit_unbinded_parameters(
-    #     G, p
-    # )
-    result = algo.compute_minimum_eigenvalue(operator=H, aux_operators=None)
-    print(result)
+    # brute force 2, but it is not the result of QAOA
+    if False:
+        algo = NumPyMinimumEigensolver()
+        result = algo.compute_minimum_eigenvalue(operator=H, aux_operators=None)
+        print(result)
 
-    _, C, _ = get_maxcut_qaoa_qiskit_circuit_unbinded_parameters(
-        G, p
-    )
+    # check H generated are the same
+    if False:
+        _, C, _ = get_maxcut_qaoa_qiskit_circuit_unbinded_parameters(
+            G, p
+        )
 
-    assert H == C
+        # angles_to_qiskit_format(angles=)
 
-    # print(H)
-
-    # print(C)
-
-    # return
+        assert H == C
     
-    # return
-    # reg3_dataset_table = get_3_reg_dataset_table()
-
-    # row = get_full_qaoa_dataset_table_row(G, p)
-    # df = reg3_dataset_table.reset_index()
-    # # print(df['p_max'].value_counts())
-    # # df = 
-    # df = df[(df["G"] == G)]
-    # for row_id, row in df.iloc[0:1].iterrows():
-    #     pass
-    
-    # print(row)
-    # G = row['G']
-    # problem = Maxcut(G).to_quadratic_program()
-    # H, offset = problem.to_ising()
     inits = []
     # return
     min_energies = []
+    recon_init_pt_vals = []
     for idx in ids: # idx: tuples
         # print(idx, recon[idx[0], idx[1], idx[2], idx[3]])
         # continue
@@ -441,6 +555,10 @@ def find_good_initial_points_on_recon_LS_and_verify_top(
         #     'beta': np.array(init_beta_gamma[:p]),
         #     'gamma': np.array(init_beta_gamma[p:]),
         # }
+        recon_init_pt_val = recon[tuple(idx)]
+        print(recon_init_pt_val)
+        recon_init_pt_vals.append(recon_init_pt_val)
+        
         print(init_beta_gamma)
         # format of Qiskit, p=2: gamma, beta, gamma, beta
         initial_point = np.zeros(shape=2*p)
@@ -454,25 +572,31 @@ def find_good_initial_points_on_recon_LS_and_verify_top(
 
         # print(initial_point)
         # min_energy = _get_min_e(G, p, None, initial_point)
-        min_energy = _get_min_given_init_pt(G=G, p=p, C=H, initial_point=initial_point)
-
+        # min_energy = _get_min_given_init_pt(G=G, p=p, C=H, initial_point=initial_point)
+        
+        min_energy = get_minimum_by_QAOA(G, p, initial_point)
+        # min_energy = 0
         min_energies.append(min_energy)
+
+        print("---------------------------")
+
 
     timestamp = get_curr_formatted_timestamp()
     save_dir = f"figs/find_init_pts_by_recon/{timestamp}"
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
 
-    save_path = f"{save_dir}/nQ{n_qubits}_p{p}_seed{seed}_csSeed{cs_seed}"
-    print("save path: ", save_path)
+    save_path = f"{save_dir}/recon-eps={eps:.3f}-csSeed={cs_seed}-{data_fname}"
+    print("initial points data saved to ", save_path)
     np.savez_compressed(
         save_path,
         ids=ids,
         initial_points=inits, # one to one correspondence to ids
         min_energies=min_energies, # one to one correspondence to ids
         min_recon=min_recon,
+        recon_init_pt_vals=recon_init_pt_vals,
         eps=eps,
-        # C_opt=C_opt,
+        C_opt=C_opt,
     )
 
 
@@ -485,6 +609,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     if args.aim == 'find':
+        # test_qiskit_qaoa_circuit()
+        # exit()
         find_good_initial_points_on_recon_LS_and_verify_top(
             n_qubits=16, p=2, noise="ideal"
         )
