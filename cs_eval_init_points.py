@@ -11,7 +11,7 @@ import concurrent.futures
 import timeit
 
 from qiskit.compiler import transpile, assemble
-
+from qiskit.providers.aer.noise import NoiseModel
 from qiskit_optimization.algorithms import MinimumEigenOptimizer
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, execute
 from qiskit.algorithms.optimizers import (
@@ -60,12 +60,12 @@ from data_loader import load_grid_search_data
 # from QAOAKit import vis
 
 sys.path.append('..')
-# from QAOAKit.noisy_params_optim import (
-#     get_pauli_error_noise_model,
-#     optimize_under_noise,
-#     get_depolarizing_error_noise_model,
-#     compute_expectation
-# )
+from QAOAKit.noisy_params_optim import (
+    get_pauli_error_noise_model,
+    optimize_under_noise,
+    get_depolarizing_error_noise_model,
+    compute_expectation
+)
 
 # from QAOAKit.vis import(
 #     _vis_recon_distributed_landscape,
@@ -372,14 +372,15 @@ def get_wrapper(p, C):
     return energy_evaluation
 
 
-def get_minimum_by_QAOA(G: nx.Graph, p: int, qiskit_init_pt: np.ndarray):
+def get_minimum_by_QAOA(G: nx.Graph, p: int, qiskit_init_pt: np.ndarray,
+    noise_model: NoiseModel):
     """Get minimum cost value by random initialization.
     """
     maxcut = Maxcut(G)
     problem = maxcut.to_quadratic_program()
     C, offset = problem.to_ising()
 
-    qinst = AerSimulator(shots=2048)
+    qinst = AerSimulator(shots=2048, noise_model=noise_model)
     # shots = 2048
     optimizer = SPSA()
     qaoa = QAOA(
@@ -399,7 +400,7 @@ def get_minimum_by_QAOA(G: nx.Graph, p: int, qiskit_init_pt: np.ndarray):
 
 
 def find_good_initial_points_on_recon_LS_and_verify_top(
-    n_qubits: int, p: int, noise: str
+    n_qubits: int, noise: str, p1: float, p2: float
 ):
     """Find good initial points on recon landscapes.
 
@@ -409,10 +410,23 @@ def find_good_initial_points_on_recon_LS_and_verify_top(
     """
     method = 'sv'
     problem = 'maxcut'
-    # noise = 'depolar-0.001-0.005'
+
+    if noise == "ideal":
+        noise_model = None
+        noise = 'ideal'
+    elif noise == "depolar":
+        noise_model = get_depolarizing_error_noise_model(p1, p2)
+        noise = f'{noise}-{p1}-{p2}'
+    elif noise == "pauli":
+        noise_model = get_pauli_error_noise_model(p1)
+        noise = f'{noise}-{p1}'
+    else:
+        raise NotImplementedError(f"Noise model {args.noise} not implemented yet")
+
+    noise = 'ideal'
     # n_qubits = 16
     cs_seed = n_qubits
-    # p = 1
+    p = 2
     sf = 0.05
     seed = 0
     if p == 2:
@@ -544,7 +558,9 @@ def find_good_initial_points_on_recon_LS_and_verify_top(
     # return
     min_energies = []
     recon_init_pt_vals = []
-    for idx in ids: # idx: tuples
+    for i, idx in enumerate(ids): # idx: tuples
+        print(f"----------- {i}-th ----------------")
+        # print(f"\rProcess: {i:>3} / {len(ids)}")
         # print(idx, recon[idx[0], idx[1], idx[2], idx[3]])
         # continue
         init_beta_gamma = [0 for _ in range(2*p)]
@@ -556,15 +572,15 @@ def find_good_initial_points_on_recon_LS_and_verify_top(
         #     'gamma': np.array(init_beta_gamma[p:]),
         # }
         recon_init_pt_val = recon[tuple(idx)]
-        print(recon_init_pt_val)
+        # print(recon_init_pt_val)
         recon_init_pt_vals.append(recon_init_pt_val)
         
-        print(init_beta_gamma)
+        # print(init_beta_gamma)
         # format of Qiskit, p=2: gamma, beta, gamma, beta
         initial_point = np.zeros(shape=2*p)
         initial_point[::2] = init_beta_gamma[p:]
         initial_point[1::2] = init_beta_gamma[:p]
-        print(initial_point)
+        # print(initial_point)
 
         inits.append(initial_point)
         # return
@@ -574,11 +590,11 @@ def find_good_initial_points_on_recon_LS_and_verify_top(
         # min_energy = _get_min_e(G, p, None, initial_point)
         # min_energy = _get_min_given_init_pt(G=G, p=p, C=H, initial_point=initial_point)
         
-        min_energy = get_minimum_by_QAOA(G, p, initial_point)
-        # min_energy = 0
+        # min_energy = get_minimum_by_QAOA(G, p, initial_point, noise_model)
+        min_energy = 0
         min_energies.append(min_energy)
 
-        print("---------------------------")
+        # print("---------------------------")
 
 
     timestamp = get_curr_formatted_timestamp()
@@ -597,22 +613,22 @@ def find_good_initial_points_on_recon_LS_and_verify_top(
         recon_init_pt_vals=recon_init_pt_vals,
         eps=eps,
         C_opt=C_opt,
+        offset=offset,
     )
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--aim', type=str, help="Your aims, vis, opt", required=True)
-    # parser.add_argument('-n', type=int, help="Number of qubits", required=True)
-    # parser.add_argument('-p', type=str, help="QAOA layers")
+    parser.add_argument('-n', type=int, help="Number of qubits", required=True)
+    # parser.add_argument('-p', type=str, help="QAOA layers", required=True)
+    parser.add_argument('--noise', type=str, help="Noise type", required=True)
+    parser.add_argument('--p1', type=float, help="Depolar")
+    parser.add_argument('--p2', type=float, help="Depolar")
 
     args = parser.parse_args()
     
-    if args.aim == 'find':
-        # test_qiskit_qaoa_circuit()
-        # exit()
-        find_good_initial_points_on_recon_LS_and_verify_top(
-            n_qubits=16, p=2, noise="ideal"
-        )
-    else:
-        raise NotImplementedError()
+    # test_qiskit_qaoa_circuit()
+    # exit()
+    find_good_initial_points_on_recon_LS_and_verify_top(
+        n_qubits=args.n, noise=args.noise, p1=args.p1, p2=args.p2
+    )
