@@ -56,6 +56,7 @@ from scipy.spatial.distance import (
     cosine
 )
 from qiskit.quantum_info import Statevector
+from QAOAKit.n_dim_cs import recon_4D_landscape_by_2D
 # from QAOAKit import vis
 
 sys.path.append('..')
@@ -135,6 +136,7 @@ from QAOAKit.compressed_sensing import (
     one_D_CS_p1_generate_landscape,
     gen_p1_landscape,
     one_D_CS_p1_recon_with_given_landscapes_and_varing_sampling_frac,
+    recon_2D_landscape,
     two_D_CS_p1_recon_with_given_landscapes,
     _vis_one_D_p1_recon,
     p1_generate_grad,
@@ -1292,7 +1294,7 @@ def cal_multi_errors(a, b):
     a = a.reshape(-1)
     b = b.reshape(-1)
     diff['L2-norm'] = np.linalg.norm(a - b)
-    diff['MSE'] = cal_recon_error(a, b, 'MSE')
+    diff['SqrtMSE'] = cal_recon_error(a, b, 'MSE')
     diff['1-NCC'] = 1 - cal_recon_error(a, b, "CROSS_CORRELATION")
     diff['COS'] = cosine(a, b)
     return diff
@@ -1306,8 +1308,37 @@ def cal_gap(C_opt, full, recon):
     print(f"min_miti_recon: {min_recon}, C_opt - min_recon: {C_opt - min_recon}")
 
 
+def _get_recon_landscape(p: int, origin: np.ndarray, sampling_frac: float, is_reconstructed: bool,
+    recon_save_path: str, cs_seed: int
+) -> np.ndarray:
+    save_dir = os.path.dirname(recon_save_path)
+    print("save dir: ", save_dir)
+    if not is_reconstructed:
+        np.random.seed(cs_seed)
+        if p == 1:
+            recon = recon_2D_landscape(
+                origin=origin,
+                sampling_frac=sampling_frac
+            )
+            if not os.path.exists(save_dir):
+                os.makedirs(save_dir)
+            np.savez_compressed(recon_save_path, recon=recon, sampling_frac=sampling_frac) 
+        elif p == 2:
+            recon = recon_4D_landscape_by_2D(
+                origin=origin,
+                sampling_frac=sampling_frac
+            )
+            if not os.path.exists(save_dir):
+                os.makedirs(save_dir)
+            np.savez_compressed(recon_save_path, recon=recon, sampling_frac=sampling_frac)
+    else:
+        recon = np.load(recon_save_path, allow_pickle=True)['recon']
+    
+    return recon
+
+
 def vis_case_compare_mitigation_method():
-    is_reconstructed = True
+    is_reconstructed = True 
 
     method = 'sv'
     problem = 'maxcut'
@@ -1319,22 +1350,11 @@ def vis_case_compare_mitigation_method():
     p2 = 0.02
     n_qubits = 20
 
-    if noise == "ideal":
-        noise_model = None
-        noise = 'ideal'
-    elif noise == "depolar":
-        noise_model = get_depolarizing_error_noise_model(p1, p2)
-        noise = f'{noise}-{p1}-{p2}'
-    elif noise == "pauli":
-        noise_model = get_pauli_error_noise_model(p1)
-        noise = f'{noise}-{p1}'
-    else:
-        raise NotImplementedError(f"Noise model {noise} not implemented yet")
+    noise = f'depolar-{p1}-{p2}'
 
-    noise = 'ideal'
     # n_qubits = 16
     cs_seed = n_qubits
-    p = 2
+    p = 1
     sf = 0.05
     seed = 0
     if p == 2:
@@ -1346,81 +1366,74 @@ def vis_case_compare_mitigation_method():
     else:
         raise ValueError("Invalid depth of QAOA")
 
-    ideal_data, data_fname, _ = load_grid_search_data(
+    ideal_data, ideal_data_fname, _ = load_grid_search_data(
         n_qubits=n_qubits, p=p, problem=problem, method=method,
         noise=noise, beta_step=bs, gamma_step=gs, seed=seed,
     )
-    origin = ideal_data['data']
-    offset = ideal_data['offset']
-    # full_ranges = data['full_ranges']
-    print("offset:", offset)
+    full_range = ideal_data['full_range']
 
+    ideal = ideal_data['data']
+    # offset = ideal_data['offset']
+    # full_ranges = data['full_ranges']
+    # print("offset:", offset)
 
     # derive origin full landscape
-    data_dir = "figs/cnt_opt_miti/2022-08-10_10:14:03/G40_nQ8_p1"
-    data = np.load(f"{data_dir}/data.npz", allow_pickle=True)
-    origin = data['origin'].tolist()
-    full_range = data['full_range'].tolist()
-    miti1 = origin['mitis']
-    C_opt = data['C_opt']
-
-    # ----------- tmp start
-    # sf = 0.05
-    # miti1_recon = two_D_CS_p1_recon_with_given_landscapes(
-    #     figdir=None,
-    #     origin=origin,
-    #     full_range=None,
-    #     sampling_frac=sf
-    # )
-    # recon1_path = f"{data_dir}/2D_CS_recon_sf{sf:.3f}"
-    # np.savez_compressed(recon1_path, recon=miti1_recon)
-
-    # return
-
-    # ----------- tmp end
-
-    # derive reconstructed landscape
-    sf = 0.05
-    recon_path = f"{data_dir}/2D_CS_recon_sf{sf:.3f}.npz"
-    recon = np.load(recon_path, allow_pickle=True)['recon'].tolist()
-    miti1_recon = recon['mitis']
-
-    data2_dir = "figs/gen_p1_landscape/2022-10-08_16:52:53/G40_nQ8_p1_depolar0.001_0.005_zneLinear"
-    miti2 = np.load(f"{data2_dir}/data.npz", allow_pickle=True)['origin'].tolist()['mitis']
-
+    # data_dir = "figs/cnt_opt_miti/2022-08-10_10:14:03/G40_nQ8_p1"
+    # data = np.load(f"{data_dir}/data.npz", allow_pickle=True)
+    # origin = data['origin'].tolist()
+    # full_range = data['full_range'].tolist()
+    # miti1 = origin['mitis']
+    # C_opt = data['C_opt']
+    
     if not is_reconstructed:
-        miti2_recon = two_D_CS_p1_recon_with_given_landscapes(
-            figdir=None,
-            origin={ "mitis": miti2 },
-            full_range=None,
-            sampling_frac=sf
-        )
-        recon2_path = f"{data2_dir}/2D_CS_recon_sf{sf:.3f}"
-        np.savez_compressed(recon2_path, recon=miti2_recon, sampling_frac=sf)
-        miti2_recon = miti2_recon['mitis']
+        timestamp = get_curr_formatted_timestamp()
     else:
-        recon2_path = f"{data2_dir}/2D_CS_recon_sf{sf:.3f}.npz"
-        miti2_recon = np.load(recon2_path, allow_pickle=True)['recon'].tolist()['mitis']
+        timestamp = "2022-11-07_13:55:52_OK" # TODO
 
+    # -------- derive miti1 data
+
+    miti1_data, miti1_data_fname, _ = load_grid_search_data(
+        n_qubits=n_qubits, p=p, problem=problem, method=method,
+        noise=noise, beta_step=bs, gamma_step=gs, seed=seed, miti_method=miti_method1
+    )
+    miti1 = miti1_data['data']
+    # mitigation_method1 = miti1_data['mitigation_method']
+    # mitigation
+    print(miti1_data['mitigation_method'], miti1_data['mitigation_config'])
+    # print(mitigation_config1)
+
+    # exit()
+    recon1_path = f"figs/recon_p2_landscape/{timestamp}/recon-sf={sf:.3f}-cs_seed={cs_seed}-{miti1_data_fname}"
+    miti1_recon = _get_recon_landscape(p, miti1, sf, is_reconstructed, recon1_path, cs_seed)
+
+    # -------- derive miti2 data
+
+    miti2_data, miti2_data_fname, _ = load_grid_search_data(
+        n_qubits=n_qubits, p=p, problem=problem, method=method,
+        noise=noise, beta_step=bs, gamma_step=gs, seed=seed, miti_method=miti_method2
+    )
+    miti2 = miti2_data['data']
+
+    recon2_path = f"figs/recon_p2_landscape/{timestamp}/recon-sf={sf:.3f}-cs_seed={cs_seed}-{miti2_data_fname}"
+    miti2_recon = _get_recon_landscape(p, miti2, sf, is_reconstructed, recon2_path, cs_seed)
+    
     # --------------- compare MSE, NCC and Cosine distance -----------
 
     # metrics = ['MSE', 'NCC', 'COS']
     # metrics = {"MSE": 0, "NCC": 0, "COS": 0}
 
-    diff1 = cal_multi_errors(miti1, miti1_recon)
-    diff2 = cal_multi_errors(miti2, miti2_recon)
+    # diff1 = cal_multi_errors(miti1, miti1_recon)
+    # diff2 = cal_multi_errors(miti2, miti2_recon)
+    
+    diff1 = cal_multi_errors(miti1, ideal)
+    diff2 = cal_multi_errors(miti2, ideal)
     print(diff1)
     print(diff2)
 
     # --------------- gap ------------
-    # min_miti = np.min(miti1)
-    # min_miti_recon = np.min(miti1_recon)
-    # print("C_opt: ", C_opt)
-    # print(f"min_miti: {min_miti}, C_opt - min_miti: {C_opt - min_miti}")
-    # print(f"min_miti_recon: {min_miti_recon}", C_opt - min_miti_recon)
 
-    cal_gap(C_opt, miti1, miti1_recon)
-    cal_gap(C_opt, miti2, miti2_recon)
+    # cal_gap(C_opt, miti1, miti1_recon)
+    # cal_gap(C_opt, miti2, miti2_recon)
 
     # reg3_dataset_table = get_3_reg_dataset_table()
     # df = reg3_dataset_table.reset_index()
@@ -1431,7 +1444,6 @@ def vis_case_compare_mitigation_method():
     # for row_id, row in df.iloc[1:2].iterrows():
     #     pass
     # assert row_id == 40
-
 
     vis_landscapes(
         # landscapes=[origin['unmitis'], miti1, miti2, miti1_recon, miti2_recon],
