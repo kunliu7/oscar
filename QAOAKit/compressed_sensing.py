@@ -1275,6 +1275,35 @@ def idct2(x):
     return idct(idct(x.T, norm='ortho', axis=0).T, norm='ortho', axis=0)
 
 
+def recon_2D_by_LASSO(nx, ny, A, b, alpha: float):
+    vx = cvx.Variable(nx * ny)
+    objective = cvx.Minimize(alpha * cvx.norm(vx, 1) + cvx.norm(A*vx - b, 2)**2)
+    prob = cvx.Problem(objective)
+    result = prob.solve(verbose=True)
+    Xat2 = np.array(vx.value).squeeze()
+
+    # reconstruct signal
+    Xat = Xat2.reshape(nx, ny).T # stack columns
+    Xa = idct2(Xat)
+    return Xa
+
+
+# def recon_2D_by_BPDN(nx, ny, A, b):
+#     """Basic Pursuit Denoising.
+#     """
+#     vx = cvx.Variable(nx * ny)
+#     objective = cvx.Minimize(cvx.norm(vx, 1))
+#     prob = cvx.Problem(objective)
+#     result = prob.solve(verbose=True)
+#     Xat2 = np.array(vx.value).squeeze()
+
+#     # reconstruct signal
+#     Xat = Xat2.reshape(nx, ny).T # stack columns
+#     Xa = idct2(Xat)
+
+#     return Xa
+
+
 def recon_2D_by_cvxpy(nx, ny, A, b):
     # do L1 optimization
     vx = cvx.Variable(nx * ny)
@@ -1671,11 +1700,12 @@ def vis_optimization_on_p1_landscape(
     plt.close(fig)
     return True
 
-
-def recon_p1_landscape(
+# rename from recon_p1_landscape to recon_2D landscape
+def recon_2D_landscape(
     origin: np.ndarray,
     sampling_frac: float,
     random_indices: np.ndarray=None,
+    method='BP'
 ) -> np.ndarray:
     """Reconstruct a p==1 landscape.
 
@@ -1709,7 +1739,13 @@ def recon_p1_landscape(
     A = A[ri,:] # same as phi times kron
 
     # b = X.T.flat[ri]
-    recon = recon_2D_by_cvxpy(nx, ny, A, origin.T.flat[ri])
+    if method == 'BP':
+        recon = recon_2D_by_cvxpy(nx, ny, A, origin.T.flat[ri])
+    elif method == 'BPDN':
+        recon = recon_2D_by_LASSO(nx, ny, A, origin.T.flat[ri], 0.001)
+    else:
+        assert False, "Invalid CS method"
+
     return recon
 
 
