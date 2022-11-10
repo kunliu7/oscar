@@ -18,6 +18,7 @@ def load_grid_search_data(
     beta_step: int,
     gamma_step: int,
     seed: int,
+    miti_method: str=""
 ) -> Tuple[dict, str, str]:
     """Load grid search landscape data.
 
@@ -30,8 +31,11 @@ def load_grid_search_data(
     gs = gamma_step
 
     data_dir = f"figs/grid_search/{problem}/{method}-{noise}-p={p}"
-    if noise == 'depolar-0.001-0.02':
-        fname = f"{problem}-{method}-{noise}-n={nq}-p={p}-seed={seed}-{bs}-{gs}.npz"
+    if noise in ['depolar-0.001-0.02', 'depolar-0.1-0.1']:
+        if miti_method:
+            fname = f"{problem}-{method}-{noise}-n={nq}-p={p}-seed={seed}-{bs}-{gs}-{miti_method}.npz"
+        else:
+            fname = f"{problem}-{method}-{noise}-n={nq}-p={p}-seed={seed}-{bs}-{gs}.npz"
     else:
         fname = f"{method}-{noise}-n={nq}-p={p}-seed={seed}-{bs}-{gs}.npz"
 
@@ -61,6 +65,14 @@ def load_grid_search_data(
 
     data['full_ranges'] = full_ranges
     data['full_range'] = full_range
+
+    if p == 2:
+        data['plot_range'] = { 
+            'beta': full_range['beta'].shape[0] ** 2,
+            'gamma': full_range['gamma'].shape[0] ** 2
+        }
+    elif p == 1:
+        data['plot_range'] = full_range.copy()
 
     """
     np.savez_compressed(
