@@ -467,6 +467,7 @@ def find_good_initial_points_on_recon_LS_and_verify_top(
     else:
         print("QAOAKit does not have true optima of this graph")
         print("compared with random initialization")
+        C_opt = None
 
     # get_minimum_by_random_init(G, None, p)
 
@@ -590,7 +591,7 @@ def find_good_initial_points_on_recon_LS_and_verify_top(
         # min_energy = _get_min_e(G, p, None, initial_point)
         # min_energy = _get_min_given_init_pt(G=G, p=p, C=H, initial_point=initial_point)
         
-        # min_energy = get_minimum_by_QAOA(G, p, initial_point, noise_model)
+        min_energy = get_minimum_by_QAOA(G, p, initial_point, noise_model)
         min_energy = 0
         min_energies.append(min_energy)
 
