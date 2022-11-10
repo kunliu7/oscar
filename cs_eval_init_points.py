@@ -423,7 +423,7 @@ def find_good_initial_points_on_recon_LS_and_verify_top(
     else:
         raise NotImplementedError(f"Noise model {args.noise} not implemented yet")
 
-    noise = 'ideal'
+    # noise = 'ideal'
     # n_qubits = 16
     cs_seed = n_qubits
     p = 2
@@ -592,7 +592,7 @@ def find_good_initial_points_on_recon_LS_and_verify_top(
         # min_energy = _get_min_given_init_pt(G=G, p=p, C=H, initial_point=initial_point)
         
         min_energy = get_minimum_by_QAOA(G, p, initial_point, noise_model)
-        min_energy = 0
+        # min_energy = 0
         min_energies.append(min_energy)
 
         # print("---------------------------")
