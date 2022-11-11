@@ -2,12 +2,53 @@
 import numpy as np
 from typing import Tuple
 
-def hello() -> Tuple[dict, str, str]:
-    """_summary_
+
+def load_recon_data(
+    n_qubits: int,
+    p: int,
+    problem: str,
+    method: str,
+    noise: str,
+    beta_step: int,
+    gamma_step: int,
+    seed: int,
+    sampling_frac: float,
+    cs_seed: int
+) -> Tuple[dict, str, str]:
+    """Load grid search landscape data.
 
     Returns:
-        Tuple[dict, str, str]: _description_
+        Tuple[dict, str, str]: data; data filename; data directory.
     """
+    # abbv.
+    n = n_qubits
+    bs = beta_step
+    gs = gamma_step
+    sf = sampling_frac
+
+    data_dir = f"figs/gen_p1_landscape/{method}-{noise}"
+    fname = f"{sf:.3f}_p{p}_bs{bs}_nQ{n}_csSeed{n}"
+
+    data_path = f"{data_dir}/{fname}"
+
+    print("read data from ", data_path)
+    data = np.load(
+        data_path,
+        allow_pickle=True
+    )
+
+    data = dict(data)
+
+    """
+    np.savez_compressed(
+        recon=recon,
+        sampling_frac=sf,
+    )
+    """
+
+    return data, fname, data_dir
+
+
 
 def load_grid_search_data(
     n_qubits: int,

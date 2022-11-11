@@ -54,6 +54,8 @@ from scipy.spatial.distance import (
 from qiskit.quantum_info import Statevector
 from qiskit.opflow import PrimitiveOp, PauliSumOp
 from QAOAKit.n_dim_cs import recon_4D_landscape, recon_4D_landscape_by_2D
+from cs_comp_miti import _get_recon_landscape
+from data_loader import load_grid_search_data
 # from QAOAKit import vis
 
 sys.path.append('..')
@@ -134,7 +136,7 @@ from QAOAKit.compressed_sensing import (
     cal_recon_error,
     gen_p1_landscape,
     gen_p2_landscape,
-    recon_p1_landscape,
+    recon_2D_landscape,
     two_D_CS_p1_recon_with_distributed_landscapes,
     two_D_CS_p1_recon_with_given_landscapes,
 )
@@ -153,6 +155,109 @@ from qiskit.algorithms.minimum_eigen_solvers.qaoa import QAOAAnsatz
 from scipy import interpolate
 
 test_utils_folder = Path(__file__).parent
+
+
+def recon_landscapes_varying_qubits_and_instances(
+    p: int, problem: str, noise: str, n_seeds: int, n_qubits_list: list
+):
+    """Section 4 ABCD
+    """
+    is_recon = False
+
+    method = 'sv'
+    miti_method = ''
+    mses = []
+    coss = []
+
+    if p == 1:
+        bs = 50 # beta step
+        gs = 2 * bs
+    elif p == 2:
+        bs = 12
+        gs = 15
+
+    sfs = np.arange(0.01, 0.11, 0.02)
+    seeds = list(range(n_seeds))
+    # if p == 1 and noise == 'ideal':
+    #     n_qubits_list = [16, 20, 24, 30]
+    # elif p == 1 and noise == 'depolar-0.003-0.007':
+    #     n_qubits_list = [12, 16, 20]
+    # elif p == 2 and noise == 'ideal':
+    #     n_qubits_list = [16, 20, 24]
+    # elif p == 2 and noise == 'ideal':
+    #     n_qubits_list = [12, 16, 20]
+
+    print("noise =", noise)
+    print("n qubits list =", n_qubits_list)
+    print("seeds =", seeds)
+    print("sfs =", sfs)
+
+    for n_qubits in n_qubits_list:
+        cs_seed = n_qubits # ! compare horizontally
+
+        for seed in seeds:
+            data, data_fname, data_dir = load_grid_search_data(
+                n_qubits=n_qubits, p=p, problem=problem, method=method,
+                noise=noise, beta_step=bs, gamma_step=gs, seed=seed, miti_method=miti_method
+            )
+
+            # 和Tianyi代码使用相同目录结构
+            recon_dir = f"figs/grid_search_recon/{problem}/{method}-{noise}-p={p}"
+
+            for sf in sfs:
+                recon_fname = f"recon-cs_seed={cs_seed}-sf={sf:.3f}-{data_fname}"
+                recon_path = f"{recon_dir}/{recon_fname}"
+
+                origin = data['data']
+                recon = _get_recon_landscape(p, origin, sf, is_recon, 
+                    recon_path, cs_seed)
+                     
+                mse = cal_recon_error(origin.reshape(-1), recon.reshape(-1), "MSE")
+                # ncc = cal_recon_error(landscape.reshape(-1), recon.reshape(-1), "CROSS_CORRELATION")
+                cos = cosine(origin.reshape(-1), recon.reshape(-1))
+                mses.append(mse)
+                coss.append(cos)
+
+                # ncc = cal_recon_error()
+                print("RMSE: ", mse)
+                print("Cosine: ", cos)
+                
+                # vis_landscapes(
+                #     landscapes=[origin, recon],
+                #     labels=["origin", "recon"],
+                #     full_range={
+                #         "beta": plot_range['beta'],
+                #         "gamma": plot_range['gamma'] 
+                #     },
+                #     true_optima=None,
+                #     title="Origin and recon",
+                #     save_path=f'{fig_dir}/origin_and_2D_recon_sf{sf:.3f}_bs{bs}_gs{gs}_nQ{n_qubits}_seed{seed}_csSeed{cs_seed}.png',
+                #     params_paths=[None, None]
+                # )
+
+    print("noise =", noise)
+    print("n qubits list =", n_qubits_list)
+    print("seeds =", seeds)
+    print("sfs =", sfs)
+
+    print("mse =", mses)
+    print("cos =", coss)
+    mses = np.array(mses)
+    coss = np.array(coss)
+
+    mses = mses.reshape(len(n_qubits_list), len(seeds), len(sfs))
+    coss = coss.reshape(len(n_qubits_list), len(seeds), len(sfs))
+    print("mse's shape =", mses.shape)
+    print("cos's shape =", coss.shape)
+    # timestamp = get_curr_formatted_timestamp()
+    np.savez_compressed(
+        f"{recon_dir}/recon_error_ns={n_qubits_list}-seeds={seeds}-sfs={sfs}",
+        mses=mses,
+        coss=coss,
+        n_qubits_list=n_qubits_list,
+        seeds=seeds,
+        sfs=sfs
+    )
 
 
 def recon_p1_landscape_noisy_varying_qubits_and_instances():
@@ -203,7 +308,7 @@ def recon_p1_landscape_noisy_varying_qubits_and_instances():
                     # seed = seed
                     cs_seed = n_qubits
                     np.random.seed(seed=cs_seed)
-                    recon = recon_p1_landscape(
+                    recon = recon_2D_landscape(
                         origin=origin,
                         sampling_frac=sf
                     )
@@ -306,7 +411,7 @@ def recon_p1_landscape_ideal_varying_qubits_and_instances():
                     cs_seed = n_qubits
                     # rng = np.random.default_rng(seed=seed)
                     np.random.seed(seed=cs_seed)
-                    recon = recon_p1_landscape(
+                    recon = recon_2D_landscape(
                         origin=origin,
                         sampling_frac=sf
                     )
@@ -364,7 +469,7 @@ def recon_p1_landscape_ideal_varying_qubits_and_instances():
 
 
 def recon_p2_landscape_ideal_varying_qubits_and_instances():
-    is_recon = True
+    is_recon = False
 
     bs = 12 # beta step
     gs = 15
@@ -375,10 +480,10 @@ def recon_p2_landscape_ideal_varying_qubits_and_instances():
     # n_qubits_list = [16, 20, 24]
     # seeds = [0, 1]
     # sfs = np.arange(0.01, 0.11, 0.02)
-    
-    n_qubits_list = [24]
-    seeds = [0]
-    sfs = np.arange(0.01, 0.1, 0.02)
+    n_qubits_list = [16, 20, 24]
+    seeds = [0, 1]
+    # sfs = np.arange(0.01, 0.1, 0.02)
+    sfs = [0.05]
     
     for n_qubits in n_qubits_list:
         for seed in seeds:
@@ -519,7 +624,7 @@ def recon_large_qubits_p1_landscape_top():
             if not is_recon:
                 seed = beta_steps
                 np.random.seed(seed)
-                recon = recon_p1_landscape(
+                recon = recon_2D_landscape(
                     origin=origin,
                     sampling_frac=sf
                 )
@@ -690,7 +795,7 @@ def CS_by_BPDN_p1():
             seed = 42
             np.random.seed(seed)
             start = time.time()
-            recon = recon_p1_landscape(
+            recon = recon_2D_landscape(
                 origin=origin,
                 sampling_frac=sf,
                 method=method
@@ -830,6 +935,12 @@ def CS_by_BPDN_p2():
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--aim', type=str, help="Your aims, vis, opt", required=True)
+    parser.add_argument('--ns', type=int, nargs='+', help="Your aims, vis, opt", required=True)
+    parser.add_argument('-p', type=int, help="Your aims, vis, opt", required=True)
+    # parser.add_argument('--method', type=str, help="Your aims, vis, opt", required=True)
+    parser.add_argument('--noise', type=str, help="Your aims, vis, opt", required=True)
+    parser.add_argument('--problem', type=str, help="Your aims, vis, opt", required=True)
+    parser.add_argument('--n_seeds', type=int, help="Your aims, vis, opt", required=True)
     args = parser.parse_args()
     
     if args.aim == 'large1':
@@ -840,11 +951,16 @@ if __name__ == "__main__":
         CS_by_BPDN_p1()
     elif args.aim == 'comp2':
         CS_by_BPDN_p2()
-    elif args.aim == 'noisy_p1':
-        recon_p1_landscape_noisy_varying_qubits_and_instances()
     elif args.aim == 'ideal_p1':
         recon_p1_landscape_ideal_varying_qubits_and_instances()
+    elif args.aim == 'noisy_p1':
+        recon_p1_landscape_noisy_varying_qubits_and_instances()
     elif args.aim == 'ideal_p2':
         recon_p2_landscape_ideal_varying_qubits_and_instances()
+    elif args.aim == 'noisy_p2':
+        pass
+    elif args.aim == 'final':
+        recon_landscapes_varying_qubits_and_instances(p=args.p, problem=args.problem,
+            noise=args.noise, n_seeds=args.n_seeds, n_qubits_list=args.ns)
     else:
-        assert False, f"Invalid aim: {args.aim}"
+        raise NotImplementedError()
