@@ -1339,8 +1339,27 @@ def _get_recon_landscape(p: int, origin: np.ndarray, sampling_frac: float, is_re
     return recon
 
 
+def compare_with_ideal_landscapes(ideal, ls1, ls2):
+    diff1 = ideal - ls1   # Richardson factory
+    diff2 = ideal - ls2   # linear factory
+
+    ids = np.abs(diff1) < np.abs(diff2)     # indices that Richardson is closer to ideal than linear
+
+    print(np.sum(ids))
+    print(np.sum(ids == True))
+    print(np.sum(ids == False))
+    
+    print(np.var(diff1))
+    print(np.var(diff2))
+
+    print(np.var(np.abs(diff1)))
+    print(np.var(np.abs(diff2)))
+
+
+
 def vis_case_compare_mitigation_method():
     is_reconstructed = True 
+    is_test = False
 
     method = 'sv'
     problem = 'maxcut'
@@ -1351,6 +1370,12 @@ def vis_case_compare_mitigation_method():
     p1 = 0.001
     p2 = 0.02
     n_qubits = 20
+
+    if is_test: 
+        # test
+        p1 = 0.001
+        p2 = 0.02
+        n_qubits = 8
 
     noise = f'depolar-{p1}-{p2}'
 
@@ -1372,6 +1397,12 @@ def vis_case_compare_mitigation_method():
         n_qubits=n_qubits, p=p, problem=problem, method=method,
         noise='ideal', beta_step=bs, gamma_step=gs, seed=seed
     )
+    
+    if is_test:
+        ideal_data, ideal_data_fname, _ = load_grid_search_data(
+            n_qubits=n_qubits, p=p, problem=problem, method=method,
+            noise=noise, beta_step=bs, gamma_step=gs, seed=seed, miti_method=miti_method2
+        )
 
     full_range = ideal_data['full_range']
 
@@ -1388,7 +1419,8 @@ def vis_case_compare_mitigation_method():
         params_paths=[None, None]
     )
 
-    # return
+    if is_test:
+        return
     # offset = ideal_data['offset']
     # full_ranges = data['full_ranges']
     # print("offset:", offset)
@@ -1490,27 +1522,4 @@ def vis_case_compare_mitigation_method():
 
 
 if __name__ == "__main__":
-    # debug_existing_BP_top()
-    # debug_existing_BP_top_2()
-    # debug_existing_BP_top_3()
-    # gen_p1_landscape_with_other_miti_top()
-    # data = np.load(
-    #     "figs/grid_search/maxcut/sv-depolar-0.1-0.1-p=1/maxcut-sv-depolar-0.1-0.1-n=8-p=1-seed=0-50-100-zne-RichardsonFactory.npz",
-    #     allow_pickle=True)
-
-    # origin = data['data']
-
-    # full_range = data['full_range'].tolist()
-    
-    # vis_landscapes(
-    #     # landscapes=[origin['unmitis'], miti1, miti2, miti1_recon, miti2_recon],
-    #     landscapes=[origin, origin],
-    #     labels=["ZNE RichardsonFactory", "ZNE LinearFactory"],
-    #     full_range=full_range,
-    #     true_optima=None,
-    #     title="Compare different ZNE configs and reconstruction",
-    #     save_path="paper_figs/debug_miti.png",
-    #     params_paths=[None, None]
-    # )
-
     vis_case_compare_mitigation_method()
