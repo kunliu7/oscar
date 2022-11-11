@@ -156,8 +156,9 @@ from scipy import interpolate
 from qiskit.opflow import AerPauliExpectation, PauliExpectation
 from qiskit_optimization.applications import Maxcut, SKModel, NumberPartition
 
+from data_loader import get_recon_pathname
+from cs_comp_miti import _get_recon_landscape
 # test_utils_folder = Path(__file__).parent
-
 
 def test_qiskit_qaoa_circuit():
     full_qaoa_dataset_table = get_3_reg_dataset_table()
@@ -373,7 +374,7 @@ def get_wrapper(p, C):
 
 
 def get_minimum_by_QAOA(G: nx.Graph, p: int, qiskit_init_pt: np.ndarray,
-    noise_model: NoiseModel):
+    noise_model: NoiseModel, maxiter: int):
     """Get minimum cost value by random initialization.
     """
     maxcut = Maxcut(G)
@@ -382,7 +383,16 @@ def get_minimum_by_QAOA(G: nx.Graph, p: int, qiskit_init_pt: np.ndarray,
 
     qinst = AerSimulator(shots=2048, noise_model=noise_model)
     # shots = 2048
-    optimizer = SPSA()
+    # optimizer = SPSA(maxiter=maxiter)
+    if isinstance(maxiter, int):
+        optimizer = SPSA(maxiter=maxiter)
+        print("maxiter:", maxiter)
+    else:
+        optimizer = SPSA()
+        print("no maxiter")
+    
+    print("noise model", noise_model)
+
     qaoa = QAOA(
         optimizer=optimizer,
         reps=p,
@@ -399,8 +409,41 @@ def get_minimum_by_QAOA(G: nx.Graph, p: int, qiskit_init_pt: np.ndarray,
     return eigenvalue
 
 
+def get_random_initialization(G:nx.Graph, p: int, n_pts: int,
+    noise_model: NoiseModel, beta_bound: float, gamma_bound: float, maxiter: int):
+    print(f"beta_bound={beta_bound}, gamma_bound={gamma_bound}")
+    np.random.seed(0)
+
+    betas = [np.random.uniform(-beta_bound, beta_bound, n_pts) for _ in range(p)]
+    gammas = [np.random.uniform(-gamma_bound, gamma_bound, n_pts) for _ in range(p)]
+    inits = np.concatenate(betas + gammas)
+    # print(inits.shape)
+    inits = inits.reshape(n_pts, 2*p)
+    print("init points shape:", inits.shape)
+
+    energies = []
+    qiskit_inits = []
+    for i in range(n_pts):
+        print(f"----- {i}-th ------")
+
+        init_betas_gammas = inits[i,:]
+
+        # format of Qiskit, p=2: gamma, beta, gamma, beta
+        qiskit_init = np.zeros(shape=2*p)
+        qiskit_init[::2] = init_betas_gammas[p:] # gammas
+        qiskit_init[1::2] = init_betas_gammas[:p] # betas
+        
+        qiskit_inits.append(qiskit_init)
+        energy = get_minimum_by_QAOA(G, p, qiskit_init, noise_model, maxiter)
+        energies.append(energy)
+
+    energies = np.array(energies) 
+    qiskit_inits = np.array(qiskit_inits)
+    return energies, qiskit_inits
+
+
 def find_good_initial_points_on_recon_LS_and_verify_top(
-    n_qubits: int, noise: str, p1: float, p2: float
+    n_qubits: int, noise: str, p1: float, p2: float, maxiter:int
 ):
     """Find good initial points on recon landscapes.
 
@@ -423,6 +466,7 @@ def find_good_initial_points_on_recon_LS_and_verify_top(
     else:
         raise NotImplementedError(f"Noise model {args.noise} not implemented yet")
 
+    print("noise:", noise)
     # noise = 'ideal'
     # n_qubits = 16
     cs_seed = n_qubits
@@ -461,13 +505,16 @@ def find_good_initial_points_on_recon_LS_and_verify_top(
         print(row)
         C_opt = -row['C_opt']
         print("QAOAKit has its minimum: ", C_opt)
+        is_comp_random = False
         # angles = {
         #     'beta': row['beta'],
         # }
     else:
+        
         print("QAOAKit does not have true optima of this graph")
         print("compared with random initialization")
         C_opt = None
+        is_comp_random = False
 
     # get_minimum_by_random_init(G, None, p)
 
@@ -488,8 +535,11 @@ def find_good_initial_points_on_recon_LS_and_verify_top(
         # ! old path
         # recon_path = f"figs/gen_p1_landscape/sv-ideal/2D_CS_recon_p2/sf{sf:.3f}_bs{bs}_gs{gs}_nQ{n_qubits}.npz"
         # ! new path 新增seed和cs_seed
-        recon_path = f"figs/gen_p1_landscape/sv-ideal/2D_CS_recon_p2/sf{sf:.3f}_bs{bs}_gs{gs}_nQ{n_qubits}_seed{seed}_csSeed{cs_seed}.npz"
-        recon = np.load(f"{recon_path}")['recon']
+        recon_path, _, _ = get_recon_pathname(p, problem, method, noise, cs_seed, sf, data_fname)
+        recon = _get_recon_landscape(p, origin, sf, False, recon_path, cs_seed)
+        # recon_path = f"figs/gen_p1_landscape/sv-{noise}/2D_CS_recon_p2/sf{sf:.3f}_bs{bs}_gs{gs}_nQ{n_qubits}_seed{seed}_csSeed{cs_seed}.npz"
+        # recon = np.load(f"{recon_path}")['recon']
+
     elif p == 1:
         recon_path = f"figs/gen_p1_landscape/sv-ideal/2D_CS_recon/sf{sf:.3f}_p1_bs{bs}_nQ{n_qubits}_csSeed{cs_seed}.npz"
         recon = np.load(f"{recon_path}")['recon']
@@ -516,11 +566,13 @@ def find_good_initial_points_on_recon_LS_and_verify_top(
 
     mask = np.abs(recon - min_recon) < eps
     # print(mask)
-    print("number of points: ", np.sum(mask == True))
+    n_pts = np.sum(mask == True)
+    print("number of points: ", n_pts)
     # return
     ids = np.argwhere(mask == True) # return indices of points where mask == True
     # print(ids)
 
+    # return
     # landscape.shape = (beta, beta, gamma, gamma)
     # randomly sample some points within eps as initial points
     # print(full_ranges)
@@ -591,11 +643,16 @@ def find_good_initial_points_on_recon_LS_and_verify_top(
         # min_energy = _get_min_e(G, p, None, initial_point)
         # min_energy = _get_min_given_init_pt(G=G, p=p, C=H, initial_point=initial_point)
         
-        min_energy = get_minimum_by_QAOA(G, p, initial_point, noise_model)
+        min_energy = get_minimum_by_QAOA(G, p, initial_point, noise_model, maxiter)
         # min_energy = 0
         min_energies.append(min_energy)
 
         # print("---------------------------")
+
+    if is_comp_random:
+        random_energies, random_inits = \
+            get_random_initialization(G, p, n_pts, noise_model,
+                data['beta_bound'], data['gamma_bound'], maxiter)
 
 
     timestamp = get_curr_formatted_timestamp()
@@ -603,19 +660,39 @@ def find_good_initial_points_on_recon_LS_and_verify_top(
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
 
-    save_path = f"{save_dir}/recon-eps={eps:.3f}-csSeed={cs_seed}-{data_fname}"
+    save_path = f"{save_dir}/init-maxiter={maxiter}-eps={eps:.3f}-{data_fname}"
     print("initial points data saved to ", save_path)
-    np.savez_compressed(
-        save_path,
-        ids=ids,
-        initial_points=inits, # one to one correspondence to ids
-        min_energies=min_energies, # one to one correspondence to ids
-        min_recon=min_recon,
-        recon_init_pt_vals=recon_init_pt_vals,
-        eps=eps,
-        C_opt=C_opt,
-        offset=offset,
-    )
+    
+    if is_comp_random:
+        np.savez_compressed(
+            save_path,
+            ids=ids,
+            initial_points=inits, # one to one correspondence to ids
+            min_energies=min_energies, # one to one correspondence to ids
+            min_recon=min_recon,
+            recon_init_pt_vals=recon_init_pt_vals,
+            eps=eps,
+            C_opt=C_opt,
+            offset=offset,
+            maxiter=maxiter,
+
+            # diff
+            random_energies=random_energies,
+            random_inits=random_inits,
+        )
+    else:
+        np.savez_compressed(
+            save_path,
+            ids=ids,
+            initial_points=inits, # one to one correspondence to ids
+            min_energies=min_energies, # one to one correspondence to ids
+            min_recon=min_recon,
+            recon_init_pt_vals=recon_init_pt_vals,
+            eps=eps,
+            C_opt=C_opt,
+            offset=offset,
+            maxiter=maxiter
+        )
 
 
 if __name__ == "__main__":
@@ -625,11 +702,12 @@ if __name__ == "__main__":
     parser.add_argument('--noise', type=str, help="Noise type", required=True)
     parser.add_argument('--p1', type=float, help="Depolar")
     parser.add_argument('--p2', type=float, help="Depolar")
+    parser.add_argument('--maxiter', type=int, help="Depolar", default=None)
 
     args = parser.parse_args()
     
     # test_qiskit_qaoa_circuit()
     # exit()
     find_good_initial_points_on_recon_LS_and_verify_top(
-        n_qubits=args.n, noise=args.noise, p1=args.p1, p2=args.p2
+        n_qubits=args.n, noise=args.noise, p1=args.p1, p2=args.p2, maxiter=args.maxiter
     )
