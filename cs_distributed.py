@@ -311,13 +311,13 @@ def reconstruct_by_distributed_landscapes_top():
 
 
 def reconstruct_by_distributed_landscapes_two_noisy_simulations_top(
-    n_qubits: int, p: int,
+    n_qubits: int, p: int, noise1: str, noise2: str
 ):
     """Reconstructed with two noisy simulations
     """
     if n_qubits == 8:
-        noise1 = 'depolar-0.001-0.005'
-        noise2 = 'depolar-0.003-0.007'
+        # noise1 = 'depolar-0.001-0.005'
+        # noise2 = 'depolar-0.003-0.007'
         method = 'shots'
         problem = 'maxcut'
 
@@ -344,13 +344,13 @@ def reconstruct_by_distributed_landscapes_two_noisy_simulations_top(
             noisy1.transpose(), # to compatible with n>=16 landscapes
             noisy2.transpose()
         ]
-    elif n_qubits >= 16:
+    elif n_qubits >= 12:
         is_existing_recon = False
         method = 'sv'
         problem = 'maxcut'
-        noise1 = 'depolar-0.001-0.005'
+        # noise1 = 'depolar-0.001-0.005'
         # noise2 = 'depolar-0.003-0.007'
-        noise2 = 'depolar-0.001-0.02'
+        # noise2 = 'depolar-0.001-0.02'
 
         noisy_data1, _, _ = load_grid_search_data(
             n_qubits=n_qubits, p=p, problem=problem, method=method,
@@ -449,7 +449,8 @@ def reconstruct_by_distributed_landscapes_two_noisy_simulations_top(
     print('ratio cfg: ', ratios_cfg1)
     print("Sqrt MSE between recon and noise1's original: ", errors1)
     print("Sqrt MSE between recon and noise2's original: ", errors2)
-
+    
+    print('')
     save_path = f"{recon_dir}/distributed_LS_errors-n={n_qubits}-p={p}-noise1={noise1}-noise2={noise2}"
     print(f"recon errors save to {save_path}")
     np.savez_compressed(
@@ -505,6 +506,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('-n', type=int, help="Number of qubits", required=True)
     parser.add_argument('-p', type=int, help="QAOA circuit depth", required=True)
+    parser.add_argument('--noise1', type=str)
+    parser.add_argument('--noise2', type=str)
     # parser.add_argument('-n', type=int, help="Number of qubits", required=True)
     # parser.add_argument('-p', type=str, help="QAOA layers")
 
@@ -513,5 +516,6 @@ if __name__ == "__main__":
     # gen_p1_landscape_top()
     # reconstruct_by_distributed_landscapes_top()
     # for nq in [12, 16, 20]:
-    reconstruct_by_distributed_landscapes_two_noisy_simulations_top(n_qubits=args.n, p=args.p)
+    reconstruct_by_distributed_landscapes_two_noisy_simulations_top(
+        n_qubits=args.n, p=args.p, noise1=args.noise1, noise2=args.noise2)
     # test_4D_CS()
