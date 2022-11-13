@@ -1369,7 +1369,7 @@ def var_of_grad(ls) -> list:
 
 
 def cal_barren_plateaus(ls) -> float:
-    return np.mean(var_of_grad)
+    return np.mean(var_of_grad(ls))
 
 
 def compare_by_matrics(ls1, ls2, metrics):
@@ -1381,6 +1381,16 @@ def compare_by_matrics(ls1, ls2, metrics):
         
     rsts.append(rst)
     return rsts
+
+
+def print_table(noisy, richard, linear, metric):
+    lss = [noisy, richard, linear]
+    # for met in metrics:
+    vals = []
+    for ls in lss:
+        vals.append(metric(ls))
+
+    print(metric.__name__, vals)
 
 
 def compare_with_ideal_landscapes(ideal, ls1, ls2):
@@ -1518,6 +1528,18 @@ def vis_case_compare_mitigation_method(check: bool=False):
     miti2_recon = get_recon_landscape(p, miti2, sf, is_reconstructed, recon2_path, cs_seed)
     
     print(miti2_data['mitigation_method'], miti2_data['mitigation_config'])
+
+
+    metrics = [cal_smoothness, cal_barren_plateaus, cal_variance]
+    for metric in metrics:
+        print("origin: ", end="")
+        print_table(noisy, miti1, miti2, metric)
+
+        print("recon: ", end="")
+        print_table(noisy_recon, miti1_recon, miti2_recon, metric)
+        print("")
+
+    return
     
     # --------------- compare MSE, NCC and Cosine distance -----------
 
