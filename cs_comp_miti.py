@@ -1340,7 +1340,27 @@ def cal_gap(C_opt, full, recon):
 #     return recon
 
 
-# def 
+# def check_improvement_of_mitigation(noisy, miti, metrics):
+
+def smoothness(ls) -> list:
+    """
+    sd(diff(x))/abs(mean(diff(x)))
+    sd(diff(y))/abs(mean(diff(y)))
+    """
+
+    grad = np.gradient(ls)
+    std_of_grad = [g.std() for g in grad]
+    abs_mean = [np.abs(g.mean()) for g in grad]
+
+    std_of_grad = np.array(std_of_grad)
+    abs_mean = np.array(abs_mean)
+
+    smoothness = std_of_grad / (abs_mean + 0.01)
+    return smoothness.mean()
+
+
+def metric_smoothness(ls1, ls2) -> float:
+    return smoothness(ls1) - smoothness(ls2)
 
 
 def metric_variance(ls1, ls2) -> float:
@@ -1366,7 +1386,6 @@ def metric_barren_plateaus(ls1, ls2) -> float:
 # def metric(ls1, ls2) -> Tuple[bool, float]:
 
 def compare_by_matrics(ls1, ls2, metrics):
-    metrics = [metric_barren_plateaus, metric_variance]
     metric_vals = [met(ls1, ls2) for met in metrics]
     metric_vals = np.array(metric_vals)
     return metric_vals
@@ -1387,6 +1406,16 @@ def compare_with_ideal_landscapes(ideal, ls1, ls2):
 
     print("var abs(diff1) =", np.var(np.abs(diff1)))
     print("var abs(diff2) =", np.var(np.abs(diff2)))
+
+
+
+
+def configurate(ideal, noisy, miti):
+    pass
+
+
+def benchmark():
+    pass
 
 
 def vis_case_compare_mitigation_method(check: bool=False):
@@ -1441,14 +1470,20 @@ def vis_case_compare_mitigation_method(check: bool=False):
         )
         return
     else:
-        ideal_data, ideal_data_fname, _ = load_grid_search_data(
+        ideal_data, _, _ = load_grid_search_data(
             n_qubits=n_qubits, p=p, problem=problem, method=method,
             noise='ideal', beta_step=bs, gamma_step=gs, seed=seed
+        )
+        
+        noisy_data, _, _ = load_grid_search_data(
+            n_qubits=n_qubits, p=p, problem=problem, method=method,
+            noise=noise, beta_step=bs, gamma_step=gs, seed=seed
         )
 
     full_range = ideal_data['full_range']
 
     ideal = ideal_data['data']
+    noisy = noisy_data['data']
 
     # offset = ideal_data['offset']
     # full_ranges = data['full_ranges']
@@ -1537,15 +1572,28 @@ def vis_case_compare_mitigation_method(check: bool=False):
     print("diff1 = ideal - ls1, diff2 = ideal - ls2")
     compare_with_ideal_landscapes(ideal, miti1_recon, miti2_recon)
     # save_path = f"figs/recon_2D"
+    
+    print("\n----- (1) Configuring  ZNE mitigation with OSCAR -----")
+    metrics = [metric_barren_plateaus, metric_variance, metric_smoothness]
+    print("metrics:", [m.__name__ for m in metrics])
+    
+    diff_origin = compare_by_matrics(miti1, miti2, metrics)
+    diff_recon = compare_by_matrics(miti1_recon, miti2_recon, metrics)
 
-    print("----------")
+    print(f"Origin {miti_method1}'s - Origin {miti_method2}'s:", diff_origin)
+    print(f"Recon  {miti_method1}'s - Recon {miti_method2}'s:", diff_recon)
+    
+    print("\n----- (2) Benchmarking ZNE mitigation with OSCAR -----")
+    # metrics = [metric_barren_plateaus, metric_variance]
+    print("metrics:", [m.__name__ for m in metrics])
+    # improvement of miti1
+    imp_origin = compare_by_matrics(miti1, noisy, metrics)
+    imp_recon  = compare_by_matrics(miti1_recon, noisy, metrics)
+    
+    print(f"Origin {miti_method1}'s - unmiti's:", imp_origin)
+    print(f"Recon  {miti_method1}'s - unmiti's:", imp_recon)
 
-    met_origin = compare_by_matrics(miti1, miti2)
-    met_recon = compare_by_matrics(miti1_recon, miti2_recon)
-
-    print(met_origin)
-    print(met_recon)
-
+    print("")
     # np.savez_compressed(
     #     miti1=miti1,
     #     miti2=miti2,
