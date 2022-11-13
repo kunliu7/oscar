@@ -6,6 +6,7 @@ import pandas as pd
 import time
 import concurrent.futures
 import timeit
+from typing import List
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, execute
 from qiskit.algorithms.optimizers import (
     ADAM,
@@ -310,8 +311,95 @@ def reconstruct_by_distributed_landscapes_top():
     return
 
 
+def get_geometric_mean(a: np.ndarray):
+    assert len(a.shape) == 1
+    mean = a.prod() ** (1.0 / len(a))
+    return mean
+
+
+def ndarray2D_to_set_of_tuples(a):
+    ids = []
+
+    for idx in a:
+        ids.append(tuple(idx))
+
+    ids = set(ids)
+    print("ndarray to set:", len(ids))
+    return ids
+
+# def choose_index_with_pos_value(ls, )
+
+
+def normalize_by_geo_mean(ls1, ls2, n_pts: int):
+    rng = np.random.default_rng(0)
+    ls1 = ls1.copy()
+    ls2 = ls2.copy()
+
+    # minimum = min(np.min(ls1), np.min(ls2)) - 0.1
+
+    # print("minimum =", minimum)
+
+    # ls1 -= minimum
+    # ls2 -= minimum
+
+    # assert ls1.min() > 0
+    # assert ls2.min() > 0
+
+    shape = ls1.shape
+    print("shape =", shape)
+
+    ids = []
+    crs = []
+
+    cnt_pts = n_pts
+    # only want positive terms
+    # 从所有positive elements中随机选index
+
+    print("total:", np.prod(shape))
+
+    # ----------- start intersection ------------
+    ids_pos1 = np.argwhere(ls1 > 0)
+    ids_pos2 = np.argwhere(ls2 > 0)
+
+    print(ids_pos1.shape)
+    print(ids_pos2.shape)
+    # ids_pos1 = tuple(ids_pos1)
+    # ids_pos2 = tuple(ids_pos2)
+
+    assert len(shape) == 2
+    ids_pos1 = ndarray2D_to_set_of_tuples(ids_pos1)
+    ids_pos2 = ndarray2D_to_set_of_tuples(ids_pos2)
+
+    intersect = ids_pos1.intersection(ids_pos2)
+    intersect: List[tuple] = list(intersect)
+    print("intersect:", len(intersect), intersect[:5])
+
+    # ----------- start sampling ------------
+
+    ids = rng.choice(intersect, size=n_pts, replace=False)
+    print("sampled:", len(ids), ids[:5])
+
+    for idx in ids:
+        idx = tuple(idx)
+        e1 = ls1[idx]
+        e2 = ls2[idx]
+        assert e1 > 0 and e2 > 0
+        cr = e1 / e2
+        assert cr > 0
+        crs.append(cr)
+
+    crs = np.array(crs)
+    cr = get_geometric_mean(crs)
+
+    ls2 *= cr
+    print("CR =", cr)
+    
+    return ls1, ls2, cr
+
+
 def reconstruct_by_distributed_landscapes_two_noisy_simulations_top(
-    n_qubits: int, p: int, noise1: str, noise2: str
+    n_qubits: int, p: int, noise1: str, noise2: str,
+    normalize: str, norm_frac: float
 ):
     """Reconstructed with two noisy simulations
     """
@@ -384,9 +472,21 @@ def reconstruct_by_distributed_landscapes_two_noisy_simulations_top(
         if not os.path.exists(recon_dir):
             os.makedirs(recon_dir)
     else:
-        recon_dir = "figs/recon_distributed_landscape/2022-09-30_14:34:08"
+        # recon_dir = "figs/recon_distributed_landscape/2022-09-30_14:34:08"
+        recon_dir = "figs/recon_distributed_landscape/2022-11-12_16:10:35"
 
-    # --------- data prepared OK -----------
+    # --------- data prepared OK, check if want to normalize -----------
+    landscape_shape = datas[0].shape
+    n_pts = np.prod(landscape_shape)
+    if normalize == 'geo':
+        n_normalize = round(norm_frac * n_pts)
+        print("# points used to derive normalize ratio =", n_normalize)
+        noisy1, noisy2, _ = normalize_by_geo_mean(noisy1, noisy2, n_normalize)
+        datas = [noisy1, noisy2]
+    elif normalize == None:
+        print("do not normalize")
+    else:
+        raise NotImplementedError()
 
     # sfs = np.arange(0.05, 0.42, 0.03)
     sfs = [0.10]
@@ -402,8 +502,7 @@ def reconstruct_by_distributed_landscapes_two_noisy_simulations_top(
     ratios_cfg1 = [0.0, 0.25, 0.5, 0.75, 1.0]
     sf = sfs[0]
     
-    landscape_shape = datas[0].shape
-    n_pts = np.prod(landscape_shape)
+    # n_pts = np.prod(landscape_shape)
     k = round(sf * n_pts)
     random_indices = np.random.choice(np.prod(n_pts), k, replace=False) # random sample of indices
 
@@ -424,7 +523,12 @@ def reconstruct_by_distributed_landscapes_two_noisy_simulations_top(
             np.savez_compressed(f"{recon_dir}/recon_by_{len(datas)}_landscapes_sf{sf:.3f}_ratios{ratios}",
                 recon = recon)
         else:
-            recon = np.load(f"{recon_dir}/recon_by_{len(datas)}_landscapes_sf{sf:.3f}_ratios{ratios}.npz")['recon']
+            recon = np.load(
+                # f"{recon_dir}/recon_by_{len(datas)}_landscapes_sf{sf:.3f}_ratios{ratios}.npz"
+                "recon errors save to figs/recon_distributed_landscape/2022-11-13_13:51:38/dist_LS_errors-n=20-p=1-noise1=depolar-0.003-0.007-noise2=depolar-0.001-0.02-normalize=geo-norm_frac=0.100.npz"
+                # f"figs/recon_distributed_landscape/2022-11-12_15:11:59/dist_LS_errors-n={n_qubits}-p=1-noise1=depolar-0.003-0.007-noise2=depolar-0.001-0.02-normalize=geo-norm_frac=0.100.npz"
+                , allow_pickle=True
+            )['recon']
 
         _vis_recon_distributed_landscape(
             landscapes=datas + [recon],
@@ -451,7 +555,7 @@ def reconstruct_by_distributed_landscapes_two_noisy_simulations_top(
     print("Sqrt MSE between recon and noise2's original: ", errors2)
     
     print('')
-    save_path = f"{recon_dir}/distributed_LS_errors-n={n_qubits}-p={p}-noise1={noise1}-noise2={noise2}"
+    save_path = f"{recon_dir}/dist_LS_errors-n={n_qubits}-p={p}-noise1={noise1}-noise2={noise2}-normalize={normalize}-norm_frac={norm_frac:.3f}"
     print(f"recon errors save to {save_path}")
     np.savez_compressed(
         save_path,
@@ -459,6 +563,31 @@ def reconstruct_by_distributed_landscapes_two_noisy_simulations_top(
         errors2=errors2,
         ratios=ratios_cfg1
     )
+
+    vis = True
+    if vis:
+        baseline_paths = [
+            "figs/recon_distributed_landscape/2022-11-10_13:47:08_OK/distributed_LS_errors-n=12-p=1-noise1=depolar-0.003-0.007-noise2=depolar-0.001-0.02.npz",
+            "figs/recon_distributed_landscape/2022-11-10_13:51:25_OK/distributed_LS_errors-n=16-p=1-noise1=depolar-0.003-0.007-noise2=depolar-0.001-0.02.npz",
+            "figs/recon_distributed_landscape/2022-11-10_13:56:38_OK/distributed_LS_errors-n=20-p=1-noise1=depolar-0.003-0.007-noise2=depolar-0.001-0.02.npz"
+        ]
+
+        n_qubits_to_baseline_paths_idx = {12: 0, 16: 1, 20: 2}
+        baseline_data = np.load(baseline_paths[n_qubits_to_baseline_paths_idx[n_qubits]], allow_pickle=True)
+        baseline = baseline_data['errors1']
+    
+        fig = plt.figure(figsize=[6, 4])
+        ax = plt.axes()
+        ax.plot(ratios_cfg1, baseline, label=f"# qubits={n_qubits}, unnormalized")
+        ax.plot(ratios_cfg1, errors1, label=f"# qubits={n_qubits}, normalized")
+
+        # ax.plot(sf_range[start:], es_noisy, label=f"noisy, {nq_range[i]} qubits, {inst_range[j]}-th inst")
+        ax.set_xlabel("Percentage of samples from first landscape")
+        ax.set_ylabel("Sqrt MSE with first landscape")
+        ax.set_title("Reconstruct by samples from two landscapes")
+        plt.legend()
+        fig.savefig(f"{recon_dir}/compare_with_baseline.png", bbox_inches='tight')
+
 
     return
 
@@ -508,6 +637,8 @@ if __name__ == "__main__":
     parser.add_argument('-p', type=int, help="QAOA circuit depth", required=True)
     parser.add_argument('--noise1', type=str)
     parser.add_argument('--noise2', type=str)
+    parser.add_argument('--normalize', type=str, default=None)
+    parser.add_argument('--norm_frac', type=float, default=0)
     # parser.add_argument('-n', type=int, help="Number of qubits", required=True)
     # parser.add_argument('-p', type=str, help="QAOA layers")
 
@@ -517,5 +648,7 @@ if __name__ == "__main__":
     # reconstruct_by_distributed_landscapes_top()
     # for nq in [12, 16, 20]:
     reconstruct_by_distributed_landscapes_two_noisy_simulations_top(
-        n_qubits=args.n, p=args.p, noise1=args.noise1, noise2=args.noise2)
+        n_qubits=args.n, p=args.p, noise1=args.noise1, noise2=args.noise2,
+        normalize=args.normalize, norm_frac=args.norm_frac
+    )
     # test_4D_CS()
