@@ -1340,6 +1340,38 @@ def cal_gap(C_opt, full, recon):
 #     return recon
 
 
+# def 
+
+
+def metric_variance(ls1, ls2) -> float:
+    margin = np.var(ls1) - np.var(ls2)
+    return margin
+
+
+def var_of_grad(ls) -> list:
+    grad = np.gradient(ls)
+
+    var_of_grad = [g.var() for g in grad]
+    return var_of_grad
+
+
+def metric_barren_plateaus(ls1, ls2) -> float:
+    var_grad1 = var_of_grad(ls1)
+    var_grad2 = var_of_grad(ls2)
+
+    mean1 = np.mean(var_grad1)
+    mean2 = np.mean(var_grad2)
+    return mean1 - mean2
+
+# def metric(ls1, ls2) -> Tuple[bool, float]:
+
+def compare_by_matrics(ls1, ls2, metrics):
+    metrics = [metric_barren_plateaus, metric_variance]
+    metric_vals = [met(ls1, ls2) for met in metrics]
+    metric_vals = np.array(metric_vals)
+    return metric_vals
+
+
 def compare_with_ideal_landscapes(ideal, ls1, ls2):
     diff1 = ideal - ls1
     diff2 = ideal - ls2
@@ -1505,6 +1537,14 @@ def vis_case_compare_mitigation_method(check: bool=False):
     print("diff1 = ideal - ls1, diff2 = ideal - ls2")
     compare_with_ideal_landscapes(ideal, miti1_recon, miti2_recon)
     # save_path = f"figs/recon_2D"
+
+    print("----------")
+
+    met_origin = compare_by_matrics(miti1, miti2)
+    met_recon = compare_by_matrics(miti1_recon, miti2_recon)
+
+    print(met_origin)
+    print(met_recon)
 
     # np.savez_compressed(
     #     miti1=miti1,
