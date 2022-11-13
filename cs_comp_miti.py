@@ -1,3 +1,4 @@
+import argparse
 from tkinter.messagebox import NO
 import networkx as nx
 import matplotlib.pyplot as plt
@@ -155,7 +156,7 @@ from QAOAKit.interpolate import (
 # from qiskit_optimization import QuadraticProgram
 from qiskit.algorithms.minimum_eigen_solvers.qaoa import QAOAAnsatz
 
-from data_loader import get_recon_pathname, load_grid_search_data
+from data_loader import get_recon_landscape, get_recon_pathname, load_grid_search_data
 
 test_utils_folder = Path(__file__).parent
 
@@ -1293,9 +1294,9 @@ def cal_multi_errors(a, b):
     diff = {}
     a = a.reshape(-1)
     b = b.reshape(-1)
-    diff['L2-norm'] = np.linalg.norm(a - b)
+    # diff['L2-norm'] = np.linalg.norm(a - b)
     diff['SqrtMSE'] = cal_recon_error(a, b, 'MSE')
-    diff['1-NCC'] = 1 - cal_recon_error(a, b, "CROSS_CORRELATION")
+    # diff['1-NCC'] = 1 - cal_recon_error(a, b, "CROSS_CORRELATION")
     diff['COS'] = cosine(a, b)
     return diff
 
@@ -1308,74 +1309,67 @@ def cal_gap(C_opt, full, recon):
     print(f"min_miti_recon: {min_recon}, C_opt - min_recon: {C_opt - min_recon}")
 
 
-def _get_recon_landscape(p: int, origin: np.ndarray, sampling_frac: float, is_reconstructed: bool,
-    recon_save_path: str, cs_seed: int
-) -> np.ndarray:
-    save_dir = os.path.dirname(recon_save_path)
-    is_recon = os.path.exists(recon_save_path)
-    if not is_recon:
-        np.random.seed(cs_seed)
-        if p == 1:
-            recon = recon_2D_landscape(
-                origin=origin,
-                sampling_frac=sampling_frac
-            )
-            if not os.path.exists(save_dir):
-                os.makedirs(save_dir)
-            np.savez_compressed(recon_save_path, recon=recon, sampling_frac=sampling_frac) 
-        elif p == 2:
-            recon = recon_4D_landscape_by_2D(
-                origin=origin,
-                sampling_frac=sampling_frac
-            )
-            if not os.path.exists(save_dir):
-                os.makedirs(save_dir)
-            np.savez_compressed(recon_save_path, recon=recon, sampling_frac=sampling_frac)
-        print("not exists, save to", save_dir)
-    else:
-        recon = np.load(recon_save_path, allow_pickle=True)['recon']
-        print("read from", save_dir)
+# def _get_recon_landscape(p: int, origin: np.ndarray, sampling_frac: float, is_reconstructed: bool,
+#     recon_save_path: str, cs_seed: int
+# ) -> np.ndarray:
+#     save_dir = os.path.dirname(recon_save_path)
+#     is_recon = os.path.exists(recon_save_path)
+#     if not is_recon:
+#         np.random.seed(cs_seed)
+#         if p == 1:
+#             recon = recon_2D_landscape(
+#                 origin=origin,
+#                 sampling_frac=sampling_frac
+#             )
+#             if not os.path.exists(save_dir):
+#                 os.makedirs(save_dir)
+#             np.savez_compressed(recon_save_path, recon=recon, sampling_frac=sampling_frac) 
+#         elif p == 2:
+#             recon = recon_4D_landscape_by_2D(
+#                 origin=origin,
+#                 sampling_frac=sampling_frac
+#             )
+#             if not os.path.exists(save_dir):
+#                 os.makedirs(save_dir)
+#             np.savez_compressed(recon_save_path, recon=recon, sampling_frac=sampling_frac)
+#         print("not exists, save to", save_dir)
+#     else:
+#         recon = np.load(recon_save_path, allow_pickle=True)['recon']
+#         print("read from", save_dir)
     
-    return recon
+#     return recon
 
 
 def compare_with_ideal_landscapes(ideal, ls1, ls2):
-    diff1 = ideal - ls1   # Richardson factory
-    diff2 = ideal - ls2   # linear factory
+    diff1 = ideal - ls1
+    diff2 = ideal - ls2
 
     ids = np.abs(diff1) < np.abs(diff2)     # indices that Richardson is closer to ideal than linear
 
-    print(np.sum(ids))
-    print(np.sum(ids == True))
-    print(np.sum(ids == False))
+    # print("n_pts =", np.sum(ids))
+    print("abs(diff1) <  abs(diff2), num of such points =", np.sum(ids == True))
+    print("abs(diff1) >= abs(diff2), num of such points =", np.sum(ids == False))
     
-    print(np.var(diff1))
-    print(np.var(diff2))
+    print("var diff1 =", np.var(diff1))
+    print("var diff2 =", np.var(diff2))
 
-    print(np.var(np.abs(diff1)))
-    print(np.var(np.abs(diff2)))
+    print("var abs(diff1) =", np.var(np.abs(diff1)))
+    print("var abs(diff2) =", np.var(np.abs(diff2)))
 
 
-
-def vis_case_compare_mitigation_method():
+def vis_case_compare_mitigation_method(check: bool=False):
     is_reconstructed = True 
-    is_test = False
+    is_test = check
 
     method = 'sv'
     problem = 'maxcut'
-    miti_method1 = 'zne-LinearFactory'
-    miti_method2 = 'zne-RichardsonFactory'
+    miti_method1 = 'zne-RichardsonFactory'
+    miti_method2 = 'zne-LinearFactory'
 
     # noise-3
     p1 = 0.001
     p2 = 0.02
-    n_qubits = 20
-
-    if is_test: 
-        # test
-        p1 = 0.001
-        p2 = 0.02
-        n_qubits = 8
+    n_qubits = 16
 
     noise = f'depolar-{p1}-{p2}'
 
@@ -1393,34 +1387,37 @@ def vis_case_compare_mitigation_method():
     else:
         raise ValueError("Invalid depth of QAOA")
 
-    ideal_data, ideal_data_fname, _ = load_grid_search_data(
-        n_qubits=n_qubits, p=p, problem=problem, method=method,
-        noise='ideal', beta_step=bs, gamma_step=gs, seed=seed
-    )
-    
     if is_test:
-        ideal_data, ideal_data_fname, _ = load_grid_search_data(
+        ideal_data1, ideal_data_fname, _ = load_grid_search_data(
+            n_qubits=n_qubits, p=p, problem=problem, method=method,
+            noise=noise, beta_step=bs, gamma_step=gs, seed=seed, miti_method=miti_method1
+        )
+        ideal_data2, ideal_data_fname, _ = load_grid_search_data(
             n_qubits=n_qubits, p=p, problem=problem, method=method,
             noise=noise, beta_step=bs, gamma_step=gs, seed=seed, miti_method=miti_method2
+        )
+        full_range = ideal_data1['full_range']
+        vis_landscapes(
+            # landscapes=[origin['unmitis'], miti1, miti2, miti1_recon, miti2_recon],
+            landscapes=[ideal_data1['data'], ideal_data2['data']],
+            labels=[miti_method1, miti_method2],
+            full_range=full_range,
+            true_optima=None,
+            title="Compare different ZNE configs and reconstruction",
+            save_path="paper_figs/debug_miti.png",
+            params_paths=[None, None]
+        )
+        return
+    else:
+        ideal_data, ideal_data_fname, _ = load_grid_search_data(
+            n_qubits=n_qubits, p=p, problem=problem, method=method,
+            noise='ideal', beta_step=bs, gamma_step=gs, seed=seed
         )
 
     full_range = ideal_data['full_range']
 
     ideal = ideal_data['data']
 
-    vis_landscapes(
-        # landscapes=[origin['unmitis'], miti1, miti2, miti1_recon, miti2_recon],
-        landscapes=[ideal, ideal],
-        labels=["ZNE RichardsonFactory", "ZNE LinearFactory"],
-        full_range=full_range,
-        true_optima=None,
-        title="Compare different ZNE configs and reconstruction",
-        save_path="paper_figs/debug_miti.png",
-        params_paths=[None, None]
-    )
-
-    if is_test:
-        return
     # offset = ideal_data['offset']
     # full_ranges = data['full_ranges']
     # print("offset:", offset)
@@ -1453,9 +1450,11 @@ def vis_case_compare_mitigation_method():
     # exit()
     recon1_path, _, _ = get_recon_pathname(p, problem, method, noise, cs_seed, sf, miti1_data_fname)
     # recon1_path = f"figs/recon_p2_landscape/{timestamp}/recon-sf={sf:.3f}-cs_seed={cs_seed}-{miti1_data_fname}"
-    miti1_recon = _get_recon_landscape(p, miti1, sf, is_reconstructed, recon1_path, cs_seed)
+    miti1_recon = get_recon_landscape(p, miti1, sf, is_reconstructed, recon1_path, cs_seed)
 
     # -------- derive miti2 data
+
+    print("\n\n")
 
     miti2_data, miti2_data_fname, _ = load_grid_search_data(
         n_qubits=n_qubits, p=p, problem=problem, method=method,
@@ -1465,7 +1464,7 @@ def vis_case_compare_mitigation_method():
 
     recon2_path, _, _ = get_recon_pathname(p, problem, method, noise, cs_seed, sf, miti2_data_fname)
     # recon2_path = f"figs/recon_p2_landscape/{timestamp}/recon-sf={sf:.3f}-cs_seed={cs_seed}-{miti2_data_fname}"
-    miti2_recon = _get_recon_landscape(p, miti2, sf, is_reconstructed, recon2_path, cs_seed)
+    miti2_recon = get_recon_landscape(p, miti2, sf, is_reconstructed, recon2_path, cs_seed)
     
     print(miti2_data['mitigation_method'], miti2_data['mitigation_config'])
     
@@ -1476,12 +1475,35 @@ def vis_case_compare_mitigation_method():
 
     # diff1 = cal_multi_errors(miti1, miti1_recon)
     # diff2 = cal_multi_errors(miti2, miti2_recon)
-    
+    print("")
+    print(f"ideal and {miti_method1} error")
     diff1 = cal_multi_errors(miti1, ideal)
-    diff2 = cal_multi_errors(miti2, ideal)
     print(diff1)
+    
+    print(f"ideal and recon-{miti_method1} error")
+    diff1 = cal_multi_errors(miti1_recon, ideal)
+    print(diff1)
+
+    print("")
+    
+    print(f"ideal and {miti_method2}")
+    diff2 = cal_multi_errors(miti2, ideal)
     print(diff2)
     
+    print(f"ideal and recon-{miti_method2}")
+    diff2 = cal_multi_errors(miti2_recon, ideal)
+    print(diff2)
+
+    print("")
+    
+    print(f"ls1: Origin {miti_method1}, ls2: Origin {miti_method2}")
+    print("diff1 = ideal - ls1, diff2 = ideal - ls2")
+    compare_with_ideal_landscapes(ideal, miti1, miti2)
+    
+    print("")
+    print(f"ls1: Recon {miti_method1}, ls2: Recon {miti_method2}")
+    print("diff1 = ideal - ls1, diff2 = ideal - ls2")
+    compare_with_ideal_landscapes(ideal, miti1_recon, miti2_recon)
     # save_path = f"figs/recon_2D"
 
     # np.savez_compressed(
@@ -1512,14 +1534,17 @@ def vis_case_compare_mitigation_method():
     vis_landscapes(
         # landscapes=[origin['unmitis'], miti1, miti2, miti1_recon, miti2_recon],
         landscapes=[miti1, miti2, miti1_recon, miti2_recon],
-        labels=["ZNE RichardsonFactory", "ZNE LinearFactory", "ZNE RichardsonFactory Recon", "ZNE LinearFactory Recon"],
+        labels=[miti_method1, miti_method2, f"recon-{miti_method1}", f"recon-{miti_method2}"],
         full_range=full_range,
         true_optima=None,
         title="Compare different ZNE configs and reconstruction",
-        save_path="paper_figs/case3_debug_after_miti.svg",
+        save_path="paper_figs/case3_debug_after_miti.png",
         params_paths=[None, None, None, None]
     )
 
 
 if __name__ == "__main__":
-    vis_case_compare_mitigation_method()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--check', action='store_true', default=False)
+    args = parser.parse_args()
+    vis_case_compare_mitigation_method(args.check)
