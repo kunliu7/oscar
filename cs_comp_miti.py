@@ -1340,9 +1340,7 @@ def cal_gap(C_opt, full, recon):
 #     return recon
 
 
-# def check_improvement_of_mitigation(noisy, miti, metrics):
-
-def smoothness(ls) -> float:
+def cal_smoothness(ls) -> float:
     """
     sd(diff(x))/abs(mean(diff(x)))
     sd(diff(y))/abs(mean(diff(y)))
@@ -1354,19 +1352,13 @@ def smoothness(ls) -> float:
 
     std_of_grad = np.array(std_of_grad)
     abs_mean = np.array(abs_mean)
-    print(abs_mean)
 
     smoothness = std_of_grad / (abs_mean + 0.01)
     return smoothness.mean()
 
 
-def metric_smoothness(ls1, ls2) -> float:
-    return smoothness(ls1) - smoothness(ls2)
-
-
-def metric_variance(ls1, ls2) -> float:
-    margin = np.var(ls1) - np.var(ls2)
-    return margin
+def cal_variance(ls) -> float:
+    return np.var(ls)
 
 
 def var_of_grad(ls) -> list:
@@ -1376,20 +1368,19 @@ def var_of_grad(ls) -> list:
     return var_of_grad
 
 
-def metric_barren_plateaus(ls1, ls2) -> float:
-    var_grad1 = var_of_grad(ls1)
-    var_grad2 = var_of_grad(ls2)
+def cal_barren_plateaus(ls) -> float:
+    return np.mean(var_of_grad)
 
-    mean1 = np.mean(var_grad1)
-    mean2 = np.mean(var_grad2)
-    return mean1 - mean2
-
-# def metric(ls1, ls2) -> Tuple[bool, float]:
 
 def compare_by_matrics(ls1, ls2, metrics):
-    metric_vals = [met(ls1, ls2) for met in metrics]
-    metric_vals = np.array(metric_vals)
-    return metric_vals
+    rsts = []
+    for met in metrics:
+        met1 = met(ls1)
+        met2 = met(ls2)
+        rst = [met1, met2, met1 - met2]
+        
+    rsts.append(rst)
+    return rsts
 
 
 def compare_with_ideal_landscapes(ideal, ls1, ls2):
@@ -1407,16 +1398,6 @@ def compare_with_ideal_landscapes(ideal, ls1, ls2):
 
     print("var abs(diff1) =", np.var(np.abs(diff1)))
     print("var abs(diff2) =", np.var(np.abs(diff2)))
-
-
-
-
-def configurate(ideal, noisy, miti):
-    pass
-
-
-def benchmark():
-    pass
 
 
 def vis_case_compare_mitigation_method(check: bool=False):
@@ -1475,16 +1456,18 @@ def vis_case_compare_mitigation_method(check: bool=False):
             n_qubits=n_qubits, p=p, problem=problem, method=method,
             noise='ideal', beta_step=bs, gamma_step=gs, seed=seed
         )
+        full_range = ideal_data['full_range']
+        ideal = ideal_data['data']
         
-        noisy_data, _, _ = load_grid_search_data(
+        noisy_data, noisy_data_fname, _ = load_grid_search_data(
             n_qubits=n_qubits, p=p, problem=problem, method=method,
             noise=noise, beta_step=bs, gamma_step=gs, seed=seed
         )
+        noisy = noisy_data['data']
+    
+        noisy_recon_path, _, _ = get_recon_pathname(p, problem, method, noise, cs_seed, sf, noisy_data_fname)
+        noisy_recon = get_recon_landscape(p, noisy, sf, is_reconstructed, noisy_recon_path, cs_seed)
 
-    full_range = ideal_data['full_range']
-
-    ideal = ideal_data['data']
-    noisy = noisy_data['data']
 
     # offset = ideal_data['offset']
     # full_ranges = data['full_ranges']
@@ -1575,7 +1558,8 @@ def vis_case_compare_mitigation_method(check: bool=False):
     # save_path = f"figs/recon_2D"
     
     print("\n----- (1) Configuring  ZNE mitigation with OSCAR -----")
-    metrics = [metric_barren_plateaus, metric_variance, metric_smoothness]
+    # metrics = [cal_barren_plateaus, cal_variance, cal_smoothness]
+    metrics = [cal_smoothness]
     print("metrics:", [m.__name__ for m in metrics])
     
     diff_origin = compare_by_matrics(miti1, miti2, metrics)
@@ -1589,10 +1573,17 @@ def vis_case_compare_mitigation_method(check: bool=False):
     print("metrics:", [m.__name__ for m in metrics])
     # improvement of miti1
     imp_origin = compare_by_matrics(miti1, noisy, metrics)
-    imp_recon  = compare_by_matrics(miti1_recon, noisy, metrics)
+    imp_recon  = compare_by_matrics(miti1_recon, noisy_recon, metrics)
     
     print(f"Origin {miti_method1}'s - unmiti's:", imp_origin)
     print(f"Recon  {miti_method1}'s - unmiti's:", imp_recon)
+    
+    print("")
+    imp_origin = compare_by_matrics(miti2, noisy, metrics)
+    imp_recon  = compare_by_matrics(miti2_recon, noisy_recon, metrics)
+    
+    print(f"Origin {miti_method2}'s - Origin unmiti's:", imp_origin)
+    print(f"Recon  {miti_method2}'s - Recon unmiti's:", imp_recon)
 
     print("")
     # np.savez_compressed(
