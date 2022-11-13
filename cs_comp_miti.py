@@ -1342,7 +1342,7 @@ def cal_gap(C_opt, full, recon):
 
 # def check_improvement_of_mitigation(noisy, miti, metrics):
 
-def smoothness(ls) -> list:
+def smoothness(ls) -> float:
     """
     sd(diff(x))/abs(mean(diff(x)))
     sd(diff(y))/abs(mean(diff(y)))
@@ -1354,6 +1354,7 @@ def smoothness(ls) -> list:
 
     std_of_grad = np.array(std_of_grad)
     abs_mean = np.array(abs_mean)
+    print(abs_mean)
 
     smoothness = std_of_grad / (abs_mean + 0.01)
     return smoothness.mean()
