@@ -1606,6 +1606,7 @@ def two_D_CS_p1_recon_with_distributed_landscapes(
     ratios: list=None,
     ri: np.ndarray=None,
 ) -> None:
+    rng = np.random.default_rng(0)
     """Reconstruct landscapes by sampling on distributed landscapes.
 
     Args:
@@ -1629,7 +1630,7 @@ def two_D_CS_p1_recon_with_distributed_landscapes(
     
     k = round(nx * ny * sampling_frac)
     if not isinstance(ri, np.ndarray):
-        ri = np.random.choice(nx * ny, k, replace=False) # random sample of indices
+        ri = rng.choice(nx * ny, k, replace=False) # random sample of indices
     else:
         assert len(ri.shape) == 1 and ri.shape[0] == k
     
@@ -1656,7 +1657,7 @@ def two_D_CS_p1_recon_with_distributed_landscapes(
     
     for ik in range(k):
         # which_origin = ik % n_origins
-        which_origin = np.random.choice(len(origins), 1, p=ratios)[0]
+        which_origin = rng.choice(len(origins), 1, p=ratios)[0]
         b[ik] = origins_T[which_origin].flat[ri[ik]]
 
     recon = recon_2D_by_cvxpy(nx, ny, A, b)
