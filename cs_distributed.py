@@ -141,6 +141,8 @@ from QAOAKit.interpolate import (
 # from qiskit_optimization import QuadraticProgram
 from qiskit.algorithms.minimum_eigen_solvers.qaoa import QAOAAnsatz
 from data_loader import load_grid_search_data
+from sklearn.linear_model import LinearRegression
+
 
 test_utils_folder = Path(__file__).parent
 
@@ -397,43 +399,98 @@ def normalize_by_geo_mean(ls1, ls2, n_pts: int):
     return ls1, ls2, cr
 
 
+def normalize_by_linear_regression(ls1, ls2, n_pts):
+    ls1 = ls1.copy()
+    ls2 = ls2.copy()
+    rng = np.random.default_rng(0)
+    shape = ls1.shape
+    print("shape =", shape)
+    pos = True
+
+    ids = []
+    for dim_size in shape:
+        idx = rng.integers(dim_size, size=n_pts) 
+        ids.append(idx)
+
+    # ids = np.array(ids)
+    print(ids[0].shape, ids[0][:5])
+    # ids = ids.reshape(n_pts, len(shape))
+
+    y = ls1[tuple(ids)]
+    x = ls2[tuple(ids)]
+    print(x.shape)
+    print(y.shape)
+
+    x = x.reshape(-1, 1)
+    y = y.reshape(-1, 1)
+    model = LinearRegression()
+    model = model.fit(x, y)
+
+    r_sq = model.score(x, y)
+    print('coefficient of determination(𝑅²) :', r_sq)
+    # coefficient of determination(𝑅²) : 0.715875613747954
+    print('intercept:', model.intercept_)
+    # （标量） 系数b0 intercept: 5.633333333333329 -------this will be an array when y is also 2-dimensional
+    print('slope:', model.coef_)
+
+    # ls2_flat = ls2.reshape(-1)
+    ls2_flat = ls2.flatten().reshape(-1, 1)
+    y_pred = model.predict(ls2_flat)
+    print(y_pred.shape)
+    ls2_normalized = y_pred.reshape(shape)
+
+    return ls1, ls2_normalized
+
+
 def reconstruct_by_distributed_landscapes_two_noisy_simulations_top(
-    n_qubits: int, p: int, noise1: str, noise2: str,
+    n_qubits_list: List[int], p: int, noise1: str, noise2: str,
     normalize: str, norm_frac: float
 ):
     """Reconstructed with two noisy simulations
     """
-    if n_qubits == 8:
-        # noise1 = 'depolar-0.001-0.005'
-        # noise2 = 'depolar-0.003-0.007'
-        method = 'shots'
-        problem = 'maxcut'
+    # if n_qubits == 8:
+    #     # noise1 = 'depolar-0.001-0.005'
+    #     # noise2 = 'depolar-0.003-0.007'
+    #     method = 'shots'
+    #     problem = 'maxcut'
 
-        is_existing_recon = False
+    #     is_existing_recon = False
 
-        noisy_data_dir1 = "figs/cnt_opt_miti/2022-08-08_19:48:31"
-        noisy_data1 = np.load(f"{noisy_data_dir1}/data.npz", allow_pickle=True)
-        ideal = noisy_data1['origin'].tolist()['ideals']
-        full_range = noisy_data1['full_range'].tolist()
+    #     noisy_data_dir1 = "figs/cnt_opt_miti/2022-08-08_19:48:31"
+    #     noisy_data1 = np.load(f"{noisy_data_dir1}/data.npz", allow_pickle=True)
+    #     ideal = noisy_data1['origin'].tolist()['ideals']
+    #     full_range = noisy_data1['full_range'].tolist()
 
-        # depolarizing 0.001 and 0.005, one-qubit gate error and two-qubit gate error
-        noisy1 = noisy_data1['origin'].tolist()['unmitis']
+    #     # depolarizing 0.001 and 0.005, one-qubit gate error and two-qubit gate error
+    #     noisy1 = noisy_data1['origin'].tolist()['unmitis']
 
-        noisy_data_dir2 = "figs/gen_p1_landscape/2022-09-29_00:31:54/G40_nQ8_p1_depolar0.003_0.007"
-        noisy_data2 = np.load(
-            f"{noisy_data_dir2}/data.npz",
-            allow_pickle=True)
+    #     noisy_data_dir2 = "figs/gen_p1_landscape/2022-09-29_00:31:54/G40_nQ8_p1_depolar0.003_0.007"
+    #     noisy_data2 = np.load(
+    #         f"{noisy_data_dir2}/data.npz",
+    #         allow_pickle=True)
 
-        # depolarizing 0.003 and 0.007, one-qubit gate error and two-qubit gate error
-        noisy2 = noisy_data2['origin'].tolist()['unmitis']
+    #     # depolarizing 0.003 and 0.007, one-qubit gate error and two-qubit gate error
+    #     noisy2 = noisy_data2['origin'].tolist()['unmitis']
 
-        datas = [
-            # ideal,
-            noisy1.transpose(), # to compatible with n>=16 landscapes
-            noisy2.transpose()
-        ]
-    elif n_qubits >= 12:
-        is_existing_recon = False
+    #     datas = [
+    #         # ideal,
+    #         noisy1.transpose(), # to compatible with n>=16 landscapes
+    #         noisy2.transpose()
+    #     ]
+    # elif n_qubits >= 12:
+    is_existing_recon = False
+    if not is_existing_recon:
+        signature = get_curr_formatted_timestamp()
+        recon_dir = f"figs/recon_distributed_landscape/{signature}"
+        if not os.path.exists(recon_dir):
+            os.makedirs(recon_dir)
+    else:
+        raise ValueError()
+
+    errors1 = []
+    errors2 = []
+    for n_qubits in n_qubits_list:
+        
         method = 'sv'
         problem = 'maxcut'
         # noise1 = 'depolar-0.001-0.005'
@@ -460,133 +517,137 @@ def reconstruct_by_distributed_landscapes_two_noisy_simulations_top(
 
         datas = [noisy1, noisy2]
 
-    else:
-        raise ValueError("Invalid number of qubits")
 
-    for data in datas:
-        print(data.shape)
+        for data in datas:
+            print(data.shape)
 
-    if not is_existing_recon:
-        signature = get_curr_formatted_timestamp()
-        recon_dir = f"figs/recon_distributed_landscape/{signature}"
-        if not os.path.exists(recon_dir):
-            os.makedirs(recon_dir)
-    else:
-        # recon_dir = "figs/recon_distributed_landscape/2022-09-30_14:34:08"
-        recon_dir = "figs/recon_distributed_landscape/2022-11-12_16:10:35"
+        # --------- data prepared OK, check if want to normalize -----------
+        landscape_shape = datas[0].shape
+        n_pts = np.prod(landscape_shape)
+        if normalize == 'geo':
+            n_normalize = round(norm_frac * n_pts)
+            print("# points used to derive normalize ratio =", n_normalize)
+            noisy1, noisy2, _ = normalize_by_geo_mean(noisy1, noisy2, n_normalize)
+            datas = [noisy1, noisy2]
+        elif normalize == 'linear':
+            print("normalized by linear regression")
+            n_normalize = round(norm_frac * n_pts)
+            noisy1, noisy2 = normalize_by_linear_regression(noisy1, noisy2, n_normalize)
+            datas = [noisy1, noisy2]
 
-    # --------- data prepared OK, check if want to normalize -----------
-    landscape_shape = datas[0].shape
-    n_pts = np.prod(landscape_shape)
-    if normalize == 'geo':
-        n_normalize = round(norm_frac * n_pts)
-        print("# points used to derive normalize ratio =", n_normalize)
-        noisy1, noisy2, _ = normalize_by_geo_mean(noisy1, noisy2, n_normalize)
-        datas = [noisy1, noisy2]
-    elif normalize == None:
-        print("do not normalize")
-    else:
-        raise NotImplementedError()
-
-    # sfs = np.arange(0.05, 0.42, 0.03)
-    sfs = [0.10]
-
-    # ratios = [.0, 1.0]
-    # ratios = [0.25, 0.75]
-    # ratios = [0.75, 0.25]
-    # ratios = [1.0, 0.]
-
-    errors1 = []
-    errors2 = []
-
-    ratios_cfg1 = [0.0, 0.25, 0.5, 0.75, 1.0]
-    sf = sfs[0]
-    
-    # n_pts = np.prod(landscape_shape)
-    k = round(sf * n_pts)
-    random_indices = np.random.choice(np.prod(n_pts), k, replace=False) # random sample of indices
-
-    for ratio in ratios_cfg1:
-        ratios = [ratio, 1-ratio]
-
-        if not is_existing_recon:
-            if p == 1:
-                recon = two_D_CS_p1_recon_with_distributed_landscapes(
-                    origins=datas,
-                    sampling_frac=sf,
-                    ratios=[ratio, 1-ratio],
-                    ri=random_indices
-                )
-            elif p == 2:
-                raise NotImplementedError()
-            
-            np.savez_compressed(f"{recon_dir}/recon_by_{len(datas)}_landscapes_sf{sf:.3f}_ratios{ratios}",
-                recon = recon)
+        elif normalize == None:
+            print("do not normalize")
         else:
-            recon = np.load(
-                # f"{recon_dir}/recon_by_{len(datas)}_landscapes_sf{sf:.3f}_ratios{ratios}.npz"
-                "recon errors save to figs/recon_distributed_landscape/2022-11-13_13:51:38/dist_LS_errors-n=20-p=1-noise1=depolar-0.003-0.007-noise2=depolar-0.001-0.02-normalize=geo-norm_frac=0.100.npz"
-                # f"figs/recon_distributed_landscape/2022-11-12_15:11:59/dist_LS_errors-n={n_qubits}-p=1-noise1=depolar-0.003-0.007-noise2=depolar-0.001-0.02-normalize=geo-norm_frac=0.100.npz"
-                , allow_pickle=True
-            )['recon']
+            raise NotImplementedError()
 
-        _vis_recon_distributed_landscape(
-            landscapes=datas + [recon],
-            labels=[noise1, noise2, f'recon. by {ratios} of each'],
-            full_range=full_range,
-            bounds=None,
-            true_optima=None,
-            title=f'reconstruct distributed landscapes, sampling fraction: {sf:.3f}',
-            save_path=f'{recon_dir}/recon_by_{len(datas)}_landscapes_sf{sf:.3f}_ratios{ratios}.png'
-        )
+            # recon_dir = "figs/recon_distributed_landscape/2022-09-30_14:34:08"
+            recon_dir = "figs/recon_distributed_landscape/2022-11-12_16:10:35"
 
-        # error1 = np.linalg.norm(noisy1 - recon)
-        error1 = cal_recon_error(noisy1.reshape(-1), recon.reshape(-1), "MSE")
-        errors1.append(error1)
+        # sfs = np.arange(0.05, 0.42, 0.03)
+        sfs = [0.10]
 
-        # error2 = np.linalg.norm(noisy2 - recon)
-        error2 = cal_recon_error(noisy2.reshape(-1), recon.reshape(-1), "MSE")
-        errors2.append(error2)
+        # ratios = [.0, 1.0]
+        # ratios = [0.25, 0.75]
+        # ratios = [0.75, 0.25]
+        # ratios = [1.0, 0.]
 
-        print(f"reconstruct error 1: {error1}; error 2: {error2}")
-    
-    print('ratio cfg: ', ratios_cfg1)
-    print("Sqrt MSE between recon and noise1's original: ", errors1)
-    print("Sqrt MSE between recon and noise2's original: ", errors2)
+        ratios_cfg1 = [0.0, 0.25, 0.5, 0.75, 1.0]
+        sf = sfs[0]
+        
+        # n_pts = np.prod(landscape_shape)
+        rng = np.random.default_rng(0)
+        k = round(sf * n_pts)
+        random_indices = rng.choice(np.prod(n_pts), k, replace=False) # random sample of indices
+
+        for ratio in ratios_cfg1:
+            ratios = [ratio, 1-ratio]
+
+            # recon_fname = f"recon-n={n_qubits}-ratios={ratios}-sf={sf:.3f}-norm={normalize}-nf={norm_frac:.3f}"
+            recon_fname = f"recon-n={n_qubits}-ratios={ratios}-sf={sf:.3f}-norm={normalize}-nf={norm_frac:.3f}"
+            if not is_existing_recon:
+                if p == 1:
+                    # recon = np.zeros_like(datas[0])
+                    recon = two_D_CS_p1_recon_with_distributed_landscapes(
+                        origins=datas,
+                        sampling_frac=sf,
+                        ratios=[ratio, 1-ratio],
+                        ri=random_indices
+                    )
+                elif p == 2:
+                    raise NotImplementedError()
+                
+                np.savez_compressed(f"{recon_dir}/{recon_fname}", recon=recon)
+
+            else:
+                # recon = np.load(
+                #     # f"{recon_dir}/recon_by_{len(datas)}_landscapes_sf{sf:.3f}_ratios{ratios}.npz"
+                #     "recon errors save to figs/recon_distributed_landscape/2022-11-13_13:51:38/dist_LS_errors-n=20-p=1-noise1=depolar-0.003-0.007-noise2=depolar-0.001-0.02-normalize=geo-norm_frac=0.100.npz"
+                #     # f"figs/recon_distributed_landscape/2022-11-12_15:11:59/dist_LS_errors-n={n_qubits}-p=1-noise1=depolar-0.003-0.007-noise2=depolar-0.001-0.02-normalize=geo-norm_frac=0.100.npz"
+                #     , allow_pickle=True
+                # )['recon']
+                raise ValueError()
+
+            _vis_recon_distributed_landscape(
+                landscapes=datas + [recon],
+                labels=[noise1, noise2, f'recon. by {ratios} of each'],
+                full_range=full_range,
+                bounds=None,
+                true_optima=None,
+                title=f'reconstruct distributed landscapes, sampling fraction: {sf:.3f}',
+                save_path=f"{recon_dir}/{recon_fname}.png"
+            )
+
+            # error1 = np.linalg.norm(noisy1 - recon)
+            error1 = cal_recon_error(noisy1.reshape(-1), recon.reshape(-1), "MSE")
+            errors1.append(error1)
+
+            # error2 = np.linalg.norm(noisy2 - recon)
+            error2 = cal_recon_error(noisy2.reshape(-1), recon.reshape(-1), "MSE")
+            errors2.append(error2)
+
+            # print(f"reconstruct error 1: {error1}; error 2: {error2}")
+
+    print('ratio cfg:', ratios_cfg1)
+    print("Sqrt MSE between recon and noise1's original:", errors1)
+    print("Sqrt MSE between recon and noise2's original:", errors2)
+
+    errors1 = np.array(errors1).reshape(len(n_qubits_list), len(ratios_cfg1))
+    errors2 = np.array(errors2).reshape(len(n_qubits_list), len(ratios_cfg1))
     
     print('')
-    save_path = f"{recon_dir}/dist_LS_errors-n={n_qubits}-p={p}-noise1={noise1}-noise2={noise2}-normalize={normalize}-norm_frac={norm_frac:.3f}"
+    save_path = f"{recon_dir}/dist_LS_errors-ns={n_qubits_list}-p={p}-r={ratios_cfg1}-n1={noise1}-n2={noise2}-norm={normalize}-nf={norm_frac:.3f}"
     print(f"recon errors save to {save_path}")
     np.savez_compressed(
         save_path,
+        n_qubits_list=n_qubits_list,
         errors1=errors1,
         errors2=errors2,
         ratios=ratios_cfg1
     )
 
-    vis = True
-    if vis:
-        baseline_paths = [
-            "figs/recon_distributed_landscape/2022-11-10_13:47:08_OK/distributed_LS_errors-n=12-p=1-noise1=depolar-0.003-0.007-noise2=depolar-0.001-0.02.npz",
-            "figs/recon_distributed_landscape/2022-11-10_13:51:25_OK/distributed_LS_errors-n=16-p=1-noise1=depolar-0.003-0.007-noise2=depolar-0.001-0.02.npz",
-            "figs/recon_distributed_landscape/2022-11-10_13:56:38_OK/distributed_LS_errors-n=20-p=1-noise1=depolar-0.003-0.007-noise2=depolar-0.001-0.02.npz"
-        ]
+    # vis = True
+    # if vis:
+    #     baseline_paths = [
+    #         "figs/recon_distributed_landscape/2022-11-10_13:47:08_OK/distributed_LS_errors-n=12-p=1-noise1=depolar-0.003-0.007-noise2=depolar-0.001-0.02.npz",
+    #         "figs/recon_distributed_landscape/2022-11-10_13:51:25_OK/distributed_LS_errors-n=16-p=1-noise1=depolar-0.003-0.007-noise2=depolar-0.001-0.02.npz",
+    #         "figs/recon_distributed_landscape/2022-11-10_13:56:38_OK/distributed_LS_errors-n=20-p=1-noise1=depolar-0.003-0.007-noise2=depolar-0.001-0.02.npz"
+    #     ]
 
-        n_qubits_to_baseline_paths_idx = {12: 0, 16: 1, 20: 2}
-        baseline_data = np.load(baseline_paths[n_qubits_to_baseline_paths_idx[n_qubits]], allow_pickle=True)
-        baseline = baseline_data['errors1']
+    #     n_qubits_to_baseline_paths_idx = {12: 0, 16: 1, 20: 2}
+    #     baseline_data = np.load(baseline_paths[n_qubits_to_baseline_paths_idx[n_qubits]], allow_pickle=True)
+    #     baseline = baseline_data['errors1']
     
-        fig = plt.figure(figsize=[6, 4])
-        ax = plt.axes()
-        ax.plot(ratios_cfg1, baseline, label=f"# qubits={n_qubits}, unnormalized")
-        ax.plot(ratios_cfg1, errors1, label=f"# qubits={n_qubits}, normalized")
+    #     fig = plt.figure(figsize=[6, 4])
+    #     ax = plt.axes()
+    #     ax.plot(ratios_cfg1, baseline, label=f"# qubits={n_qubits}, unnormalized")
+    #     ax.plot(ratios_cfg1, errors1, label=f"# qubits={n_qubits}, normalized")
 
-        # ax.plot(sf_range[start:], es_noisy, label=f"noisy, {nq_range[i]} qubits, {inst_range[j]}-th inst")
-        ax.set_xlabel("Percentage of samples from first landscape")
-        ax.set_ylabel("Sqrt MSE with first landscape")
-        ax.set_title("Reconstruct by samples from two landscapes")
-        plt.legend()
-        fig.savefig(f"{recon_dir}/compare_with_baseline.png", bbox_inches='tight')
+    #     # ax.plot(sf_range[start:], es_noisy, label=f"noisy, {nq_range[i]} qubits, {inst_range[j]}-th inst")
+    #     ax.set_xlabel("Percentage of samples from first landscape")
+    #     ax.set_ylabel("Sqrt MSE with first landscape")
+    #     ax.set_title("Reconstruct by samples from two landscapes")
+    #     plt.legend()
+    #     fig.savefig(f"{recon_dir}/compare_with_baseline.png", bbox_inches='tight')
 
 
     return
@@ -633,12 +694,13 @@ def test_4D_CS():
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('-n', type=int, help="Number of qubits", required=True)
+    # parser.add_argument('-n', type=int, help="Number of qubits", required=True)
     parser.add_argument('-p', type=int, help="QAOA circuit depth", required=True)
     parser.add_argument('--noise1', type=str)
     parser.add_argument('--noise2', type=str)
     parser.add_argument('--normalize', type=str, default=None)
     parser.add_argument('--norm_frac', type=float, default=0)
+    parser.add_argument('--ns', type=int, nargs='+', help="Your aims, vis, opt", required=True)
     # parser.add_argument('-n', type=int, help="Number of qubits", required=True)
     # parser.add_argument('-p', type=str, help="QAOA layers")
 
@@ -647,8 +709,9 @@ if __name__ == "__main__":
     # gen_p1_landscape_top()
     # reconstruct_by_distributed_landscapes_top()
     # for nq in [12, 16, 20]:
+    # for n in args.ns:
     reconstruct_by_distributed_landscapes_two_noisy_simulations_top(
-        n_qubits=args.n, p=args.p, noise1=args.noise1, noise2=args.noise2,
+        n_qubits_list=args.ns, p=args.p, noise1=args.noise1, noise2=args.noise2,
         normalize=args.normalize, norm_frac=args.norm_frac
     )
     # test_4D_CS()
