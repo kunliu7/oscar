@@ -54,8 +54,8 @@ from scipy.spatial.distance import (
 from qiskit.quantum_info import Statevector
 from qiskit.opflow import PrimitiveOp, PauliSumOp
 from QAOAKit.n_dim_cs import recon_4D_landscape, recon_4D_landscape_by_2D
-from cs_comp_miti import _get_recon_landscape
-from data_loader import load_grid_search_data
+# from cs_comp_miti import _get_recon_landscape
+from data_loader import load_grid_search_data, get_recon_landscape
 # from QAOAKit import vis
 
 sys.path.append('..')
@@ -201,6 +201,8 @@ def recon_landscapes_varying_qubits_and_instances(
                 noise=noise, beta_step=bs, gamma_step=gs, seed=seed, miti_method=miti_method
             )
 
+            plot_range = data['plot_range']
+
             # 和Tianyi代码使用相同目录结构
             recon_dir = f"figs/grid_search_recon/{problem}/{method}-{noise}-p={p}"
 
@@ -209,7 +211,7 @@ def recon_landscapes_varying_qubits_and_instances(
                 recon_path = f"{recon_dir}/{recon_fname}"
 
                 origin = data['data']
-                recon = _get_recon_landscape(p, origin, sf, is_recon, 
+                recon = get_recon_landscape(p, origin, sf, is_recon, 
                     recon_path, cs_seed)
                      
                 mse = cal_recon_error(origin.reshape(-1), recon.reshape(-1), "MSE")
@@ -222,18 +224,19 @@ def recon_landscapes_varying_qubits_and_instances(
                 print("RMSE: ", mse)
                 print("Cosine: ", cos)
                 
-                # vis_landscapes(
-                #     landscapes=[origin, recon],
-                #     labels=["origin", "recon"],
-                #     full_range={
-                #         "beta": plot_range['beta'],
-                #         "gamma": plot_range['gamma'] 
-                #     },
-                #     true_optima=None,
-                #     title="Origin and recon",
-                #     save_path=f'{fig_dir}/origin_and_2D_recon_sf{sf:.3f}_bs{bs}_gs{gs}_nQ{n_qubits}_seed{seed}_csSeed{cs_seed}.png',
-                #     params_paths=[None, None]
-                # )
+                base_recon_fname = os.path.splitext(recon_fname)[0]
+                vis_landscapes(
+                    landscapes=[origin, recon],
+                    labels=["origin", "recon"],
+                    full_range={
+                        "beta": plot_range['beta'],
+                        "gamma": plot_range['gamma'] 
+                    },
+                    true_optima=None,
+                    title="Origin and recon",
+                    save_path=f'{recon_dir}/vis/vis-{base_recon_fname}.png',
+                    params_paths=[None, None]
+                )
 
     print("noise =", noise)
     print("n qubits list =", n_qubits_list)
@@ -250,8 +253,10 @@ def recon_landscapes_varying_qubits_and_instances(
     print("mse's shape =", mses.shape)
     print("cos's shape =", coss.shape)
     # timestamp = get_curr_formatted_timestamp()
+    recon_error_save_dir = f"{recon_dir}/recon_error_ns={n_qubits_list}-seeds={seeds}-sfs={sfs}"
+    print(f"recon error data save to {recon_error_save_dir}")
     np.savez_compressed(
-        f"{recon_dir}/recon_error_ns={n_qubits_list}-seeds={seeds}-sfs={sfs}",
+        recon_error_save_dir,
         mses=mses,
         coss=coss,
         n_qubits_list=n_qubits_list,
