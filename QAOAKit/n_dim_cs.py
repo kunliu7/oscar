@@ -1,8 +1,4 @@
-import imp
-from re import I, L
-import re
 import time
-from turtle import left, right
 from typing import Callable, List, Optional, Tuple
 import networkx as nx
 import numpy as np
@@ -23,18 +19,20 @@ from sklearn import linear_model
 
 from qiskit.providers.aer.noise import NoiseModel
 import concurrent.futures
-from mitiq import zne, Observable, PauliString
-from mitiq.zne.zne import execute_with_zne
-from mitiq.interface.mitiq_qiskit.qiskit_utils import (
-    execute,
-    execute_with_noise,
-    execute_with_shots_and_noise
-)
+# from mitiq import zne, Observable, PauliString
+# from mitiq.zne.zne import execute_with_zne
+# from mitiq.interface.mitiq_qiskit.qiskit_utils import (
+#     execute,
+#     execute_with_noise,
+#     execute_with_shots_and_noise
+# )
 
-from mitiq.interface import convert_to_mitiq
+# from mitiq.interface import convert_to_mitiq
 
 from qiskit.quantum_info import Statevector
 from sympy import beta, per
+
+from QAOAKit.compressed_sensing import recon_2D_by_LASSO
 
 from .qaoa import get_maxcut_qaoa_circuit
 from .utils import (
@@ -755,7 +753,8 @@ def recon_4D_by_cvxpy(shape, A, b):
 
 def recon_4D_landscape_by_2D(
     origin: np.ndarray,
-    sampling_frac: float
+    sampling_frac: float,
+    method: str="BP"
 ):
     """Reconstruct landscapes by sampling on given landscapes.
 
@@ -789,7 +788,13 @@ def recon_4D_landscape_by_2D(
 
     # b = X.T.flat[ri]
     # recon = recon_4D_by_cvxpy(shape, A, origin.T.flat[ri])
-    recon = recon_2D_by_cvxpy(nx, ny, A, origin_2d.T.flat[ri])
+    b = origin_2d.T.flat[ri]
+    if method == 'BP':
+        recon = recon_2D_by_cvxpy(nx, ny, A, b)
+    elif method == 'BPDN':
+        recon = recon_2D_by_LASSO(nx, ny, A, b, 0.001)
+    else:
+        assert False, "Invalid CS method"
 
     recon = recon.reshape(*shape_4d)
 
@@ -809,6 +814,7 @@ def recon_4D_landscape_by_2D(
 
 
 
+# ! Error
 def recon_4D_landscape(
     figdir: str,
     origin: np.ndarray,
