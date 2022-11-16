@@ -444,7 +444,7 @@ def normalize_by_linear_regression(ls1, ls2, n_pts):
 
 def reconstruct_by_distributed_landscapes_two_noisy_simulations_top(
     n_qubits_list: List[int], p: int, noise1: str, noise2: str,
-    normalize: str, norm_frac: float
+    normalize: str, norm_frac: float, error_type: str, recon_dir: str
 ):
     """Reconstructed with two noisy simulations
     """
@@ -478,14 +478,23 @@ def reconstruct_by_distributed_landscapes_two_noisy_simulations_top(
     #         noisy2.transpose()
     #     ]
     # elif n_qubits >= 12:
-    is_existing_recon = False
+    is_existing_recon = True if isinstance(recon_dir, str) else False
     if not is_existing_recon:
         signature = get_curr_formatted_timestamp()
         recon_dir = f"figs/recon_distributed_landscape/{signature}"
         if not os.path.exists(recon_dir):
             os.makedirs(recon_dir)
     else:
-        raise ValueError()
+        # method = normalize
+        # if method == 'baseline':
+        #     path = "figs/recon_distributed_landscape/2022-11-13_16:48:42"
+        # elif method == 'linear':
+        #     path = "figs/recon_distributed_landscape/2022-11-13_16:48:56"
+        # elif method == 'geo':
+        #     path = "figs/recon_distributed_landscape/2022-11-13_16:49:14"
+        print("recon_dir specified:", recon_dir)
+        # raise NotImplementedError()
+        # raise ValueError()
 
     errors1 = []
     errors2 = []
@@ -539,9 +548,8 @@ def reconstruct_by_distributed_landscapes_two_noisy_simulations_top(
             print("do not normalize")
         else:
             raise NotImplementedError()
-
             # recon_dir = "figs/recon_distributed_landscape/2022-09-30_14:34:08"
-            recon_dir = "figs/recon_distributed_landscape/2022-11-12_16:10:35"
+            # recon_dir = "figs/recon_distributed_landscape/2022-11-12_16:10:35"
 
         # sfs = np.arange(0.05, 0.42, 0.03)
         sfs = [0.10]
@@ -585,24 +593,26 @@ def reconstruct_by_distributed_landscapes_two_noisy_simulations_top(
                 #     # f"figs/recon_distributed_landscape/2022-11-12_15:11:59/dist_LS_errors-n={n_qubits}-p=1-noise1=depolar-0.003-0.007-noise2=depolar-0.001-0.02-normalize=geo-norm_frac=0.100.npz"
                 #     , allow_pickle=True
                 # )['recon']
-                raise ValueError()
+                recon = np.load(f"{recon_dir}/{recon_fname}.npz", allow_pickle=True)['recon']
+                # raise ValueError()
 
-            _vis_recon_distributed_landscape(
-                landscapes=datas + [recon],
-                labels=[noise1, noise2, f'recon. by {ratios} of each'],
-                full_range=full_range,
-                bounds=None,
-                true_optima=None,
-                title=f'reconstruct distributed landscapes, sampling fraction: {sf:.3f}',
-                save_path=f"{recon_dir}/{recon_fname}.png"
-            )
+            if not is_existing_recon:
+                _vis_recon_distributed_landscape(
+                    landscapes=datas + [recon],
+                    labels=[noise1, noise2, f'recon. by {ratios} of each'],
+                    full_range=full_range,
+                    bounds=None,
+                    true_optima=None,
+                    title=f'reconstruct distributed landscapes, sampling fraction: {sf:.3f}',
+                    save_path=f"{recon_dir}/{recon_fname}.png"
+                )
 
             # error1 = np.linalg.norm(noisy1 - recon)
-            error1 = cal_recon_error(noisy1.reshape(-1), recon.reshape(-1), "MSE")
+            error1 = cal_recon_error(noisy1.reshape(-1), recon.reshape(-1), error_type)
             errors1.append(error1)
 
             # error2 = np.linalg.norm(noisy2 - recon)
-            error2 = cal_recon_error(noisy2.reshape(-1), recon.reshape(-1), "MSE")
+            error2 = cal_recon_error(noisy2.reshape(-1), recon.reshape(-1), error_type)
             errors2.append(error2)
 
             # print(f"reconstruct error 1: {error1}; error 2: {error2}")
@@ -615,7 +625,7 @@ def reconstruct_by_distributed_landscapes_two_noisy_simulations_top(
     errors2 = np.array(errors2).reshape(len(n_qubits_list), len(ratios_cfg1))
     
     print('')
-    save_path = f"{recon_dir}/dist_LS_errors-ns={n_qubits_list}-p={p}-r={ratios_cfg1}-n1={noise1}-n2={noise2}-norm={normalize}-nf={norm_frac:.3f}"
+    save_path = f"{recon_dir}/dist_LS_errors-ns={n_qubits_list}-p={p}-r={ratios_cfg1}-n1={noise1}-n2={noise2}-norm={normalize}-nf={norm_frac:.3f}-error={error_type}"
     print(f"recon errors save to {save_path}")
     np.savez_compressed(
         save_path,
@@ -648,7 +658,6 @@ def reconstruct_by_distributed_landscapes_two_noisy_simulations_top(
     #     ax.set_title("Reconstruct by samples from two landscapes")
     #     plt.legend()
     #     fig.savefig(f"{recon_dir}/compare_with_baseline.png", bbox_inches='tight')
-
 
     return
 
@@ -701,6 +710,8 @@ if __name__ == "__main__":
     parser.add_argument('--normalize', type=str, default=None)
     parser.add_argument('--norm_frac', type=float, default=0)
     parser.add_argument('--ns', type=int, nargs='+', help="Your aims, vis, opt", required=True)
+    parser.add_argument('--error', type=str, required=True)
+    parser.add_argument('--recon_dir', type=str, default=None)
     # parser.add_argument('-n', type=int, help="Number of qubits", required=True)
     # parser.add_argument('-p', type=str, help="QAOA layers")
 
@@ -712,6 +723,7 @@ if __name__ == "__main__":
     # for n in args.ns:
     reconstruct_by_distributed_landscapes_two_noisy_simulations_top(
         n_qubits_list=args.ns, p=args.p, noise1=args.noise1, noise2=args.noise2,
-        normalize=args.normalize, norm_frac=args.norm_frac
+        normalize=args.normalize, norm_frac=args.norm_frac,
+        error_type=args.error, recon_dir=args.recon_dir
     )
     # test_4D_CS()
