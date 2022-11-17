@@ -1081,6 +1081,22 @@ def vis_landscapes(
     assert len(landscapes) == len(labels)
     assert len(landscapes) == len(params_paths)
 
+    # print("full_range =", full_range)
+
+    tmp = []
+    for ls in landscapes:
+        if len(ls.shape) == 4:
+            shape = ls.shape
+            ls = ls.reshape(shape[0] * shape[1], shape[2] * shape[3])
+            print(f"reshape: {shape} -> {ls.shape}")
+        elif len(ls.shape) == 2:
+            pass
+        else:
+            raise ValueError()
+        tmp.append(ls)
+
+    landscapes = tmp
+
     # plt.figure
     plt.rc('font', size=28)
     if len(landscapes) == 2:
@@ -1097,6 +1113,7 @@ def vis_landscapes(
 
     # TODO Check ij and xy
     X, Y = np.meshgrid(full_range['beta'], full_range['gamma'], indexing='ij')
+    # X, Y = np.meshgrid(full_range['beta'], full_range['gamma'], indexing='xy')
     
     # c = ax.pcolormesh(X, Y, Z, cmap='viridis', vmin=Z.min(), vmax=Z.max())
     for idx, landscape in enumerate(landscapes):
@@ -1105,7 +1122,7 @@ def vis_landscapes(
         axs[idx].set_xlabel('beta')
         axs[idx].set_ylabel('gamma')
         if isinstance(true_optima, list) or isinstance(true_optima, np.ndarray):
-            axs[idx].plot(true_optima[1], true_optima[0], marker="o", color='red', markersize=7, label="true optima")
+            axs[idx].plot(true_optima[0], true_optima[1], marker="o", color='red', markersize=7, label="true optima")
 
         params = params_paths[idx]
         if isinstance(params, list) or isinstance(params, np.ndarray):
@@ -1122,6 +1139,16 @@ def vis_landscapes(
 
     fig.colorbar(im, ax=[axs[i] for i in range(len(landscapes))])
     plt.legend()
+    save_dir = os.path.dirname(save_path)
+
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+    # if os.path.exists(save_path):
+    #     print("same path file exists, refuse to overwrite, please check")
+    #     return
+
     fig.savefig(save_path, bbox_inches='tight')
     # plt.show()
     plt.close('all')
+
+    print("save to: ", save_path)
