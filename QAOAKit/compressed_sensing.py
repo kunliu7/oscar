@@ -1213,10 +1213,14 @@ def cal_recon_error(x, x_recon, residual_type):
         res = res[0]
         # assert np.isclose(res[0])
         # return res[0]
+    elif residual_type == 'NRMSE':
+        res = np.sqrt((diff ** 2).mean())
+        quantiles = np.nanquantile(x, q=(0.25, 0.5, 0.75))
+        res /= (quantiles[2] - quantiles[0])
     elif residual_type == 'ZNCC':
         res = 0
         # res = np.sum((x_recon - x_recon.mean()) * (x - x.mean())) / np.sqrt(x_recon.var() * x.var())
     else:
-        assert False, f"Invalid residual_type {residual_type}"
+        raise NotImplementedError(f"Invalid residual_type {residual_type}")
 
     return res
