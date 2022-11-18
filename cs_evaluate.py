@@ -1,7 +1,6 @@
 import argparse
 import itertools
-from lib2to3.pgen2.token import CIRCUMFLEX
-from sqlite3 import paramstyle
+from typing import List
 import networkx as nx
 import matplotlib.pyplot as plt
 import numpy as np
@@ -158,7 +157,7 @@ test_utils_folder = Path(__file__).parent
 
 
 def recon_landscapes_varying_qubits_and_instances(
-    p: int, problem: str, noise: str, n_seeds: int, n_qubits_list: list
+    p: int, problem: str, noise: str, n_seeds: List[int], n_qubits_list: list, error_type: str
 ):
     """Section 4 ABCD
     """
@@ -177,7 +176,10 @@ def recon_landscapes_varying_qubits_and_instances(
         gs = 15
 
     sfs = np.arange(0.01, 0.11, 0.02)
-    seeds = list(range(n_seeds))
+    if len(n_seeds) == 1:
+        seeds = list(range(n_seeds[0]))
+    elif len(n_seeds) == 2:
+        seeds = list(range(n_seeds[0], n_seeds[1]))
     # if p == 1 and noise == 'ideal':
     #     n_qubits_list = [16, 20, 24, 30]
     # elif p == 1 and noise == 'depolar-0.003-0.007':
@@ -214,7 +216,7 @@ def recon_landscapes_varying_qubits_and_instances(
                 recon = get_recon_landscape(p, origin, sf, is_recon, 
                     recon_path, cs_seed)
                      
-                mse = cal_recon_error(origin.reshape(-1), recon.reshape(-1), "MSE")
+                mse = cal_recon_error(origin.reshape(-1), recon.reshape(-1), error_type)
                 # ncc = cal_recon_error(landscape.reshape(-1), recon.reshape(-1), "CROSS_CORRELATION")
                 cos = cosine(origin.reshape(-1), recon.reshape(-1))
                 mses.append(mse)
@@ -253,7 +255,7 @@ def recon_landscapes_varying_qubits_and_instances(
     print("mse's shape =", mses.shape)
     print("cos's shape =", coss.shape)
     # timestamp = get_curr_formatted_timestamp()
-    recon_error_save_dir = f"{recon_dir}/recon_error_ns={n_qubits_list}-seeds={seeds}-sfs={sfs}"
+    recon_error_save_dir = f"{recon_dir}/recon_error_ns={n_qubits_list}-seeds={seeds}-sfs={sfs}-error={error_type}"
     print(f"recon error data save to {recon_error_save_dir}")
     np.savez_compressed(
         recon_error_save_dir,
@@ -945,7 +947,8 @@ if __name__ == "__main__":
     # parser.add_argument('--method', type=str, help="Your aims, vis, opt", required=True)
     parser.add_argument('--noise', type=str, help="Your aims, vis, opt", required=True)
     parser.add_argument('--problem', type=str, help="Your aims, vis, opt", required=True)
-    parser.add_argument('--n_seeds', type=int, help="Your aims, vis, opt", required=True)
+    parser.add_argument('--n_seeds', type=int, nargs='+', help="Your aims, vis, opt", required=True)
+    parser.add_argument('--error', type=str, help="Your aims, vis, opt", required=True)
     args = parser.parse_args()
     
     if args.aim == 'large1':
@@ -966,6 +969,6 @@ if __name__ == "__main__":
         pass
     elif args.aim == 'final':
         recon_landscapes_varying_qubits_and_instances(p=args.p, problem=args.problem,
-            noise=args.noise, n_seeds=args.n_seeds, n_qubits_list=args.ns)
+            noise=args.noise, n_seeds=args.n_seeds, n_qubits_list=args.ns, error_type=args.error)
     else:
         raise NotImplementedError()
