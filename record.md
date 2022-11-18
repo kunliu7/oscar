@@ -7,6 +7,18 @@
 ## Maxcut
 
 
+### p=2 noisy
+
+#### n12
+python cs_evaluate.py --aim final -p 2 --ns 12 --problem maxcut --noise depolar-0.003-0.007 --n_seeds 4 --error NRMSE
+python cs_evaluate.py --aim final -p 2 --ns 12 --problem maxcut --noise depolar-0.003-0.007 --n_seeds 4 8 --error NRMSE
+
+#### n16
+python cs_evaluate.py --aim final -p 2 --ns 16 --problem maxcut --noise depolar-0.003-0.007 --n_seeds 4 --error NRMSE
+python cs_evaluate.py --aim final -p 2 --ns 16 --problem maxcut --noise depolar-0.003-0.007 --n_seeds 4 8 --error NRMSE
+
+#### n20
+
 ## Partition
 python cs_evaluate.py --aim final -p 2 --ns 12 16 20 24 --problem partition --noise ideal --n_seeds 1
 
@@ -42,6 +54,31 @@ python cs_distributed.py --ns 12 16 20 -p 1 --noise1 depolar-0.003-0.007 --noise
 python cs_distributed.py --ns 12 16 20 -p 1 --noise1 depolar-0.003-0.007 --noise2 depolar-0.001-0.02 --normalize geo --norm_frac 0.1
 python cs_distributed.py --ns 12 16 20 -p 1 --noise1 depolar-0.003-0.007 --noise2 depolar-0.001-0.02 --normalize linear --norm_frac 0.1
 
+**For visualize**
+
+baseline:
+python cs_distributed.py --ns 12 16 20 -p 1 --noise1 depolar-0.003-0.007 --noise2 depolar-0.001-0.02 \
+    --error NRMSE --recon_dir "figs/recon_distributed_landscape/2022-11-13_16:48:42"
+
+Geometric mean:
+python cs_distributed.py --ns 12 16 20 -p 1 --noise1 depolar-0.003-0.007 --noise2 depolar-0.001-0.02 \
+    --normalize geo --norm_frac 0.1 --error NRMSE \
+    --recon_dir "figs/recon_distributed_landscape/2022-11-13_16:49:14"
+
+Linear regression
+python cs_distributed.py --ns 12 16 20 -p 1 --noise1 depolar-0.003-0.007 --noise2 depolar-0.001-0.02 \
+    --normalize linear --norm_frac 0.1 --error NRMSE \
+    --recon_dir "figs/recon_distributed_landscape/2022-11-13_16:48:56"
+
+
+```python
+if method == 'baseline':
+    path = "figs/recon_distributed_landscape/2022-11-13_16:48:42"
+elif method == 'geo':
+    path = "figs/recon_distributed_landscape/2022-11-13_16:49:14"
+elif method == 'linear':
+    path = "figs/recon_distributed_landscape/2022-11-13_16:48:56"
+```
 # ============== Use case, debug barren plateaus =========
 
 ![vis_figs_bp.ipynb](vis_figs_bp.ipynb)
@@ -73,7 +110,17 @@ figs/find_init_pts_by_recon/2022-11-10_00:51:15_OK/recon-eps=0.600-csSeed=20-sv-
 ### p=2, n = 20, noisy-3 (ALREADY HAD DATA)
 python cs_eval_init_points.py -n 20 --noise depolar --p1 0.001 --p2 0.02
 
+
+### BP initialization
+python cs_eval_init_points.py -n 16 --noise ideal --eps 0.5 --check --seed 0 --stride 11
+python cs_eval_init_points.py -n 20 --noise ideal --eps 0.6 --check --seed 0 --stride 10
+
+python cs_eval_init_points.py -n 16 --noise ideal --eps 0.3 --check --inst_seed 1 --random_seed 42 --stride 10
+python cs_eval_init_points.py -n 20 --noise ideal --eps 0.6 --check --inst_seed 1 --random_seed 42 --stride 10
+
+
 # ============== Use case, error mitigation ==============
 
 ![cs_comp_miti.py](cs_comp_miti.py)
 ![vis_figs_comp_miti.ipynb](vis_figs_comp_miti.ipynb)
+
