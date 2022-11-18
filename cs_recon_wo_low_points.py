@@ -156,10 +156,25 @@ from scipy import interpolate
 test_utils_folder = Path(__file__).parent
 
 
+def exclude_low_points(ls: np.ndarray, sf: float, eps: float):
+    flatten = ls.reshape(-1)
+    minimum = ls.min()
+
+    k = round(np.prod(ls.shape) * sf)
+    ids = np.argwhere(flatten - minimum > eps)
+    print("ids:", ids[:5]) # [[0],[1],[2],[3]]
+    ids = ids.squeeze()
+    rng = np.random.default_rng(0)
+    random_indices = rng.choice(ids, k, replace=False) # random sample of indices
+    return random_indices
+
+
 def recon_ls_without_low_points(
-    p: int, problem: str, noise: str, n_seeds: List[int], n_qubits_list: list, error_type: str
+    p: int, problem: str, noise: str, n_seeds: List[int], n_qubits_list: list, error_type: str,
+    eps: float,
+    recon_dir: str=None
 ):
-    is_recon = False
+    is_reconstructed = isinstance(recon_dir, str)
 
     method = 'sv'
     miti_method = ''
@@ -173,24 +188,19 @@ def recon_ls_without_low_points(
         bs = 12
         gs = 15
 
-    sfs = np.arange(0.01, 0.11, 0.02)
+    # sfs = np.arange(0.01, 0.11, 0.02)
+    sfs = [0.05]
     if len(n_seeds) == 1:
         seeds = list(range(n_seeds[0]))
     elif len(n_seeds) == 2:
         seeds = list(range(n_seeds[0], n_seeds[1]))
-    # if p == 1 and noise == 'ideal':
-    #     n_qubits_list = [16, 20, 24, 30]
-    # elif p == 1 and noise == 'depolar-0.003-0.007':
-    #     n_qubits_list = [12, 16, 20]
-    # elif p == 2 and noise == 'ideal':
-    #     n_qubits_list = [16, 20, 24]
-    # elif p == 2 and noise == 'ideal':
-    #     n_qubits_list = [12, 16, 20]
 
     print("noise =", noise)
     print("n qubits list =", n_qubits_list)
     print("seeds =", seeds)
     print("sfs =", sfs)
+
+    timestamp = get_curr_formatted_timestamp()
 
     for n_qubits in n_qubits_list:
         cs_seed = n_qubits # ! compare horizontally
@@ -204,16 +214,32 @@ def recon_ls_without_low_points(
             plot_range = data['plot_range']
 
             # 和Tianyi代码使用相同目录结构
-            recon_dir = f"figs/grid_search_recon/{problem}/{method}-{noise}-p={p}"
+            if not is_reconstructed:
+                recon_dir = f"figs/wo_low_points/{timestamp}"
 
             for sf in sfs:
-                recon_fname = f"recon-cs_seed={cs_seed}-sf={sf:.3f}-{data_fname}"
+                recon_fname = f"recon-cs_seed={cs_seed}-sf={sf:.3f}-eps={eps:.3f}-{data_fname}"
                 recon_path = f"{recon_dir}/{recon_fname}"
 
                 origin = data['data']
-                recon = get_recon_landscape(p, origin, sf, is_recon, 
-                    recon_path, cs_seed)
-                     
+                # recon = get_recon_landscape(p, origin, sf, is_recon, 
+                #     recon_path, cs_seed)
+
+                if not is_reconstructed:
+                    ri = exclude_low_points(origin, sf, eps) 
+                    print("e.g.", ri[:5])
+                    recon = recon_4D_landscape_by_2D(
+                        origin=origin,
+                        sampling_frac=sf,
+                        random_indices=ri
+                    )
+
+                    if not os.path.exists(recon_dir):
+                        os.makedirs(recon_dir)
+                    np.savez_compressed(recon_path, recon=recon, sampling_frac=sf) 
+                else:
+                    recon = np.load(f"{recon_path}", allow_pickle=True)['recon']
+
                 mse = cal_recon_error(origin.reshape(-1), recon.reshape(-1), error_type)
                 # ncc = cal_recon_error(landscape.reshape(-1), recon.reshape(-1), "CROSS_CORRELATION")
                 cos = cosine(origin.reshape(-1), recon.reshape(-1))
@@ -221,8 +247,8 @@ def recon_ls_without_low_points(
                 coss.append(cos)
 
                 # ncc = cal_recon_error()
-                print("RMSE: ", mse)
-                print("Cosine: ", cos)
+                print("NRMSE =", mse)
+                print("Cosine =", cos)
                 
                 base_recon_fname = os.path.splitext(recon_fname)[0]
                 vis_landscapes(
@@ -267,7 +293,6 @@ def recon_ls_without_low_points(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--aim', type=str, help="Your aims, vis, opt", required=True)
     parser.add_argument('--ns', type=int, nargs='+', help="Your aims, vis, opt", required=True)
     parser.add_argument('-p', type=int, help="Your aims, vis, opt", required=True)
     # parser.add_argument('--method', type=str, help="Your aims, vis, opt", required=True)
@@ -275,26 +300,11 @@ if __name__ == "__main__":
     parser.add_argument('--problem', type=str, help="Your aims, vis, opt", required=True)
     parser.add_argument('--n_seeds', type=int, nargs='+', help="Your aims, vis, opt", required=True)
     parser.add_argument('--error', type=str, help="Your aims, vis, opt", required=True)
+    parser.add_argument('--eps', type=float, help="Your aims, vis, opt", required=True)
+    parser.add_argument('--recon_dir', type=str, help="Your aims, vis, opt", default=None)
     args = parser.parse_args()
     
-    if args.aim == 'large1':
-        recon_large_qubits_p1_landscape_top()
-    elif args.aim == 'large2':
-        recon_large_qubits_p2_landscape_top()
-    elif args.aim == 'comp1':
-        CS_by_BPDN_p1()
-    elif args.aim == 'comp2':
-        CS_by_BPDN_p2()
-    elif args.aim == 'ideal_p1':
-        recon_p1_landscape_ideal_varying_qubits_and_instances()
-    elif args.aim == 'noisy_p1':
-        recon_p1_landscape_noisy_varying_qubits_and_instances()
-    elif args.aim == 'ideal_p2':
-        recon_p2_landscape_ideal_varying_qubits_and_instances()
-    elif args.aim == 'noisy_p2':
-        pass
-    elif args.aim == 'final':
-        recon_landscapes_varying_qubits_and_instances(p=args.p, problem=args.problem,
-            noise=args.noise, n_seeds=args.n_seeds, n_qubits_list=args.ns, error_type=args.error)
-    else:
-        raise NotImplementedError()
+    recon_ls_without_low_points(p=args.p, problem=args.problem,
+        noise=args.noise, n_seeds=args.n_seeds, n_qubits_list=args.ns, error_type=args.error,
+        eps=args.eps, recon_dir=args.recon_dir
+    )
