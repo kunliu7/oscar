@@ -373,6 +373,51 @@ def get_wrapper(p, C):
     return energy_evaluation
 
 
+def var_of_grad(ls) -> list:
+    grad = np.gradient(ls)
+
+    var_of_grad = [g.var() for g in grad]
+    return var_of_grad
+
+
+def cal_barren_plateaus(ls) -> float:
+    return np.mean(var_of_grad(ls))
+
+
+def cal_min_barren_plateaus(ls) -> float:
+    return np.min(var_of_grad(ls))
+
+
+def cal_local_barren_plateaus(center, ls, stride: int):
+    shape = ls.shape
+    p = len(shape) // 2
+
+    bounds = np.zeros(shape=(len(shape), 2))
+    bounds[:, 1] = shape
+
+    ranges = bounds.copy()
+
+    ranges[:, 0] = np.maximum(center - stride, bounds[:, 0])
+    ranges[:, 1] = np.minimum(center + stride + 1, bounds[:, 1])
+    
+    ranges = np.array(ranges, dtype=int)
+    print("center:", center)
+    print("ranges:", ranges)
+
+    if p == 2:
+        local = ls[ranges[0, 0]:ranges[0, 1],
+                    ranges[1, 0]:ranges[1, 1],
+                    ranges[2, 0]:ranges[2, 1],
+                    ranges[3, 0]:ranges[3, 1]]
+
+        print(f"totally we have {np.prod(local.shape)} many points, shape = {local.shape}")
+    else:
+        raise NotImplementedError()
+
+    return cal_barren_plateaus(local)
+    # return cal_min_barren_plateaus(local)
+
+
 def get_minimum_by_QAOA(G: nx.Graph, p: int, qiskit_init_pt: np.ndarray,
     noise_model: NoiseModel, maxiter: int):
     """Get minimum cost value by random initialization.
@@ -458,7 +503,7 @@ def get_random_initialization(G:nx.Graph, p: int, n_pts: int,
 
 def find_good_initial_points_on_recon_LS_and_verify_top(
     n_qubits: int, noise: str, p1: float, p2: float, maxiter:int, eps: List[float],
-    is_comp_random: bool, random_seed: int, check: bool=False
+    is_comp_random: bool, instance_seed: int, random_seed: int, stride: int, check: bool=False
 ):
     """Find good initial points on recon landscapes.
 
@@ -487,7 +532,7 @@ def find_good_initial_points_on_recon_LS_and_verify_top(
     cs_seed = n_qubits
     p = 2
     sf = 0.05
-    seed = 0
+    seed = instance_seed
     if p == 2:
         bs = 12
         gs = 15
@@ -574,6 +619,11 @@ def find_good_initial_points_on_recon_LS_and_verify_top(
     # eps = 0.4 # 63
     # eps = 0.5 #
     # eps = 0.6
+
+    # global_bp = cal_barren_plateaus(recon)
+    global_bp = cal_barren_plateaus(recon)
+    # global_bp = cal_min_barren_plateaus(recon)
+    print("global bp =", global_bp)
     
     min_recon = np.min(recon)
     print(f"minimum recon: {min_recon:.5f}, maximum recon: {np.max(recon)}")
@@ -606,21 +656,21 @@ def find_good_initial_points_on_recon_LS_and_verify_top(
     H, offset = problem.to_ising()
 
     # brute force 1, but it is not the result of QAOA
-    if True:
+    if False:
         print("---- brute force ---")
         obj = partial(maxcut_obj, w=get_adjacency_matrix(G))
         opt_en = brute_force(obj, n_qubits)[0]
         print(opt_en)
 
     # brute force 2, but it is not the result of QAOA
-    if True:
+    if False:
         print("---- NumPyMinimumEigensolver ----")
         algo = NumPyMinimumEigensolver()
         result = algo.compute_minimum_eigenvalue(operator=H, aux_operators=None)
         print(result)
 
     # check H generated are the same
-    if True:
+    if False:
         print("--- check H generated are the same -----")
         _, C, _ = get_maxcut_qaoa_qiskit_circuit_unbinded_parameters(
             G, p
@@ -636,19 +686,22 @@ def find_good_initial_points_on_recon_LS_and_verify_top(
     min_energies = []
     recon_init_pt_vals = []
     oscar_rsts = []
+    ids_higher_bp = []
     for i, idx in enumerate(ids): # idx: tuples
         print(f"----------- {i}-th ----------------")
         # print(f"\rProcess: {i:>3} / {len(ids)}")
         # print(idx, recon[idx[0], idx[1], idx[2], idx[3]])
         # continue
         init_beta_gamma = [0 for _ in range(2*p)]
-        for i in range(2*p):
-            init_beta_gamma[i] = full_ranges[i][idx[i]]
+        for j in range(2*p):
+            init_beta_gamma[j] = full_ranges[j][idx[j]]
 
         # initial_point = {
         #     'beta': np.array(init_beta_gamma[:p]),
         #     'gamma': np.array(init_beta_gamma[p:]),
         # }
+        local_bp = cal_local_barren_plateaus(idx, recon, stride)
+        print("local bp", local_bp)
         recon_init_pt_val = recon[tuple(idx)]
         # print(recon_init_pt_val)
         recon_init_pt_vals.append(recon_init_pt_val)
@@ -660,8 +713,12 @@ def find_good_initial_points_on_recon_LS_and_verify_top(
         initial_point[1::2] = init_beta_gamma[:p]
         # print(initial_point)
 
+        if local_bp > global_bp:
+            # ids_higher_bp.append(idx)
+            ids_higher_bp.append(i)
+
         if check:
-            pass
+            continue
 
         inits.append(initial_point)
         # return
@@ -682,6 +739,8 @@ def find_good_initial_points_on_recon_LS_and_verify_top(
 
         # print("---------------------------")
 
+    print(f"# higher than global bp: {len(ids_higher_bp)} / {len(ids)}")
+    print(ids_higher_bp)
     if is_comp_random:
         print("============== start Random =============")
         # random_energies, random_inits = \
@@ -692,7 +751,9 @@ def find_good_initial_points_on_recon_LS_and_verify_top(
                 data['beta_bound'], data['gamma_bound'], maxiter, random_seed)
     else:
         random_rsts, random_inits = None, None
-
+    
+    if check:
+        return
 
     timestamp = get_curr_formatted_timestamp()
     save_dir = f"figs/find_init_pts_by_recon/{timestamp}"
@@ -720,6 +781,8 @@ def find_good_initial_points_on_recon_LS_and_verify_top(
         oscar_energies=min_energies,
         oscar_inits=ids, # indices
 
+        ids_higher_bp=ids_higher_bp,
+
         # random initialization method
         # random_energies=random_energies,
         random_rsts=random_rsts,
@@ -737,7 +800,9 @@ if __name__ == "__main__":
     parser.add_argument('--check', action='store_true', default=False)
     parser.add_argument('--eps', type=float, nargs="+", required=True)
     parser.add_argument('--random', action='store_true', default=False)
-    parser.add_argument('--seed', type=int)
+    parser.add_argument('--inst_seed', type=int, help="seed of problem instance", required=True)
+    parser.add_argument('--random_seed', type=int)
+    parser.add_argument('--stride', type=int)
 
     args = parser.parse_args()
     
@@ -746,5 +811,5 @@ if __name__ == "__main__":
     find_good_initial_points_on_recon_LS_and_verify_top(
         n_qubits=args.n, noise=args.noise, p1=args.p1, p2=args.p2,
         maxiter=args.maxiter, eps=args.eps, is_comp_random=args.random, 
-        random_seed=args.seed, check=args.check
+        instance_seed=args.inst_seed, random_seed=args.random_seed, stride=args.stride, check=args.check
     )
