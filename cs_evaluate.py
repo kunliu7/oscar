@@ -267,6 +267,7 @@ def recon_landscapes_varying_qubits_and_instances(
     )
 
 
+# ! deprecated
 def recon_p1_landscape_noisy_varying_qubits_and_instances():
     is_recon = False
 
@@ -372,6 +373,7 @@ def recon_p1_landscape_noisy_varying_qubits_and_instances():
     )
 
 
+# ! deprecated
 def recon_p1_landscape_ideal_varying_qubits_and_instances():
     is_recon = False
 
@@ -475,6 +477,7 @@ def recon_p1_landscape_ideal_varying_qubits_and_instances():
     )
 
 
+# ! deprecated
 def recon_p2_landscape_ideal_varying_qubits_and_instances():
     is_recon = False
 
@@ -592,6 +595,7 @@ def recon_p2_landscape_ideal_varying_qubits_and_instances():
     )
 
 
+# ! deprecated
 def recon_large_qubits_p1_landscape_top():
     is_recon = False
 
@@ -674,6 +678,7 @@ def recon_large_qubits_p1_landscape_top():
     print("cos", coss)
 
 
+# ! deprecated
 def recon_large_qubits_p2_landscape_top():
     is_recon = True
     data_dir = "figs/gen_p2_landscape/2022-10-18_15:50:00_n6_p2_ideal"
