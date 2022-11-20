@@ -72,11 +72,11 @@ def load_grid_search_data(
             fname = f"{problem}-{method}-{noise}-n={nq}-p={p}-seed={seed}-{bs}-{gs}-{miti_method}.npz"
         else:
             fname = f"{problem}-{method}-{noise}-n={nq}-p={p}-seed={seed}-{bs}-{gs}.npz"
-    elif p == 1 and problem == 'maxcut' and noise == 'ideal' and seed in [0, 1, 2]:
+    elif nq != 8 and p == 1 and problem == 'maxcut' and noise == 'ideal' and seed in [0, 1, 2]:
         fname = f"{method}-{noise}-n={nq}-p={p}-seed={seed}-{bs}-{gs}.npz"
-    elif p == 1 and problem == 'maxcut' and noise == 'depolar-0.003-0.007' and seed in [0, 1]:
+    elif nq != 8 and p == 1 and problem == 'maxcut' and noise == 'depolar-0.003-0.007' and seed in [0, 1]:
         fname = f"{method}-{noise}-n={nq}-p={p}-seed={seed}-{bs}-{gs}.npz"
-    elif p == 2 and problem == 'maxcut' and noise == 'ideal' and seed in [0, 1]:
+    elif nq != 8 and p == 2 and problem == 'maxcut' and noise == 'ideal' and seed in [0, 1]:
         fname = f"{method}-{noise}-n={nq}-p={p}-seed={seed}-{bs}-{gs}.npz"
     else:
         fname = f"{problem}-{method}-{noise}-n={nq}-p={p}-seed={seed}-{bs}-{gs}.npz"
