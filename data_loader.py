@@ -1,6 +1,6 @@
 
 import numpy as np
-from typing import Tuple
+from typing import List, Tuple
 import os
 
 from QAOAKit.n_dim_cs import recon_4D_landscape_by_2D
@@ -148,3 +148,34 @@ def get_recon_pathname(p:int, problem: str, method: str,
     recon_path = f"{recon_dir}/{recon_fname}"
 
     return recon_path, recon_fname, recon_dir
+
+
+def load_optimization_path(
+    n_qubits: int,
+    p: int,
+    problem: str,
+    method: str,
+    noise: str,
+    optimizer: str,
+    maxiter: int,
+    initial_point: List[int],
+    seed: int,
+    miti_method: str=""
+) -> Tuple[dict, str, str]:
+    n = n_qubits
+    if isinstance(initial_point, np.ndarray):
+        init_pt = list(initial_point)
+    elif isinstance(initial_point, list):
+        init_pt = initial_point
+    else:
+        raise ValueError()
+    
+    assert len(init_pt) == 2 * p
+    data_dir = f"figs/optimization/{problem}/{method}-{noise}-p={p}" 
+    fname = f"{problem}-{method}-{noise}-{n=}-{p=}-{seed=}-{optimizer}-{maxiter=}-{init_pt}.npz"
+
+    data_path = f"{data_dir}/{fname}"
+    data = np.load(data_path, allow_pickle=True)
+    print("opt data load from", data_path)
+
+    return data['optimizer_path']
