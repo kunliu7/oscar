@@ -445,7 +445,8 @@ def get_minimum_by_QAOA(G: nx.Graph, p: int, qiskit_init_pt: np.ndarray,
         values.append(mean)
         params.append(parameters)
 
-    qinst = AerSimulator(shots=2048, noise_model=noise_model)
+    # qinst = AerSimulator(shots=2048, noise_model=noise_model)
+    qinst = AerSimulator(method='statevector')
     # shots = 2048
     # optimizer = SPSA(maxiter=maxiter)
     if isinstance(maxiter, int):
@@ -607,7 +608,7 @@ def find_good_initial_points_on_recon_LS_and_verify_top(
     print("number of points: ", n_pts)
     # return
     ids = np.argwhere(mask == True) # return indices of points where mask == True
-    # print(ids)
+    print(ids[:5])
 
     # return
     # landscape.shape = (beta, beta, gamma, gamma)
@@ -655,7 +656,7 @@ def find_good_initial_points_on_recon_LS_and_verify_top(
     oscar_rsts = []
     ids_higher_bp = []
     for i, idx in enumerate(ids): # idx: tuples
-        print(f"----------- {i}-th ----------------")
+        print(f"----------- {i}-th, {idx} ----------------")
         # print(f"\rProcess: {i:>3} / {len(ids)}")
         # print(idx, recon[idx[0], idx[1], idx[2], idx[3]])
         # continue
@@ -663,35 +664,47 @@ def find_good_initial_points_on_recon_LS_and_verify_top(
         for j in range(2*p):
             init_beta_gamma[j] = full_ranges[j][idx[j]]
 
-        local_bp = cal_local_barren_plateaus(idx, recon, stride)
-        print("local bp", local_bp)
+        # local_bp = cal_local_barren_plateaus(idx, recon, stride)
+        # print("local bp", local_bp)
         
         recon_init_pt_val = recon[tuple(idx)]
+        assert np.abs(recon_init_pt_val - min_recon) < eps
         origin_init_pt_val = origin[tuple(idx)]
-        print(f"recon_init_pt_val={recon_init_pt_val}, origin_init_pt_val={origin_init_pt_val}")
+        # print(f"recon_init_pt_val={recon_init_pt_val}")
+        # print(f"origin_init_pt_val={origin_init_pt_val}")
+        print("")
         recon_init_pt_vals.append(recon_init_pt_val)
         origin_init_pt_vals.append(origin_init_pt_val)
         
         # print(init_beta_gamma)
-        # format of Qiskit, p=2: gamma, beta, gamma, beta
         
-        # initial_point = np.zeros(shape=2*p)
-        # initial_point[::2] = init_beta_gamma[p:]
-        # initial_point[1::2] = init_beta_gamma[:p]
-        """Fuck
+        """Wrong:
+            format of Qiskit, bbgg
+            initial_point = np.zeros(shape=2*p)
+            initial_point[::2] = init_beta_gamma[p:]
+            initial_point[1::2] = init_beta_gamma[:p]
         """
         initial_point = init_beta_gamma
-        print(initial_point)
+        # print(initial_point)
 
-        if local_bp > global_bp:
-            # ids_higher_bp.append(idx)
-            ids_higher_bp.append(i)
+        # if local_bp > global_bp:
+        #     # ids_higher_bp.append(idx)
+        #     ids_higher_bp.append(i)
 
         oscar_inits.append(initial_point) 
         rst = get_minimum_by_QAOA(G, p, initial_point, noise_model, maxiter)
 
-        print(f"oscar min={rst[0]}, init_pt={rst[1]}, actual_init_pt={rst[2][0]}, \
-            actual_init_pt_val={rst[3][0]}, recon_init_pt_val={recon_init_pt_val}")
+        print(f"oscar min={rst[0]}, last={rst[3][-1]}")
+        print("")
+        print(f"actual_init_pt ={rst[2][0]}")
+        print(f"oscar init pt  ={initial_point}")
+        print("")
+        print(f"actual_init_pt_val={rst[3][0]}")
+        print(f"origin init pt val={origin_init_pt_val}")
+        print(f"recon_init_pt_val ={recon_init_pt_val}")
+
+        if noise == 'ideal':
+            assert np.isclose(origin_init_pt_val, rst[3][0])
 
         oscar_rsts.append(rst)
         oscar_mins.append(rst[0])
@@ -749,6 +762,8 @@ def find_good_initial_points_on_recon_LS_and_verify_top(
         # others
         ids_higher_bp=ids_higher_bp,
     )
+
+    print("oscar_mins mean:", np.mean(oscar_mins), "random_mins mean:", np.mean(random_mins))
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
