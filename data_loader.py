@@ -150,6 +150,37 @@ def get_recon_pathname(p:int, problem: str, method: str,
     return recon_path, recon_fname, recon_dir
 
 
+def get_interpolation_path_filename(
+    n_qubits: int,
+    p: int,
+    problem: str,
+    method: str,
+    noise: str,
+    optimizer: str,
+    maxiter: int,
+    initial_point: List[float],
+    seed: int,
+    miti_method: str=""
+) -> Tuple[str, str, str]:
+    n = n_qubits
+    if isinstance(initial_point, np.ndarray):
+        init_pt = list(initial_point)
+    elif isinstance(initial_point, list):
+        init_pt = initial_point
+    else:
+        print(initial_point)
+        raise ValueError()
+    
+    assert len(init_pt) == 2 * p
+    data_dir = f"figs/opt_on_recon_landscape/{problem}/{method}-{noise}-p={p}" 
+    fname = f"{problem}-{method}-{noise}-{n=}-{p=}-{seed=}-{optimizer}-{maxiter=}-{init_pt}.npz"
+
+    data_path = f"{data_dir}/{fname}"
+    if not os.path.exists(data_dir):
+        os.makedirs(data_dir)
+    return data_path, fname, data_dir
+
+
 def load_optimization_path(
     n_qubits: int,
     p: int,
@@ -179,3 +210,45 @@ def load_optimization_path(
     print("opt data load from", data_path)
 
     return data['optimizer_path']
+
+
+def get_interpolation_path(
+    n_qubits: int,
+    p: int,
+    problem: str,
+    method: str,
+    noise: str,
+    optimizer: str,
+    maxiter: int,
+    initial_point: List[int],
+    seed: int,
+    miti_method: str=""
+) -> np.ndarray:
+    n = n_qubits
+
+    save_dir = os.path.dirname(recon_save_path)
+    is_recon = os.path.exists(recon_save_path)
+    if not is_recon:
+        np.random.seed(cs_seed)
+        if p == 1:
+            recon = recon_2D_landscape(
+                origin=origin,
+                sampling_frac=sampling_frac
+            )
+            if not os.path.exists(save_dir):
+                os.makedirs(save_dir)
+            np.savez_compressed(recon_save_path, recon=recon, sampling_frac=sampling_frac) 
+        elif p == 2:
+            recon = recon_4D_landscape_by_2D(
+                origin=origin,
+                sampling_frac=sampling_frac
+            )
+            if not os.path.exists(save_dir):
+                os.makedirs(save_dir)
+            np.savez_compressed(recon_save_path, recon=recon, sampling_frac=sampling_frac)
+        print("not exists, save to", save_dir)
+    else:
+        recon = np.load(recon_save_path, allow_pickle=True)['recon']
+        print("recon landscape read from", recon_save_path)
+    
+    return recon
