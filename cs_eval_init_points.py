@@ -328,6 +328,8 @@ def _get_min_given_init_pt(
         quantum_instance=qinst,
     )
 
+    print(qaoa.ansatz.parameters)
+
     # I = Operator(np.eye(2**n_qubits))
     # I = Pauli("I" * n_qubits)
     # print(C)
@@ -411,8 +413,14 @@ def cal_local_barren_plateaus(center, ls, stride: int):
                     ranges[3, 0]:ranges[3, 1]]
 
         print(f"totally we have {np.prod(local.shape)} many points, shape = {local.shape}")
+    elif p == 1:
+        local = ls[ranges[0, 0]:ranges[0, 1],
+                    ranges[1, 0]:ranges[1, 1]]
+
+        print(f"totally we have {np.prod(local.shape)} many points, shape = {local.shape}")
     else:
         raise NotImplementedError()
+
 
     return cal_barren_plateaus(local)
     # return cal_min_barren_plateaus(local)
@@ -441,10 +449,12 @@ def get_minimum_by_QAOA(G: nx.Graph, p: int, qiskit_init_pt: np.ndarray,
     # shots = 2048
     # optimizer = SPSA(maxiter=maxiter)
     if isinstance(maxiter, int):
-        optimizer = SPSA(maxiter=maxiter)
+        # optimizer = SPSA(maxiter=maxiter)
+        optimizer = COBYLA(maxiter=maxiter)
         print("maxiter:", maxiter)
     else:
-        optimizer = SPSA()
+        # optimizer = SPSA()
+        optimizer = COBYLA()
         print("no maxiter")
     
     print("noise model", noise_model)
@@ -456,6 +466,7 @@ def get_minimum_by_QAOA(G: nx.Graph, p: int, qiskit_init_pt: np.ndarray,
         quantum_instance=qinst,
         callback=cb_store_intermediate_result
     )
+    # print(qaoa.ansatz)
     result = qaoa.compute_minimum_eigenvalue(C)
     eigenvalue = result.eigenvalue.real
 
@@ -463,35 +474,34 @@ def get_minimum_by_QAOA(G: nx.Graph, p: int, qiskit_init_pt: np.ndarray,
     print("QAOA minimum           :", eigenvalue)
     print("Real minimum (+offset) :", eigenvalue + offset)
 
-    # print("params =", params)
     return eigenvalue, qiskit_init_pt, params, values
 
 
-def get_random_initialization(G:nx.Graph, p: int, n_pts: int,
-    noise_model: NoiseModel, beta_bound: float, gamma_bound: float, maxiter: int, seed: int):
-    print(f"beta_bound={beta_bound}, gamma_bound={gamma_bound}, seed={seed}")
-    rng = np.random.default_rng(seed)
+def get_random_initialization(G: nx.Graph, p: int, n_pts: int,
+    noise_model: NoiseModel, beta_bound: float, gamma_bound: float, maxiter: int, random_seed: int):
+    print(f"beta_bound={beta_bound}, gamma_bound={gamma_bound}, random_seed={random_seed}")
+    rng = np.random.default_rng(random_seed)
 
     betas = [rng.uniform(-beta_bound, beta_bound, n_pts) for _ in range(p)]
     gammas = [rng.uniform(-gamma_bound, gamma_bound, n_pts) for _ in range(p)]
     inits = np.concatenate(betas + gammas)
-    # print(inits.shape)
-    inits = inits.reshape(n_pts, 2*p)
+    print(inits.shape)
+    inits = inits.reshape(2*p, n_pts).T
     print("init points shape:", inits.shape)
+    assert inits.shape == (n_pts, 2*p)
 
     results = []
     qiskit_inits = []
-    energies = []
     for i in range(n_pts):
         print(f"----- {i}-th ------")
 
         init_betas_gammas = inits[i,:]
 
         # format of Qiskit, p=2: gamma, beta, gamma, beta
-        qiskit_init = np.zeros(shape=2*p)
-        qiskit_init[::2] = init_betas_gammas[p:] # gammas
-        qiskit_init[1::2] = init_betas_gammas[:p] # betas
-        
+        # qiskit_init = np.zeros(shape=2*p)
+        # qiskit_init[::2] = init_betas_gammas[p:] # gammas
+        # qiskit_init[1::2] = init_betas_gammas[:p] # betas
+        qiskit_init = init_betas_gammas
         qiskit_inits.append(qiskit_init)
         rst = get_minimum_by_QAOA(G, p, qiskit_init, noise_model, maxiter)
         results.append(rst)
@@ -502,8 +512,8 @@ def get_random_initialization(G:nx.Graph, p: int, n_pts: int,
 
 
 def find_good_initial_points_on_recon_LS_and_verify_top(
-    n_qubits: int, noise: str, p1: float, p2: float, maxiter:int, eps: List[float],
-    is_comp_random: bool, instance_seed: int, random_seed: int, stride: int, check: bool=False
+    n_qubits: int, p: int, noise: str, p1: float, p2: float, maxiter:int, eps: List[float],
+    instance_seed: int, random_seed: int, stride: int, check: bool=False
 ):
     """Find good initial points on recon landscapes.
 
@@ -530,7 +540,6 @@ def find_good_initial_points_on_recon_LS_and_verify_top(
     # noise = 'ideal'
     # n_qubits = 16
     cs_seed = n_qubits
-    p = 2
     sf = 0.05
     seed = instance_seed
     if p == 2:
@@ -553,73 +562,31 @@ def find_good_initial_points_on_recon_LS_and_verify_top(
 
     algorithm_globals.massive = True
     algorithm_globals.random_seed = seed
- 
-    # full_ranges: list = data['full_ranges'].tolist()
-    # bounds = data['bounds'].tolist()
-    # n_pts_per_unit = data['n_pts_per_unit']
-    # C_opt = data['C_opt']
 
     G = nx.random_regular_graph(3, n_qubits, seed)
     if n_qubits <= 16:
         row = get_3_reg_dataset_table_row(G, p)
-        print(row)
+        # print(row)
         C_opt = -row['C_opt']
         print("QAOAKit has its minimum: ", C_opt)
-        # is_comp_random = False
-        # angles = {
-        #     'beta': row['beta'],
-        # }
     else:
-        
         print("QAOAKit does not have true optima of this graph")
         print("compared with random initialization")
         C_opt = None
-        # is_comp_random = False
 
     # get_minimum_by_random_init(G, None, p)
 
     # TODO: check
     qaoakit_angles = opt_angles_for_graph(G, p)
     qiskit_angles = angles_to_qiskit_format(qaoakit_angles)
+    print("opt angle:", qiskit_angles)
 
-    # exit()
-    # check the largest n qubits
-    # reg3_dataset_table = get_3_reg_dataset_table()
-    # df = reg3_dataset_table.reset_index()
-    # print(df['n'].value_counts())
-    # df = df[(df["n"] == n_qubits) & (df["p_max"] == p)]
-
-    # exit()
-
-    if p == 2:
-        # ! old path
-        # recon_path = f"figs/gen_p1_landscape/sv-ideal/2D_CS_recon_p2/sf{sf:.3f}_bs{bs}_gs{gs}_nQ{n_qubits}.npz"
-        # ! new path 新增seed和cs_seed
-        recon_path, _, _ = get_recon_pathname(p, problem, method, noise, cs_seed, sf, data_fname)
-        recon = get_recon_landscape(p, origin, sf, False, recon_path, cs_seed)
-        # recon_path = f"figs/gen_p1_landscape/sv-{noise}/2D_CS_recon_p2/sf{sf:.3f}_bs{bs}_gs{gs}_nQ{n_qubits}_seed{seed}_csSeed{cs_seed}.npz"
-        # recon = np.load(f"{recon_path}")['recon']
-
-    elif p == 1:
-        recon_path = f"figs/gen_p1_landscape/sv-ideal/2D_CS_recon/sf{sf:.3f}_p1_bs{bs}_nQ{n_qubits}_csSeed{cs_seed}.npz"
-        recon = np.load(f"{recon_path}")['recon']
-
-
-    # get problem instance info from QAOAKit
+    recon_path, _, _ = get_recon_pathname(p, problem, method, noise, cs_seed, sf, data_fname)
+    recon = get_recon_landscape(p, origin, sf, False, recon_path, cs_seed)
 
     print("============= origin and recon LS are loaded ===============")
     print(f"shape of recon LS: {recon.shape}, origin LS: {origin.shape}")
     
-    # find, say 100 points that are \epsilon-close to minimum value of recon landscape
-    
-    # recon = -recon
-    # C_opt = -C_opt
-    # eps = 0.2 # 4
-    # eps = 0.3 # 22
-    # eps = 0.4 # 63
-    # eps = 0.5 #
-    # eps = 0.6
-
     # global_bp = cal_barren_plateaus(recon)
     global_bp = cal_barren_plateaus(recon)
     # global_bp = cal_min_barren_plateaus(recon)
@@ -681,10 +648,10 @@ def find_good_initial_points_on_recon_LS_and_verify_top(
 
     print("============== start OSCAR =============")
     
-    inits = []
-    # return
-    min_energies = []
+    oscar_inits = []
+    oscar_mins = []
     recon_init_pt_vals = []
+    origin_init_pt_vals = []
     oscar_rsts = []
     ids_higher_bp = []
     for i, idx in enumerate(ids): # idx: tuples
@@ -696,44 +663,39 @@ def find_good_initial_points_on_recon_LS_and_verify_top(
         for j in range(2*p):
             init_beta_gamma[j] = full_ranges[j][idx[j]]
 
-        # initial_point = {
-        #     'beta': np.array(init_beta_gamma[:p]),
-        #     'gamma': np.array(init_beta_gamma[p:]),
-        # }
         local_bp = cal_local_barren_plateaus(idx, recon, stride)
         print("local bp", local_bp)
+        
         recon_init_pt_val = recon[tuple(idx)]
-        # print(recon_init_pt_val)
+        origin_init_pt_val = origin[tuple(idx)]
+        print(f"recon_init_pt_val={recon_init_pt_val}, origin_init_pt_val={origin_init_pt_val}")
         recon_init_pt_vals.append(recon_init_pt_val)
+        origin_init_pt_vals.append(origin_init_pt_val)
         
         # print(init_beta_gamma)
         # format of Qiskit, p=2: gamma, beta, gamma, beta
-        initial_point = np.zeros(shape=2*p)
-        initial_point[::2] = init_beta_gamma[p:]
-        initial_point[1::2] = init_beta_gamma[:p]
-        # print(initial_point)
+        
+        # initial_point = np.zeros(shape=2*p)
+        # initial_point[::2] = init_beta_gamma[p:]
+        # initial_point[1::2] = init_beta_gamma[:p]
+        """Fuck
+        """
+        initial_point = init_beta_gamma
+        print(initial_point)
 
         if local_bp > global_bp:
             # ids_higher_bp.append(idx)
             ids_higher_bp.append(i)
 
-        if check:
-            continue
-
-        inits.append(initial_point)
-        # return
-        # initial_point = np.array(init_beta_gamma)
-
-        # print(initial_point)
-        # min_energy = _get_min_e(G, p, None, initial_point)
-        # min_energy = _get_min_given_init_pt(G=G, p=p, C=H, initial_point=initial_point)
-        
+        oscar_inits.append(initial_point) 
         rst = get_minimum_by_QAOA(G, p, initial_point, noise_model, maxiter)
-        # rst = [0]
+
+        print(f"oscar min={rst[0]}, init_pt={rst[1]}, actual_init_pt={rst[2][0]}, \
+            actual_init_pt_val={rst[3][0]}, recon_init_pt_val={recon_init_pt_val}")
 
         oscar_rsts.append(rst)
-        min_energies.append(rst[0])
-
+        oscar_mins.append(rst[0])
+        
         if check:
             break
 
@@ -741,19 +703,17 @@ def find_good_initial_points_on_recon_LS_and_verify_top(
 
     print(f"# higher than global bp: {len(ids_higher_bp)} / {len(ids)}")
     print(ids_higher_bp)
-    if is_comp_random:
+    if isinstance(random_seed, int):
         print("============== start Random =============")
         # random_energies, random_inits = \
         #     get_random_initialization(G, p, n_pts, noise_model,
         #         data['beta_bound'], data['gamma_bound'], maxiter)
         random_rsts, random_inits = \
-            get_random_initialization(G, p, n_pts, noise_model,
+            get_random_initialization(G, p, n_pts if not check else 1, noise_model,
                 data['beta_bound'], data['gamma_bound'], maxiter, random_seed)
+        random_mins = [rst[0] for rst in random_rsts]
     else:
-        random_rsts, random_inits = None, None
-    
-    if check:
-        return
+        random_rsts, random_inits, random_mins = None, None, None
 
     timestamp = get_curr_formatted_timestamp()
     save_dir = f"figs/find_init_pts_by_recon/{timestamp}"
@@ -763,45 +723,45 @@ def find_good_initial_points_on_recon_LS_and_verify_top(
     save_path = f"{save_dir}/init-maxiter={maxiter}-eps={eps}-{data_fname}"
     print("initial points data saved to ", save_path)
     
-
     np.savez_compressed(
         save_path,
-        ids=ids,
-        initial_points=inits, # one to one correspondence to ids
-        min_energies=min_energies, # one to one correspondence to ids
-        min_recon=min_recon,
-        recon_init_pt_vals=recon_init_pt_vals,
         eps=eps,
         C_opt=C_opt, # if QAOAKit does not have it, None
         offset=offset,
         maxiter=maxiter,
+        
+        # about reconstruction
+        recon_init_pt_vals=recon_init_pt_vals,
+        origin_init_pt_vals=origin_init_pt_vals,
+        min_recon=min_recon,
 
         # OSCAR method
         oscar_rsts=oscar_rsts,
-        oscar_energies=min_energies,
-        oscar_inits=ids, # indices
-
-        ids_higher_bp=ids_higher_bp,
+        oscar_mins=oscar_mins,
+        oscar_inits=oscar_inits, # parameters, bbgg
+        oscar_init_ids=ids, # indices
 
         # random initialization method
-        # random_energies=random_energies,
+        random_mins=random_mins,
         random_rsts=random_rsts,
-        random_inits=random_inits, # indices
+        random_inits=random_inits, # parameters, bbgg
+        
+        # others
+        ids_higher_bp=ids_higher_bp,
     )
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('-n', type=int, help="Number of qubits", required=True)
-    # parser.add_argument('-p', type=str, help="QAOA layers", required=True)
+    parser.add_argument('-p', type=int, help="QAOA layers", required=True)
     parser.add_argument('--noise', type=str, help="Noise type", required=True)
     parser.add_argument('--p1', type=float, help="Depolar")
     parser.add_argument('--p2', type=float, help="Depolar")
     parser.add_argument('--maxiter', type=int, help="Depolar", default=None)
     parser.add_argument('--check', action='store_true', default=False)
     parser.add_argument('--eps', type=float, nargs="+", required=True)
-    parser.add_argument('--random', action='store_true', default=False)
     parser.add_argument('--inst_seed', type=int, help="seed of problem instance", required=True)
-    parser.add_argument('--random_seed', type=int)
+    parser.add_argument('--random_seed', type=int, default=None)
     parser.add_argument('--stride', type=int)
 
     args = parser.parse_args()
@@ -809,7 +769,7 @@ if __name__ == "__main__":
     # test_qiskit_qaoa_circuit()
     # exit()
     find_good_initial_points_on_recon_LS_and_verify_top(
-        n_qubits=args.n, noise=args.noise, p1=args.p1, p2=args.p2,
-        maxiter=args.maxiter, eps=args.eps, is_comp_random=args.random, 
+        n_qubits=args.n, p=args.p, noise=args.noise, p1=args.p1, p2=args.p2,
+        maxiter=args.maxiter, eps=args.eps,
         instance_seed=args.inst_seed, random_seed=args.random_seed, stride=args.stride, check=args.check
     )
