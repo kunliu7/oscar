@@ -267,510 +267,100 @@ def recon_landscapes_varying_qubits_and_instances(
     )
 
 
-# ! deprecated
-def recon_p1_landscape_noisy_varying_qubits_and_instances():
+def gen_heapmap_by_varying_sampling_fraction_and_beta_step(
+    p: int, problem: str, noise: str, n_seeds: List[int], n_qubits_list: list, error_type: str
+):
     is_recon = False
 
-    label = "sv-depolar-0.003-0.007"
-
-    bs = 50 # beta step
-    gs = 2 * bs
-    data_dir = f"figs/gen_p1_landscape/{label}"
+    method = 'sv'
+    miti_method = ''
     mses = []
     coss = []
 
-    n_qubits_list = [12, 16, 20]
-    seeds = [0, 1]
     sfs = np.arange(0.01, 0.11, 0.02)
+    if len(n_seeds) == 1:
+        seeds = list(range(n_seeds[0]))
+    elif len(n_seeds) == 2:
+        seeds = list(range(n_seeds[0], n_seeds[1]))
 
-    for n_qubits in n_qubits_list:
-        for seed in seeds:
-            data = np.load(
-                f"{data_dir}/{label}-n={n_qubits}-p=1-seed={seed}-{bs}-{2*bs}.npz",
-                allow_pickle=True)
+    bss = range(25, 76, 5)
 
-            timestamp = get_curr_formatted_timestamp()
-            bounds = {
-                'beta': data['beta_bound'],
-                'gamma': data['gamma_bound']
-            }
+    print("noise =", noise)
+    print("n qubits list =", n_qubits_list)
+    print("seeds =", seeds)
+    print("sfs =", sfs)
+    print("bss =", bss)
 
-            origin = data['data']
-            print(origin.shape)
+    # 和Tianyi代码使用相同目录结构
+    recon_dir = f"figs/grid_search_recon/{problem}/{method}-{noise}-p={p}"
+    for n_qubits, seed, sf, bs in itertools.product(n_qubits_list, seeds, sfs, bss):
+        cs_seed = n_qubits # ! compare horizontally
+        gs = 2 * bs
 
-            full_range = {
-                'beta': np.linspace(- bounds['beta'], bounds['beta'], origin.shape[0]),
-                'gamma': np.linspace(- bounds['gamma'], bounds['gamma'], origin.shape[1])
-            }
+        data, data_fname, data_dir = load_grid_search_data(
+            n_qubits=n_qubits, p=p, problem=problem, method=method,
+            noise=noise, beta_step=bs, gamma_step=gs, seed=seed, miti_method=miti_method
+        )
 
-            # print(full_range)
+        plot_range = data['plot_range']
 
-            # origin = {'ideals': landscape}
-            # recon_dir = f"figs/recon/{timestamp}"
-            fig_dir = f"{data_dir}/2D_CS_recon"
-            if not os.path.exists(fig_dir):
-                os.makedirs(fig_dir)
-
-            for sf in sfs:
-                if not is_recon:
-                    # seed = seed
-                    cs_seed = n_qubits
-                    np.random.seed(seed=cs_seed)
-                    recon = recon_2D_landscape(
-                        origin=origin,
-                        sampling_frac=sf
-                    )
-
-                    np.savez_compressed(f"{fig_dir}/sf{sf:.3f}_p1_bs{bs}_gs{gs}_nQ{n_qubits}_seed{seed}_csSeed{cs_seed}",
-                        recon=recon,
-                    )
-                else:
-                    recon = np.load(f"{fig_dir}/sf{sf:.3f}_p1_bs{bs}_gs{gs}_nQ{n_qubits}_seed{seed}_csSeed{cs_seed}.npz",
-                        allow_pickle=True
-                    )['recon']
-
-                    # print(recon.shape)
-                    
-                mse = cal_recon_error(origin.reshape(-1), recon.reshape(-1), "MSE")
-                # ncc = cal_recon_error(landscape.reshape(-1), recon.reshape(-1), "CROSS_CORRELATION")
-                cos = cosine(origin.reshape(-1), recon.reshape(-1))
-                mses.append(mse)
-                coss.append(cos)
-
-                # ncc = cal_recon_error()
-                print("RMSE: ", mse)
-                print("Cosine: ", cos)
-                
-                vis_landscapes(
-                    landscapes=[origin, recon],
-                    labels=["origin", "recon"],
-                    full_range={
-                        "beta": full_range['beta'],
-                        "gamma": full_range['gamma'] 
-                    },
-                    true_optima=None,
-                    title="Origin and recon",
-                    save_path=f'{fig_dir}/origin_and_2D_recon_sf{sf:.3f}_bs{bs}_gs{gs}_nQ{n_qubits}_seed{seed}_csSeed{cs_seed}.png',
-                    params_paths=[None, None]
-                )
-
-    print("mse = ", mses)
-    print("cos = ", coss)
-    mses = np.array(mses)
-    coss = np.array(coss)
-
-    mses = mses.reshape(len(n_qubits_list), len(seeds), len(sfs))
-    coss = coss.reshape(len(n_qubits_list), len(seeds), len(sfs))
-    print("mse's shape =", mses.shape)
-    print("cos's shape =", coss.shape)
-    np.savez_compressed(
-        f"{data_dir}/recon_error_noisy_p1",
-        mses=mses,
-        coss=coss,
-        n_qubits_list=n_qubits_list,
-        seeds=seeds,
-        sfs=sfs
-    )
-
-
-# ! deprecated
-def recon_p1_landscape_ideal_varying_qubits_and_instances():
-    is_recon = False
-
-    bs = 50 # beta step
-    data_dir = "figs/gen_p1_landscape/sv-ideal"
-    mses = []
-    coss = []
-
-    n_qubits_list = [16, 20, 24, 30]
-    seeds = [0, 1, 2]
-    sfs = np.arange(0.01, 0.11, 0.02)
-
-    for n_qubits in n_qubits_list:
-        for seed in seeds:
-            data = np.load(
-                f"{data_dir}/sv-ideal-n={n_qubits}-p=1-seed={seed}-{bs}-{2*bs}.npz",
-                allow_pickle=True)
-
-            timestamp = get_curr_formatted_timestamp()
-            bounds = {
-                'beta': data['beta_bound'],
-                'gamma': data['gamma_bound']
-            }
-
-            origin = data['data']
-            print(origin.shape)
-
-            full_range = {
-                'beta': np.linspace(- bounds['beta'], bounds['beta'], origin.shape[0]),
-                'gamma': np.linspace(- bounds['gamma'], bounds['gamma'], origin.shape[1])
-            }
-
-            # print(full_range)
-
-            # origin = {'ideals': landscape}
-            # recon_dir = f"figs/recon/{timestamp}"
-            fig_dir = f"{data_dir}/2D_CS_recon"
-            if not os.path.exists(fig_dir):
-                os.makedirs(fig_dir)
-
-            for sf in sfs:
-            # for sf in [0.05]:
-                if not is_recon:
-                    cs_seed = n_qubits
-                    # rng = np.random.default_rng(seed=seed)
-                    np.random.seed(seed=cs_seed)
-                    recon = recon_2D_landscape(
-                        origin=origin,
-                        sampling_frac=sf
-                    )
-
-                    np.savez_compressed(f"{fig_dir}/sf{sf:.3f}_p1_bs{bs}_nQ{n_qubits}_csSeed{cs_seed}",
-                        recon=recon,
-                    )
-                else:
-                    recon = np.load(f"{fig_dir}/sf{sf:.3f}_p1_bs{bs}_nQ{n_qubits}_csSeed{cs_seed}.npz",
-                        allow_pickle=True
-                    )['recon']
-
-                    # print(recon.shape)
-                    
-                mse = cal_recon_error(origin.reshape(-1), recon.reshape(-1), "MSE")
-                # ncc = cal_recon_error(landscape.reshape(-1), recon.reshape(-1), "CROSS_CORRELATION")
-                cos = cosine(origin.reshape(-1), recon.reshape(-1))
-                mses.append(mse)
-                coss.append(cos)
-
-                # ncc = cal_recon_error()
-                print("RMSE: ", mse)
-                print("Cosine: ", cos)
-                
-                vis_landscapes(
-                    landscapes=[origin, recon],
-                    labels=["origin", "recon"],
-                    full_range={
-                        "beta": full_range['beta'],
-                        "gamma": full_range['gamma'] 
-                    },
-                    true_optima=None,
-                    title="Origin and recon",
-                    save_path=f'{fig_dir}/origin_and_2D_recon_sf{sf:.3f}_bs{bs}_nQ{n_qubits}.png',
-                    params_paths=[None, None]
-                )
-
-    print("mse = ", mses)
-    print("cos = ", coss)
-    mses = np.array(mses)
-    coss = np.array(coss)
-
-    mses = mses.reshape(len(n_qubits_list), len(seeds), len(sfs))
-    coss = coss.reshape(len(n_qubits_list), len(seeds), len(sfs))
-    print("mse's shape =", mses.shape)
-    print("cos's shape =", coss.shape)
-    np.savez_compressed(
-        f"{data_dir}/recon_error_ideal_p1",
-        mses=mses,
-        coss=coss,
-        n_qubits_list=n_qubits_list,
-        seeds=seeds,
-        sfs=sfs
-    )
-
-
-# ! deprecated
-def recon_p2_landscape_ideal_varying_qubits_and_instances():
-    is_recon = False
-
-    bs = 12 # beta step
-    gs = 15
-    data_dir = "figs/gen_p1_landscape/sv-ideal"
-    mses = []
-    coss = []
-
-    # n_qubits_list = [16, 20, 24]
-    # seeds = [0, 1]
-    # sfs = np.arange(0.01, 0.11, 0.02)
-    n_qubits_list = [16, 20, 24]
-    seeds = [0, 1]
-    # sfs = np.arange(0.01, 0.1, 0.02)
-    sfs = [0.05]
-    
-    for n_qubits in n_qubits_list:
-        for seed in seeds:
-            data = np.load(
-                f"{data_dir}/sv-ideal-n={n_qubits}-p=2-seed={seed}-{bs}-{gs}.npz",
-                allow_pickle=True)
-
-            timestamp = get_curr_formatted_timestamp()
-            bounds = {
-                'beta': data['beta_bound'],
-                'gamma': data['gamma_bound']
-            }
-
-            origin = data['data']
-            print(origin.shape)
-
-            full_range = {
-                'beta': np.linspace(- bounds['beta'], bounds['beta'], origin.shape[0]),
-                'gamma': np.linspace(- bounds['gamma'], bounds['gamma'], origin.shape[1])
-            }
-
-            # print(full_range)
-
-            # origin = {'ideals': landscape}
-            # recon_dir = f"figs/recon/{timestamp}"
-            fig_dir = f"{data_dir}/2D_CS_recon_p2"
-            if not os.path.exists(fig_dir):
-                os.makedirs(fig_dir)
-
-            for sf in sfs:
-                cs_seed = seed
-                if not is_recon:
-                    cs_seed = n_qubits
-                    np.random.seed(seed=cs_seed)
-                    recon = recon_4D_landscape_by_2D(
-                        origin=origin,
-                        sampling_frac=sf
-                    )
-            
-                    np.savez_compressed(f"{fig_dir}/sf{sf:.3f}_bs{bs}_gs{gs}_nQ{n_qubits}_seed{seed}_csSeed{cs_seed}",
-                        recon=recon,
-                        seed=seed
-                    )
-                else:
-                    # recon = np.load(f"{fig_dir}/sf{sf:.3f}_bs{bs}_gs{gs}_nQ{n_qubits}_seed{seed}_csSeed{cs_seed}.npz",
-                    #     allow_pickle=True
-                    # )['recon']
-                    
-                    recon = np.load(f"{fig_dir}/sf{sf:.3f}_bs{bs}_gs{gs}_nQ{n_qubits}.npz",
-                        allow_pickle=True
-                    )['recon']
-
-                    # print(recon.shape)
-                    
-                mse = cal_recon_error(origin.reshape(-1), recon.reshape(-1), "MSE")
-                # ncc = cal_recon_error(landscape.reshape(-1), recon.reshape(-1), "CROSS_CORRELATION")
-                cos = cosine(origin.reshape(-1), recon.reshape(-1))
-                mses.append(mse)
-                coss.append(cos)
-
-                origin_2d = origin.reshape(origin.shape[0] * origin.shape[1],
-                    origin.shape[2] * origin.shape[3])
-                recon_2d = recon.reshape(recon.shape[0] * recon.shape[1],
-                    recon.shape[2] * recon.shape[3])
-
-                # ncc = cal_recon_error()
-                print("RMSE: ", mse)
-                print("Cosine: ", cos)
-                
-                vis_landscapes(
-                    landscapes=[origin_2d, recon_2d],
-                    labels=["origin", "recon"],
-                    full_range={
-                        "beta": range(origin_2d.shape[0]),
-                        "gamma": range(origin_2d.shape[1]) 
-                    },
-                    true_optima=None,
-                    title="Origin and recon",
-                    save_path=f'{fig_dir}/origin_and_2D_recon_sf{sf:.3f}_bs{bs}_gs{gs}_nQ{n_qubits}_seed{seed}_csSeed{cs_seed}.png',
-                    params_paths=[None, None]
-                )
-
-    print("mse = ", mses)
-    print("cos = ", coss)
-    mses = np.array(mses)
-    coss = np.array(coss)
-
-    mses = mses.reshape(len(n_qubits_list), len(seeds), len(sfs))
-    coss = coss.reshape(len(n_qubits_list), len(seeds), len(sfs))
-    print("mse's shape =", mses.shape)
-    print("cos's shape =", coss.shape)
-    np.savez_compressed(
-        f"{fig_dir}/recon_error_ideal_p2_{n_qubits_list}_{seeds}_{sfs}",
-        mses=mses,
-        coss=coss,
-        n_qubits_list=n_qubits_list,
-        seeds=seeds,
-        sfs=sfs
-    )
-
-
-# ! deprecated
-def recon_large_qubits_p1_landscape_top():
-    is_recon = False
-
-    beta_steps = range(25, 76, 5)
-    data_dir = "figs/gen_p1_landscape/2022-10-18_n16_p1_ideal"
-    mses = []
-    coss = []
-    for bs in beta_steps:
-        data = np.load(
-            f"{data_dir}/sv-ideal/sv-ideal-n=16-p=1-seed=0-{bs}-{2*bs}.npz",
-            allow_pickle=True)
-
-        timestamp = get_curr_formatted_timestamp()
-        bounds = {
-            'beta': data['beta_bound'],
-            'gamma': data['gamma_bound']
-        }
+        recon_fname = f"recon-cs_seed={cs_seed}-sf={sf:.3f}-{data_fname}"
+        recon_path = f"{recon_dir}/{recon_fname}"
 
         origin = data['data']
-        print(origin.shape)
-
-        full_range = {
-            'beta': np.linspace(- bounds['beta'], bounds['beta'], origin.shape[0]),
-            'gamma': np.linspace(- bounds['gamma'], bounds['gamma'], origin.shape[1])
-        }
-
-        # print(full_range)
-
-        # origin = {'ideals': landscape}
-        # recon_dir = f"figs/recon/{timestamp}"
-        fig_dir = f"{data_dir}/2D_CS_recon/sv-ideal"
-        if not os.path.exists(fig_dir):
-            os.makedirs(fig_dir)
-
-        for sf in np.arange(0.01, 0.11, 0.02):
-        # for sf in [0.05]:
-            if not is_recon:
-                seed = beta_steps
-                np.random.seed(seed)
-                recon = recon_2D_landscape(
-                    origin=origin,
-                    sampling_frac=sf
-                )
-
-                np.savez_compressed(f"{fig_dir}/sf{sf:.3f}_bs{bs}",
-                    recon=recon,
-                    seed=seed
-                )
-            else:
-                recon = np.load(f"{fig_dir}/sf{sf:.3f}_bs{bs}.npz",
-                    allow_pickle=True
-                )['recon']
-
-                # print(recon.shape)
+        recon = get_recon_landscape(p, origin, sf, is_recon, 
+            recon_path, cs_seed)
                 
-            mse = cal_recon_error(origin.reshape(-1), recon.reshape(-1), "MSE")
-            # ncc = cal_recon_error(landscape.reshape(-1), recon.reshape(-1), "CROSS_CORRELATION")
-            cos = cosine(origin.reshape(-1), recon.reshape(-1))
-            mses.append(mse)
-            coss.append(cos)
-
-            # ncc = cal_recon_error()
-            print("RMSE: ", mse)
-            print("Cosine: ", cos)
-            
-            vis_landscapes(
-                landscapes=[origin, recon],
-                labels=["origin", "recon"],
-                full_range={
-                    "beta": full_range['beta'],
-                    "gamma": full_range['gamma'] 
-                },
-                true_optima=None,
-                title="Origin and recon",
-                save_path=f'{fig_dir}/origin_and_2D_recon_sf{sf:.3f}_bs{bs}.png',
-                params_paths=[None, None]
-            )
-
-    print("mse", mses)
-    print("cos", coss)
-
-
-# ! deprecated
-def recon_large_qubits_p2_landscape_top():
-    is_recon = True
-    data_dir = "figs/gen_p2_landscape/2022-10-18_15:50:00_n6_p2_ideal"
-    data = np.load(f"{data_dir}/sv-aer-gpu-n=16-p=2-seed=0-12-15.npz", allow_pickle=True)
-
-    timestamp = get_curr_formatted_timestamp()
-    bounds = {
-        'beta': data['beta_bound'],
-        'gamma': data['gamma_bound']
-    }
-
-    # n_pts_per_unit = {
-    #     'beta': data['beta_bound'],
-    #     'gamma': data['gamma_bound']
-    # }
-
-    # n_pts = {}
-    # for label, bound in bounds.items():
-    #     bound_len = bound[1] - bound[0]
-    #     n_pts[label] = np.floor(n_pts_per_unit[label] * bound_len).astype(int)
-    
-    # print('bounds: ', bounds)
-    # print('n_pts: ', n_pts)
-    # print('n_pts_per_unit: ', n_pts_per_unit)
-
-    # full_range = {
-    #     'gamma': np.linspace(bounds['gamma'][0], bounds['gamma'][1], n_pts['gamma']),
-    #     'beta': np.linspace(bounds['beta'][0], bounds['beta'][1], n_pts['beta'])
-    # }
-
-    landscape = data['data']
-    print(landscape.shape)
-
-    # landscape = landscape.reshape(25, 50)
-
-    full_range = {
-        'beta': np.linspace(- bounds['beta'], bounds['beta'], landscape.shape[0]),
-        'gamma': np.linspace(- bounds['gamma'], bounds['gamma'], landscape.shape[2])
-    }
-    print(full_range)
-
-    # origin = {'ideals': landscape}
-    # recon_dir = f"figs/recon/{timestamp}"
-    figdir = f"{data_dir}/2D_CS_recon"
-    if not os.path.exists(figdir):
-        os.makedirs(figdir)
-
-    # for sf in np.arange(0.05, 0.5, 0.03):
-    for sf in [0.05]:
-        # recon = two_D_CS_p1_recon_with_given_landscapes(
-        #     figdir=None,
-        #     origin=origin,
-        #     full_range=None,
-        #     sampling_frac=sf
-        # )
-
-        if not is_recon:
-            recon = recon_4D_landscape_by_2D(
-                origin=landscape,
-                sampling_frac=sf
-            )
-            np.savez_compressed(f"{figdir}_sf{sf:.3f}",
-                recon=recon
-            )
-        else:
-            recon = np.load(f"{figdir}_sf{sf:.3f}.npz",
-                allow_pickle=True
-            )['recon']
-            
-        mse = cal_recon_error(landscape.reshape(-1), recon.reshape(-1), "MSE")
+        mse = cal_recon_error(origin.reshape(-1), recon.reshape(-1), error_type)
         # ncc = cal_recon_error(landscape.reshape(-1), recon.reshape(-1), "CROSS_CORRELATION")
-        cos = cosine(landscape.reshape(-1), recon.reshape(-1))
-        # ncc = cal_recon_error()
-        print("RMSE: ", mse)
-        print("Cosine: ", cos)
-        origin_2d = landscape.reshape(landscape.shape[0] * landscape.shape[1],
-            landscape.shape[2] * landscape.shape[3])
-        recon_2d = recon.reshape(recon.shape[0] * recon.shape[1],
-            recon.shape[2] * recon.shape[3])
+        cos = cosine(origin.reshape(-1), recon.reshape(-1))
+        mses.append(mse)
+        coss.append(cos)
 
+        # ncc = cal_recon_error()
+        print("NRMSE: ", mse)
+        print("Cosine: ", cos)
+        
+        base_recon_fname = os.path.splitext(recon_fname)[0]
         vis_landscapes(
-            landscapes=[origin_2d, recon_2d],
+            landscapes=[origin, recon],
             labels=["origin", "recon"],
             full_range={
-                "beta": range(origin_2d.shape[0]),
-                "gamma": range(origin_2d.shape[1])
+                "beta": plot_range['beta'],
+                "gamma": plot_range['gamma'] 
             },
             true_optima=None,
-            title="Compare different ZNE configs and reconstruction",
-            save_path=f'{figdir}/origin_and_2D_recon_sf{sf:.3f}.png',
+            title="Origin and recon",
+            save_path=f'{recon_dir}/vis/vis-{base_recon_fname}.png',
             params_paths=[None, None]
         )
+
+    print("noise =", noise)
+    print("n qubits list =", n_qubits_list)
+    print("seeds =", seeds)
+    print("sfs =", sfs)
+
+    print("mse =", mses)
+    print("cos =", coss)
+    mses = np.array(mses)
+    coss = np.array(coss)
+
+    mses = mses.reshape(len(n_qubits_list), len(seeds), len(sfs), len(bss))
+    coss = coss.reshape(len(n_qubits_list), len(seeds), len(sfs), len(bss))
+    print("mse's shape =", mses.shape)
+    print("cos's shape =", coss.shape)
+    # timestamp = get_curr_formatted_timestamp()
+    recon_error_save_dir = f"{recon_dir}/recon_error_ns={n_qubits_list}-seeds={seeds}-sfs={sfs}-bss={bss}-error={error_type}"
+    print(f"recon error data save to {recon_error_save_dir}")
+    np.savez_compressed(
+        recon_error_save_dir,
+        mses=mses,
+        coss=coss,
+        n_qubits_list=n_qubits_list,
+        seeds=seeds,
+        sfs=sfs,
+        bss=bss,
+    )
 
 
 def CS_by_BPDN_p1():
@@ -972,6 +562,9 @@ if __name__ == "__main__":
         recon_p2_landscape_ideal_varying_qubits_and_instances()
     elif args.aim == 'noisy_p2':
         pass
+    elif args.aim == 'heatmap':
+        gen_heapmap_by_varying_sampling_fraction_and_beta_step(p=args.p, problem=args.problem,
+            noise=args.noise, n_seeds=args.n_seeds, n_qubits_list=args.ns, error_type=args.error)
     elif args.aim == 'final':
         recon_landscapes_varying_qubits_and_instances(p=args.p, problem=args.problem,
             noise=args.noise, n_seeds=args.n_seeds, n_qubits_list=args.ns, error_type=args.error)
