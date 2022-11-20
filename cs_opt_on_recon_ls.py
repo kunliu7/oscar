@@ -13,6 +13,8 @@ from qiskit.opflow import PrimitiveOp
 from qiskit_optimization.applications import Maxcut, SKModel, NumberPartition
 from qiskit.algorithms.optimizers.optimizer import POINT
 from mitiq.zne.zne import execute_with_zne
+from qiskit.providers.aer.noise import NoiseModel
+from qiskit.algorithms.optimizers.optimizer import Optimizer as QiskitOptimizer
 from mitiq.zne.inference import (
     LinearFactory
 )
@@ -151,6 +153,58 @@ from QAOAKit.interpolate import (
 from qiskit.algorithms.minimum_eigen_solvers.qaoa import QAOAAnsatz
 
 test_utils_folder = Path(__file__).parent
+
+
+def get_minimum_by_QAOA(G: nx.Graph, p: int, qiskit_init_pt: np.ndarray,
+    noise_model: NoiseModel, optimizer: QiskitOptimizer):
+    """Get minimum cost value by random initialization.
+
+    Returns:
+        eigenvalue, qiskit_init_pt, params, values
+    """
+    maxcut = Maxcut(G)
+    problem = maxcut.to_quadratic_program()
+    C, offset = problem.to_ising()
+
+    counts = []
+    values = []
+    params = []
+    def cb_store_intermediate_result(eval_count, parameters, mean, std):
+        counts.append(eval_count)
+        values.append(mean)
+        params.append(parameters)
+
+    # qinst = AerSimulator(shots=2048, noise_model=noise_model)
+    qinst = AerSimulator(method='statevector')
+    # shots = 2048
+    # optimizer = SPSA(maxiter=maxiter)
+    # if isinstance(maxiter, int):
+    #     # optimizer = SPSA(maxiter=maxiter)
+    #     optimizer = COBYLA(maxiter=maxiter)
+    #     print("maxiter:", maxiter)
+    # else:
+    #     # optimizer = SPSA()
+    #     optimizer = COBYLA()
+    #     print("no maxiter")
+    
+    print("noise model", noise_model)
+
+    qaoa = QAOA(
+        optimizer=optimizer,
+        reps=p,
+        initial_point=qiskit_init_pt,
+        quantum_instance=qinst,
+        callback=cb_store_intermediate_result
+    )
+    # print(qaoa.ansatz)
+    result = qaoa.compute_minimum_eigenvalue(C)
+    eigenvalue = result.eigenvalue.real
+
+    print("offset                 :", offset)
+    print("QAOA minimum           :", eigenvalue)
+    print("Real minimum (+offset) :", eigenvalue + offset)
+
+    return eigenvalue, qiskit_init_pt, params, values
 
 
 def optimize_on_p1_reconstructed_landscape(
@@ -308,16 +362,28 @@ def optimize_on_p1_reconstructed_landscape(
     # ])
     
     # true_optima = shift_parameters(true_optima, bounds)
+    _, _, circ_path, _ = get_minimum_by_QAOA(G, p, initial_point, None, ADAM())
 
     base_recon_fname = os.path.splitext(recon_fname)[0]
+
     vis_landscapes(
         landscapes=[origin, recon],
-        labels=["origin", "recon"],
+        labels=["Interpolate", "Circuit Sim."],
         full_range=plot_range,
         true_optima=None,
         title="Origin and recon",
         save_path=f'{recon_dir}/vis-{base_recon_fname}.png',
-        params_paths=[params, None]
+        params_paths=[params, circ_path]
+    )
+
+    ts = get_curr_formatted_timestamp()
+    save_dir = f"figs/opt_on_recon_landscape/{ts}"
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+    np.savez_compressed(
+        f"{save_dir}/opt_on_recon-opt={optimizer_name}-{base_recon_fname}",
+        intp_path=params,
+        circ_path=circ_path
     )
 
 def gen_p1_landscape_with_other_miti_top():
