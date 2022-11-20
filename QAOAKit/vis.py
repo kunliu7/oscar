@@ -1129,8 +1129,8 @@ def vis_landscapes(
             xs = [] # beta
             ys = [] # gamma
             for param in params:
-                xs.append(param[1])
-                ys.append(param[0])
+                xs.append(param[0])
+                ys.append(param[1])
 
             axs[idx].plot(xs, ys, marker="o", color='purple', markersize=5, label="optimization path")
             axs[idx].plot(xs[0], ys[0], marker="o", color='white', markersize=9, label="initial point")
@@ -1152,3 +1152,46 @@ def vis_landscapes(
     plt.close('all')
 
     print("save to: ", save_path)
+
+
+def vis_landscape_refactored(
+    ax,
+    landscape, # list of np.ndarray
+    label, # list of labels of correlated landscapes
+    full_range, # dict, 
+    true_optima,
+    params_path, # list of list of parameters correlated to landscapes
+):
+
+    if len(ls.shape) == 4:
+        shape = ls.shape
+        ls = ls.reshape(shape[0] * shape[1], shape[2] * shape[3])
+        print(f"reshape: {shape} -> {ls.shape}")
+    elif len(ls.shape) == 2:
+        pass
+    else:
+        raise ValueError()
+
+    # TODO Check ij and xy
+    X, Y = np.meshgrid(full_range['beta'], full_range['gamma'], indexing='ij')
+    # X, Y = np.meshgrid(full_range['beta'], full_range['gamma'], indexing='xy')
+    
+    # c = ax.pcolormesh(X, Y, Z, cmap='viridis', vmin=Z.min(), vmax=Z.max())
+    im = ax.pcolormesh(X, Y, landscape) #, cmap='viridis', vmin=origin.min(), vmax=origin.max())
+    ax.set_title(label)
+    ax.set_xlabel('beta')
+    ax.set_ylabel('gamma')
+    if isinstance(true_optima, list) or isinstance(true_optima, np.ndarray):
+        ax.plot(true_optima[0], true_optima[1], marker="o", color='red', markersize=7, label="true optima")
+
+    params = params_path
+    if isinstance(params, list) or isinstance(params, np.ndarray):
+        xs = [] # beta
+        ys = [] # gamma
+        for param in params:
+            xs.append(param[0])
+            ys.append(param[1])
+
+        ax.plot(xs, ys, marker="o", color='purple', markersize=5, label="optimization path")
+        ax.plot(xs[0], ys[0], marker="o", color='white', markersize=9, label="initial point")
+        ax.plot(xs[-1], ys[-1], marker="s", color='white', markersize=12, label="last point")
