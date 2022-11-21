@@ -399,25 +399,30 @@ def normalize_by_geo_mean(ls1, ls2, n_pts: int):
     return ls1, ls2, cr
 
 
-def normalize_by_linear_regression(ls1, ls2, n_pts):
-    ls1 = ls1.copy()
-    ls2 = ls2.copy()
-    rng = np.random.default_rng(0)
+def T_flatten(a: np.ndarray):
+    assert len(a.shape) == 2
+    return a.copy().T.flat[:]
+
+
+def inv_T_flatten(a: np.ndarray, shape: tuple):
+    assert len(a.shape) == 1 and len(shape) == 2
+    return a.reshape(shape[::-1]).T
+
+
+def normalize_by_linear_regression(ls1, ls2, n_pts, ri):
     shape = ls1.shape
     print("shape =", shape)
-    pos = True
+    assert (ls1 == inv_T_flatten(T_flatten(ls1), ls1.shape)).all()
+    fls1 = T_flatten(ls1)
+    fls2 = T_flatten(ls2)
 
-    ids = []
-    for dim_size in shape:
-        idx = rng.integers(dim_size, size=n_pts) 
-        ids.append(idx)
+    rng = np.random.default_rng(7)
 
-    # ids = np.array(ids)
-    print(ids[0].shape, ids[0][:5])
-    # ids = ids.reshape(n_pts, len(shape))
+    ids = rng.choice(ri, n_pts, replace=False)
+    print(ids.shape)
 
-    y = ls1[tuple(ids)]
-    x = ls2[tuple(ids)]
+    y = fls1[ids]
+    x = fls2[ids]
     print(x.shape)
     print(y.shape)
 
@@ -485,19 +490,11 @@ def reconstruct_by_distributed_landscapes_two_noisy_simulations_top(
         if not os.path.exists(recon_dir):
             os.makedirs(recon_dir)
     else:
-        # method = normalize
-        # if method == 'baseline':
-        #     path = "figs/recon_distributed_landscape/2022-11-13_16:48:42"
-        # elif method == 'linear':
-        #     path = "figs/recon_distributed_landscape/2022-11-13_16:48:56"
-        # elif method == 'geo':
-        #     path = "figs/recon_distributed_landscape/2022-11-13_16:49:14"
         print("recon_dir specified:", recon_dir)
-        # raise NotImplementedError()
-        # raise ValueError()
 
     errors1 = []
     errors2 = []
+    sf = 0.1
     for n_qubits in n_qubits_list:
         
         method = 'sv'
@@ -525,52 +522,41 @@ def reconstruct_by_distributed_landscapes_two_noisy_simulations_top(
         noisy2 = noisy_data2['data'] 
 
         datas = [noisy1, noisy2]
-
-
         for data in datas:
             print(data.shape)
-
-        # --------- data prepared OK, check if want to normalize -----------
+        
+        rng = np.random.default_rng(0)
         landscape_shape = datas[0].shape
         n_pts = np.prod(landscape_shape)
+        k = round(sf * n_pts)
+        random_indices = rng.choice(np.prod(n_pts), k, replace=False) # random sample of indices
+
+        # --------- data prepared OK, check if want to normalize -----------
+        
+        
         if normalize == 'geo':
+            raise NotImplementedError("Current implement has some mistakes, refer to `linear`")
             n_normalize = round(norm_frac * n_pts)
             print("# points used to derive normalize ratio =", n_normalize)
             noisy1, noisy2, _ = normalize_by_geo_mean(noisy1, noisy2, n_normalize)
             datas = [noisy1, noisy2]
         elif normalize == 'linear':
             print("normalized by linear regression")
-            n_normalize = round(norm_frac * n_pts)
-            noisy1, noisy2 = normalize_by_linear_regression(noisy1, noisy2, n_normalize)
+            n_normalize = round(norm_frac * sf * n_pts)
+            # rng.choice(random_indices, n_normalize, replace=False)
+            noisy1, noisy2 = normalize_by_linear_regression(noisy1, noisy2, n_normalize, random_indices)
             datas = [noisy1, noisy2]
 
         elif normalize == None:
             print("do not normalize")
         else:
             raise NotImplementedError()
-            # recon_dir = "figs/recon_distributed_landscape/2022-09-30_14:34:08"
-            # recon_dir = "figs/recon_distributed_landscape/2022-11-12_16:10:35"
-
-        # sfs = np.arange(0.05, 0.42, 0.03)
-        sfs = [0.10]
-
-        # ratios = [.0, 1.0]
-        # ratios = [0.25, 0.75]
-        # ratios = [0.75, 0.25]
-        # ratios = [1.0, 0.]
 
         ratios_cfg1 = [0.0, 0.25, 0.5, 0.75, 1.0]
-        sf = sfs[0]
         
-        # n_pts = np.prod(landscape_shape)
-        rng = np.random.default_rng(0)
-        k = round(sf * n_pts)
-        random_indices = rng.choice(np.prod(n_pts), k, replace=False) # random sample of indices
-
         for ratio in ratios_cfg1:
             ratios = [ratio, 1-ratio]
 
-            # recon_fname = f"recon-n={n_qubits}-ratios={ratios}-sf={sf:.3f}-norm={normalize}-nf={norm_frac:.3f}"
             recon_fname = f"recon-n={n_qubits}-ratios={ratios}-sf={sf:.3f}-norm={normalize}-nf={norm_frac:.3f}"
             if not is_existing_recon:
                 if p == 1:
@@ -587,14 +573,8 @@ def reconstruct_by_distributed_landscapes_two_noisy_simulations_top(
                 np.savez_compressed(f"{recon_dir}/{recon_fname}", recon=recon)
 
             else:
-                # recon = np.load(
-                #     # f"{recon_dir}/recon_by_{len(datas)}_landscapes_sf{sf:.3f}_ratios{ratios}.npz"
-                #     "recon errors save to figs/recon_distributed_landscape/2022-11-13_13:51:38/dist_LS_errors-n=20-p=1-noise1=depolar-0.003-0.007-noise2=depolar-0.001-0.02-normalize=geo-norm_frac=0.100.npz"
-                #     # f"figs/recon_distributed_landscape/2022-11-12_15:11:59/dist_LS_errors-n={n_qubits}-p=1-noise1=depolar-0.003-0.007-noise2=depolar-0.001-0.02-normalize=geo-norm_frac=0.100.npz"
-                #     , allow_pickle=True
-                # )['recon']
                 recon = np.load(f"{recon_dir}/{recon_fname}.npz", allow_pickle=True)['recon']
-                # raise ValueError()
+
 
             if not is_existing_recon:
                 _vis_recon_distributed_landscape(
@@ -634,30 +614,6 @@ def reconstruct_by_distributed_landscapes_two_noisy_simulations_top(
         errors2=errors2,
         ratios=ratios_cfg1
     )
-
-    # vis = True
-    # if vis:
-    #     baseline_paths = [
-    #         "figs/recon_distributed_landscape/2022-11-10_13:47:08_OK/distributed_LS_errors-n=12-p=1-noise1=depolar-0.003-0.007-noise2=depolar-0.001-0.02.npz",
-    #         "figs/recon_distributed_landscape/2022-11-10_13:51:25_OK/distributed_LS_errors-n=16-p=1-noise1=depolar-0.003-0.007-noise2=depolar-0.001-0.02.npz",
-    #         "figs/recon_distributed_landscape/2022-11-10_13:56:38_OK/distributed_LS_errors-n=20-p=1-noise1=depolar-0.003-0.007-noise2=depolar-0.001-0.02.npz"
-    #     ]
-
-    #     n_qubits_to_baseline_paths_idx = {12: 0, 16: 1, 20: 2}
-    #     baseline_data = np.load(baseline_paths[n_qubits_to_baseline_paths_idx[n_qubits]], allow_pickle=True)
-    #     baseline = baseline_data['errors1']
-    
-    #     fig = plt.figure(figsize=[6, 4])
-    #     ax = plt.axes()
-    #     ax.plot(ratios_cfg1, baseline, label=f"# qubits={n_qubits}, unnormalized")
-    #     ax.plot(ratios_cfg1, errors1, label=f"# qubits={n_qubits}, normalized")
-
-    #     # ax.plot(sf_range[start:], es_noisy, label=f"noisy, {nq_range[i]} qubits, {inst_range[j]}-th inst")
-    #     ax.set_xlabel("Percentage of samples from first landscape")
-    #     ax.set_ylabel("Sqrt MSE with first landscape")
-    #     ax.set_title("Reconstruct by samples from two landscapes")
-    #     plt.legend()
-    #     fig.savefig(f"{recon_dir}/compare_with_baseline.png", bbox_inches='tight')
 
     return
 
