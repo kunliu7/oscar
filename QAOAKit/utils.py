@@ -875,6 +875,10 @@ def load_partial_qaoa_dataset_table(n_qubits: int):
     return df
 
 
-def makedir(dir: str) -> None:
+def makedir_if_not_exist(dir: str) -> None:
     if not os.path.exists(dir):
         os.makedirs(dir)
+
+
+def arraylike_to_str(a):
+    return ",".join(list(map(str, a)))
