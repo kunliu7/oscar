@@ -276,10 +276,6 @@ def optimize_on_p1_reconstructed_landscape(
     plot_range = data['plot_range']
     origin = data['data']
 
-    # recon_dir = f"figs/grid_search_recon/{problem}/{method}-{noise}-p={p}"
-    # recon_fname = f"recon-cs_seed={cs_seed}-sf={sf:.3f}-{data_fname}"
-    # recon_path = f"{recon_dir}/{recon_fname}"
-
     recon_path, recon_fname, recon_dir = get_recon_pathname(p, problem, method, noise, cs_seed, sf, data_fname)
     print("tend to save to", recon_path)
     recon = get_recon_landscape(p, origin, sf, False, recon_path, cs_seed)
@@ -292,23 +288,10 @@ def optimize_on_p1_reconstructed_landscape(
 
     if n <= 16:
         row = get_3_reg_dataset_table_row(G, p)
-        print("============================")
-        # angles1 = opt_angles_for_graph(row["G"], row["p_max"])
-        # qc1, C, offset = get_maxcut_qaoa_qiskit_circuit_unbinded_parameters(
-        #     G, p
-        # )
-        # backend = AerSimulator(method="statevector")
-        # sv1 = Statevector(backend.run(qc1).result().get_statevector())
-        # angles2 = angles_to_qaoa_format(
-        #     opt_angles_for_graph(row["G"], row["p_max"])
-        # )
-        # qc2 = get_maxcut_qaoa_circuit(row["G"], angles2["beta"], angles2["gamma"])
-        # sv2 = Statevector(backend.run(qc2).result().get_statevector())
         opt_cut = row["C_opt"]
     else:
         opt_cut = None
 
-    # optimizer = GradientDescent()
     bounds = np.array([
         [-data['beta_bound'], data['beta_bound']], 
         [-data['gamma_bound'], data['gamma_bound']], 
@@ -343,12 +326,6 @@ def optimize_on_p1_reconstructed_landscape(
         maxiter=maxiter
     )
     
-    # optimizer = L_BFGS_B()
-    # optimizer_name = raw_optimizer.__class__.__name__
-    # optimizer = SPSA()
-    # optimizer = ADAM()
-    # optimizer = SPSA()
-    # optimizer = AQGD()
     # opts = [ADAM,
     # AQGD,
     # CG,
@@ -365,6 +342,7 @@ def optimize_on_p1_reconstructed_landscape(
     # QNSPSA,
     # TNC,
     # SciPyOptimizer]
+
     # initial_point = np.hstack([[1.0 for _ in range(p)], [-1.0 for _ in range(p)]])
     print("initial point:", initial_point)
     initial_point = np.array(initial_point)
@@ -390,8 +368,7 @@ def optimize_on_p1_reconstructed_landscape(
     params = optimizer.params_path
     # print(params)
     print("len of params:", len(params))
-    # print("len of params:", len(optimizer.params_path))
-    # opt_point = params[-1].copy()
+    
     params = [
         # _params
         shift_parameters(_params, bounds)
@@ -428,7 +405,6 @@ def optimize_on_p1_reconstructed_landscape(
         intp_last_pt_val=intp_last_pt_val,
         circ_last_pt_val=circ_last_pt_val,
     )
-
 
     vis_landscapes(
         landscapes=[recon, origin],
@@ -685,32 +661,33 @@ def vis_case_compare_mitigation_method():
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-n', type=int, help="Number of qubits.", required=True)
-    parser.add_argument('--seed_range', type=int, nargs="+", required=True)
-    parser.add_argument('--noise', type=str, required=True)
-    parser.add_argument('--opts', type=str, nargs="+", required=True)
-    args = parser.parse_args()
-    batch_eval_opt_on_recon_ls(args.n, args.seed_range, args.noise, args.opts)
+    if False:
+        parser = argparse.ArgumentParser()
+        parser.add_argument('-n', type=int, help="Number of qubits.", required=True)
+        parser.add_argument('--seed_range', type=int, nargs="+", required=True)
+        parser.add_argument('--noise', type=str, required=True)
+        parser.add_argument('--opts', type=str, nargs="+", required=True)
+        args = parser.parse_args()
+        batch_eval_opt_on_recon_ls(args.n, args.seed_range, args.noise, args.opts)
 
-    exit(7)
-    parser = argparse.ArgumentParser()
-    # parser.add_argument('--ns', type=int, nargs='+', help="Your aims, vis, opt", required=True)
-    parser.add_argument('-n', type=int, help="Your aims, vis, opt", required=True)
-    parser.add_argument('-p', type=int, help="Your aims, vis, opt", required=True)
-    # parser.add_argument('--method', type=str, help="Your aims, vis, opt", required=True)
-    parser.add_argument('--noise', type=str, help="Your aims, vis, opt", required=True)
-    parser.add_argument('--miti', type=str, help="Your aims, vis, opt", default=None)
-    parser.add_argument('--seed', type=int, help="Your aims, vis, opt", required=True)
-    parser.add_argument('--lr', type=float, help="Your aims, vis, opt", default=None)
-    parser.add_argument('--maxiter', type=int, help="Your aims, vis, opt", default=None)
-    parser.add_argument('--init_pt', type=float, nargs="+", help="[beta, gamma]", required=True)
-    # parser.add_argument('--error', type=str, help="Your aims, vis, opt", required=True)
-    parser.add_argument('--check', action="store_true", help="Your aims, vis, opt", default=False)
-    parser.add_argument('--opt', type=str, required=True)
-    args = parser.parse_args()
+    else:
+        parser = argparse.ArgumentParser()
+        # parser.add_argument('--ns', type=int, nargs='+', help="Your aims, vis, opt", required=True)
+        parser.add_argument('-n', type=int, help="Your aims, vis, opt", required=True)
+        parser.add_argument('-p', type=int, help="Your aims, vis, opt", required=True)
+        # parser.add_argument('--method', type=str, help="Your aims, vis, opt", required=True)
+        parser.add_argument('--noise', type=str, help="Your aims, vis, opt", required=True)
+        parser.add_argument('--miti', type=str, help="Your aims, vis, opt", default=None)
+        parser.add_argument('--seed', type=int, help="Your aims, vis, opt", required=True)
+        parser.add_argument('--lr', type=float, help="Your aims, vis, opt", default=None)
+        parser.add_argument('--maxiter', type=int, help="Your aims, vis, opt", default=None)
+        parser.add_argument('--init_pt', type=float, nargs="+", help="[beta, gamma]", required=True)
+        # parser.add_argument('--error', type=str, help="Your aims, vis, opt", required=True)
+        parser.add_argument('--check', action="store_true", help="Your aims, vis, opt", default=False)
+        parser.add_argument('--opt', type=str, required=True)
+        args = parser.parse_args()
 
-    optimize_on_p1_reconstructed_landscape(
-        args.n, args.p, args.seed, args.noise, args.miti, args.init_pt,
-        args.opt, args.lr, args.maxiter
-    )
+        optimize_on_p1_reconstructed_landscape(
+            args.n, args.p, args.seed, args.noise, args.miti, args.init_pt,
+            args.opt, args.lr, args.maxiter
+        )
