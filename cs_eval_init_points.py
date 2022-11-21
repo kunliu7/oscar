@@ -685,7 +685,6 @@ def find_good_initial_points_on_recon_LS_and_verify_top(
             initial_point[1::2] = init_beta_gamma[:p]
         """
         initial_point = init_beta_gamma
-        # print(initial_point)
 
         # if local_bp > global_bp:
         #     # ids_higher_bp.append(idx)
