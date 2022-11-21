@@ -429,7 +429,7 @@ def optimize_on_p1_reconstructed_landscape(
         circ_last_pt_val=circ_last_pt_val,
     )
 
-    
+
     vis_landscapes(
         landscapes=[recon, origin],
         labels=["Interpolate", "Circuit Sim."],
@@ -440,7 +440,19 @@ def optimize_on_p1_reconstructed_landscape(
         params_paths=[params, None]
     )
 
-    return params[-1], circ_path[-1]
+    return params[-1], circ_path[-1], params, circ_path
+
+
+def path_dist(path1, path2):
+    common_len = min(len(path1), len(path2))
+    print("common len:", common_len)
+    # dist = np.zeros(common_len)
+    dists = []
+    for p1, p2 in zip(path1[:common_len], path2[:common_len]):
+        dist = np.linalg.norm(p1 - p2)
+        dists.append(dist)
+
+    return dists
 
 
 def batch_eval_opt_on_recon_ls(n: int, seed_range: List[int], noise: str, opts: List[str]):
@@ -469,14 +481,18 @@ def batch_eval_opt_on_recon_ls(n: int, seed_range: List[int], noise: str, opts: 
             else:
                 raise ValueError()
 
-            intp_last_pt, circ_last_pt = optimize_on_p1_reconstructed_landscape(
+            intp_last_pt, circ_last_pt, intp_path, circ_path = optimize_on_p1_reconstructed_landscape(
                 n, p, seed, noise, miti_method,
                 initial_point, opt, None, maxiter
             )
 
+            common_len_dist = path_dist(intp_path, circ_path)
+            print(common_len_dist)
+
             l2_norm = np.linalg.norm(intp_last_pt - circ_last_pt)
             dists.append(l2_norm)
 
+    # return
     print(dists)
     dists = np.array(dists).reshape(len(seeds), len(opts))
 
