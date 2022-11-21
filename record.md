@@ -20,11 +20,11 @@ python cs_evaluate.py --aim final -p 2 --ns 16 --problem maxcut --noise depolar-
 #### n20
 
 ## Partition
-python cs_evaluate.py --aim final -p 2 --ns 12 16 20 24 --problem partition --noise ideal --n_seeds 1
+python cs_evaluate.py --aim final -p 2 --ns 12 16 20 24 --problem partition --noise ideal --n_seeds 1 --error NRMSE
 
 
 ## SK model
-python cs_evaluate.py --aim final -p 2 --ns 12 16 20 24 --problem skmodel --noise ideal --n_seeds 1
+python cs_evaluate.py --aim final -p 2 --ns 12 16 20 24 --problem skmodel --noise ideal --n_seeds 8 --error NRMSE
 
 
 # ============= Section 5, distributed landscape
@@ -52,13 +52,14 @@ python cs_distributed.py -n 20 -p 1 --noise1 depolar-0.003-0.007 --noise2 depola
 
 python cs_distributed.py --ns 12 16 20 -p 1 --noise1 depolar-0.003-0.007 --noise2 depolar-0.001-0.02
 python cs_distributed.py --ns 12 16 20 -p 1 --noise1 depolar-0.003-0.007 --noise2 depolar-0.001-0.02 --normalize geo --norm_frac 0.1
-python cs_distributed.py --ns 12 16 20 -p 1 --noise1 depolar-0.003-0.007 --noise2 depolar-0.001-0.02 --normalize linear --norm_frac 0.1
+python cs_distributed.py --ns 12 16 20 -p 1 --noise1 depolar-0.003-0.007 --noise2 depolar-0.001-0.02 --normalize linear --norm_frac 0.1 --error NRMSE
 
 **For visualize**
 
 baseline:
 python cs_distributed.py --ns 12 16 20 -p 1 --noise1 depolar-0.003-0.007 --noise2 depolar-0.001-0.02 \
-    --error NRMSE --recon_dir "figs/recon_distributed_landscape/2022-11-13_16:48:42"
+    --error NRMSE \
+    --recon_dir "figs/recon_distributed_landscape/2022-11-13_16:48:42"
 
 Geometric mean:
 python cs_distributed.py --ns 12 16 20 -p 1 --noise1 depolar-0.003-0.007 --noise2 depolar-0.001-0.02 \
@@ -112,11 +113,11 @@ python cs_eval_init_points.py -n 20 --noise depolar --p1 0.001 --p2 0.02
 
 
 ### BP initialization
-python cs_eval_init_points.py -n 16 --noise ideal --eps 0.5 --check --seed 0 --stride 11
-python cs_eval_init_points.py -n 20 --noise ideal --eps 0.6 --check --seed 0 --stride 10
+python cs_eval_init_points.py -n 16 -p 2 --noise ideal --eps 0.5 --check --inst_seed 0 --stride 11
+python cs_eval_init_points.py -n 20 -p 2 --noise ideal --eps 0.6 --check --inst_seed 0 --stride 10
 
-python cs_eval_init_points.py -n 16 --noise ideal --eps 0.3 --check --inst_seed 1 --random_seed 42 --stride 10
-python cs_eval_init_points.py -n 20 --noise ideal --eps 0.6 --check --inst_seed 1 --random_seed 42 --stride 10
+python cs_eval_init_points.py -n 16 -p 2 --noise ideal --eps 0.3 --check --inst_seed 1 --random_seed 42 --stride 10
+python cs_eval_init_points.py -n 20 -p 2 --noise ideal --eps 0.6 --check --inst_seed 1 --random_seed 42 --stride 10
 
 
 # ============== Use case, error mitigation ==============
@@ -124,3 +125,24 @@ python cs_eval_init_points.py -n 20 --noise ideal --eps 0.6 --check --inst_seed 
 ![cs_comp_miti.py](cs_comp_miti.py)
 ![vis_figs_comp_miti.ipynb](vis_figs_comp_miti.ipynb)
 
+
+
+# ============== optimize on recon. landscape =============
+
+## for single path
+python cs_opt_on_recon_ls.py -n 16 -p 1 --seed 0 --noise ideal --opt ADAM --lr 0.001 --maxiter 10000 --init_pt 0.1 -0.1
+
+
+## for a batch
+### n16
+python cs_opt_on_recon_ls.py -n 16 --noise ideal --seed_range 8 --opts ADAM COBYLA SPSA
+python cs_opt_on_recon_ls.py -n 16 --noise depolar-0.001-0.02 --seed_range 8 --opts ADAM COBYLA SPSA
+
+
+python cs_opt_on_recon_ls.py -n 20 --noise ideal --seed_range 8 --opts ADAM COBYLA SPSA
+python cs_opt_on_recon_ls.py -n 20 --noise depolar-0.001-0.02 --seed_range 8 --opts ADAM COBYLA SPSA
+
+
+# =================== debug barren plateaus ===================
+
+python cs_debug_bp.py -n 16 -p 1 --seed 0 --noise ideal --opt ADAM --lr 0.001 --maxiter 10000 --init_pt 0.1 -0.1
