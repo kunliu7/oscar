@@ -52,7 +52,8 @@ from .noisy_params_optim import (
     get_depolarizing_error_noise_model
 )
 from .interpolate import (
-    approximate_fun_value_by_2D_interpolation
+    approximate_fun_value_by_2D_interpolation,
+    approximate_fun_value_by_2D_interpolation_qiskit
 )
 
 # vis
@@ -85,12 +86,13 @@ def wrap_qiskit_optimizer_to_landscape_optimizer(QiskitOptimizer):
             super(LandscapeOptimizer, self).__init__(**kwargs)
             self.fun_type = fun_type
             self.params_path = []
+            self.vals = []
             if self.fun_type == 'FUN':
                 self.fun = fun
                 return
             
             self.bounds = bounds
-            self.landscape = - landscape
+            self.landscape = landscape
             self.landscape_shape = np.array(landscape.shape)
 
             # https://numpy.org/doc/stable/reference/generated/numpy.apply_along_axis.html
@@ -122,6 +124,24 @@ def wrap_qiskit_optimizer_to_landscape_optimizer(QiskitOptimizer):
 
             x = shift_parameters(x, self.bounds)
             val = approximate_fun_value_by_2D_interpolation(
+                x=x,
+                landscape=self.landscape,
+                bounds=self.bounds
+            )
+
+            self.params_path.append(x)
+            print("appro", val)
+            self.vals.append(val[0])
+            return val[0]
+        
+
+        def approximate_fun_value_qiskit(self, x: POINT) -> float:
+            """
+            Args:
+                x (POINT): gamma, beta
+            """
+            x = shift_parameters(x, self.bounds)
+            val = approximate_fun_value_by_2D_interpolation_qiskit(
                 x=x,
                 landscape=self.landscape,
                 bounds=self.bounds
@@ -217,6 +237,8 @@ def wrap_qiskit_optimizer_to_landscape_optimizer(QiskitOptimizer):
             
             if self.fun_type == 'INTERPOLATE':
                 res = super().minimize(self.approximate_fun_value, x0, jac, bounds)
+            if self.fun_type == 'INTERPOLATE_QISKIT':
+                res = super().minimize(self.approximate_fun_value_qiskit, x0, jac, bounds)
             elif self.fun_type == 'FUN':
                 res = super().minimize(self._fun, x0, jac, bounds)
             else:
