@@ -188,6 +188,7 @@ def load_optimization_path(
     method: str,
     noise: str,
     optimizer: str,
+    lr: float,
     maxiter: int,
     initial_point: List[int],
     seed: int,
@@ -203,8 +204,12 @@ def load_optimization_path(
     
     assert len(init_pt) == 2 * p
     data_dir = f"figs/optimization/{problem}/{method}-{noise}-p={p}" 
-    fname = f"{problem}-{method}-{noise}-{n=}-{p=}-{seed=}-{optimizer}-{maxiter=}-{init_pt}.npz"
 
+    fname = f"{problem}-{method}-{noise}-{n=}-{p=}-{seed=}-{optimizer}-{maxiter=}-{init_pt}"
+    if lr:
+        fname += f"-{lr}"
+
+    fname += ".npz"
     data_path = f"{data_dir}/{fname}"
     data = np.load(data_path, allow_pickle=True)
     print("opt data load from", data_path)
