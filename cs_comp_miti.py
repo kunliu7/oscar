@@ -3,6 +3,8 @@ from tkinter.messagebox import NO
 import networkx as nx
 import matplotlib.pyplot as plt
 import numpy as np
+import scipy
+from scipy.ndimage import laplace
 import pandas as pd
 import time
 import concurrent.futures
@@ -132,15 +134,8 @@ from QAOAKit.qiskit_interface import (
 from QAOAKit.examples_utils import get_20_node_erdos_renyi_graphs
 from QAOAKit.parameter_optimization import get_median_pre_trained_kde
 from QAOAKit.compressed_sensing import (
-    CS_and_one_landscape_and_cnt_optima_and_mitiq_and_one_variable,
-    multi_landscapes_and_cnt_optima_and_mitiq_and_MP_and_one_variable_and_CS,
-    one_D_CS_p1_generate_landscape,
     gen_p1_landscape,
-    one_D_CS_p1_recon_with_given_landscapes_and_varing_sampling_frac,
-    recon_2D_landscape,
-    two_D_CS_p1_recon_with_given_landscapes,
-    _vis_one_D_p1_recon,
-    p1_generate_grad,
+    # _vis_one_D_p1_recon,
     _executor_of_qaoa_maxcut_energy,
     cal_recon_error
 )
@@ -1339,21 +1334,61 @@ def cal_gap(C_opt, full, recon):
     
 #     return recon
 
+def grad_naive(ls):
+    assert len(ls.shape) == 2
+    a = ls[:, :-1]
+    b = ls[:, 1:]
+    # print(a.shape)
+    # print(b.shape)
+    g1 = a - b
 
-def cal_smoothness(ls) -> float:
+    a = ls[1:, :]
+    b = ls[:-1, :]
+    # print(a.shape)
+    # print(b.shape)
+    g2 = a - b
+    return [g1, g2]
+
+
+def cal_laplace(ls):
+    return laplace(ls)
+
+
+def second_derivative(ls: np.ndarray) -> float:
+    # print(ls.shape)
+    g1 = np.diff(ls, n=2, axis=0)
+    g2 = np.diff(ls, n=2, axis=1)
+
+    # f[:-2] - 2* f[1:-1] + f[2:]
+    g1 = ls[:, :-2] - 2 * ls[:, 1:-1] + ls[:, 2:]
+    g2 = ls[:-2, :] - 2 * ls[1:-1, :] + ls[2:, :]
+
+    # print(g1.shape)
+    # print(g2.shape)
+
+    smooth = (g1**2).sum() + (g2**2).sum()
+    smooth /= 4
+    return smooth
+
+
+def cal_smoothness(ls: np.ndarray) -> float:
     """
     sd(diff(x))/abs(mean(diff(x)))
     sd(diff(y))/abs(mean(diff(y)))
     """
-
-    grad = np.gradient(ls)
-    std_of_grad = [g.std() for g in grad]
-    abs_mean = [np.abs(g.mean()) for g in grad]
+    # print(ls.shape)
+    # grad = np.gradient(ls)
+    # grad = grad_naive(ls)
+    grad = cal_laplace(ls)
+    std_of_grad = [np.abs(g).std() for g in grad]
+    abs_mean = [np.abs(g).mean() for g in grad]
 
     std_of_grad = np.array(std_of_grad)
     abs_mean = np.array(abs_mean)
+    # print(std_of_grad.shape)
+    # print(abs_mean.shape)
 
-    smoothness = std_of_grad / (abs_mean + 0.01)
+    smoothness = std_of_grad / (abs_mean) # + 0.01)
     return smoothness.mean()
 
 
@@ -1530,7 +1565,7 @@ def vis_case_compare_mitigation_method(check: bool=False):
     print(miti2_data['mitigation_method'], miti2_data['mitigation_config'])
 
 
-    metrics = [cal_smoothness, cal_barren_plateaus, cal_variance]
+    metrics = [second_derivative, cal_smoothness, cal_barren_plateaus, cal_variance]
     for metric in metrics:
         print("origin: ", end="")
         print_table(noisy, miti1, miti2, metric)
