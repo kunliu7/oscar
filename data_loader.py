@@ -168,10 +168,11 @@ def get_interpolation_path_filename(
     elif isinstance(initial_point, list):
         init_pt = initial_point
     else:
+        init_pt = None
         print(initial_point)
-        raise ValueError()
+        # raise ValueError()
     
-    assert len(init_pt) == 2 * p
+    # assert len(init_pt) == 2 * p
     data_dir = f"figs/opt_on_recon_landscape/{problem}/{method}-{noise}-p={p}" 
     fname = f"{problem}-{method}-{noise}-{n=}-{p=}-{seed=}-{optimizer}-{maxiter=}-{init_pt}.npz"
 
@@ -200,9 +201,10 @@ def load_optimization_path(
     elif isinstance(initial_point, list):
         init_pt = initial_point
     else:
-        raise ValueError()
+        init_pt = None
+        # raise ValueError()
     
-    assert len(init_pt) == 2 * p
+    # assert len(init_pt) == 2 * p
     data_dir = f"figs/optimization/{problem}/{method}-{noise}-p={p}" 
 
     fname = f"{problem}-{method}-{noise}-{n=}-{p=}-{seed=}-{optimizer}-{maxiter=}-{init_pt}"
