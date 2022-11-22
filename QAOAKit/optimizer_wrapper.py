@@ -149,6 +149,7 @@ def wrap_qiskit_optimizer_to_landscape_optimizer(QiskitOptimizer):
 
             self.params_path.append(x)
             # print("appro", val)
+            self.vals.append(val[0])
             return val[0]
 
         def _fun(self, x: POINT) -> float:
