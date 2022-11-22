@@ -272,7 +272,7 @@ def batch_eval_opt_on_recon_ls(n: int, seed_range: List[int], noise: str, opt: s
     save_dir = f"figs/second_optimize"
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
-    save_path = f"{save_dir}/opt_on_recon-{n=}-seeds={arraylike_to_str(seeds)}-opt={opt}-{maxiter=}"
+    save_path = f"{save_dir}/opt_on_recon-{n=}-noise={noise}-seeds={arraylike_to_str(seeds)}-opt={opt}-{maxiter=}"
     print("save to", save_path)
 
     np.savez_compressed(
@@ -459,10 +459,10 @@ def optimize_on_p1_reconstructed_landscape(
         # _, _, circ_path, _ = get_minimum_by_QAOA(G, p, initial_point, None, raw_optimizer(lr=lr, maxiter=maxiter))
         circ_path = load_optimization_path(n, p, problem, method, noise, opt_name, lr, maxiter, initial_point, seed, miti_method)
         print("len of circuit simulation path:", len(circ_path))
-        # circ_vals = []
-        # for ipt, pt in enumerate(circ_path):
-        #     print(f"\r{ipt} th / {len(circ_path)}", end="")
-        #     circ_vals.append(get_point_val(G, p, pt, None))
+        circ_vals = []
+        for ipt, pt in enumerate(circ_path):
+            print(f"\r{ipt} th / {len(circ_path)}", end="")
+            circ_vals.append(get_point_val(G, p, pt, None))
             # circ_vals = [get_point_val(G, p, pt, None) for pt in circ_path]
     else:
         circ_path = None
