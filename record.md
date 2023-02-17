@@ -19,6 +19,16 @@ python cs_evaluate.py --aim final -p 2 --ns 16 --problem maxcut --noise depolar-
 
 #### n20
 
+python cs_evaluate.py --aim final -p 2 --ns 20 --problem maxcut --noise depolar-0.003-0.007 --n_seeds 0 1 --error NRMSE
+python cs_evaluate.py --aim final -p 2 --ns 20 --problem maxcut --noise depolar-0.003-0.007 --n_seeds 1 2 --error NRMSE
+python cs_evaluate.py --aim final -p 2 --ns 20 --problem maxcut --noise depolar-0.003-0.007 --n_seeds 2 3 --error NRMSE
+python cs_evaluate.py --aim final -p 2 --ns 20 --problem maxcut --noise depolar-0.003-0.007 --n_seeds 3 4 --error NRMSE
+python cs_evaluate.py --aim final -p 2 --ns 20 --problem maxcut --noise depolar-0.003-0.007 --n_seeds 4 5 --error NRMSE
+python cs_evaluate.py --aim final -p 2 --ns 20 --problem maxcut --noise depolar-0.003-0.007 --n_seeds 5 6 --error NRMSE
+python cs_evaluate.py --aim final -p 2 --ns 20 --problem maxcut --noise depolar-0.003-0.007 --n_seeds 6 7 --error NRMSE
+python cs_evaluate.py --aim final -p 2 --ns 20 --problem maxcut --noise depolar-0.003-0.007 --n_seeds 7 8 --error NRMSE
+
+
 ## Partition
 python cs_evaluate.py --aim final -p 2 --ns 12 16 20 24 --problem partition --noise ideal --n_seeds 1 --error NRMSE
 
@@ -80,6 +90,20 @@ elif method == 'geo':
 elif method == 'linear':
     path = "figs/recon_distributed_landscape/2022-11-13_16:48:56"
 ```
+
+## IBM machine
+
+NCM:
+
+python cs_distributed.py --ns 6 -p 1 --noise1 ibm --noise2 ibm \
+    --normalize linear --norm_frac 0.1 --error NRMSE
+
+baseline:
+
+python cs_distributed.py --ns 6 -p 1 --noise1 ibm --noise2 ibm \
+    --norm_frac 0.1 --error NRMSE
+
+
 # ============== Use case, debug barren plateaus =========
 
 ![vis_figs_bp.ipynb](vis_figs_bp.ipynb)
@@ -146,3 +170,20 @@ python cs_opt_on_recon_ls.py -n 20 --noise depolar-0.001-0.02 --seed_range 8 --o
 # =================== debug barren plateaus ===================
 
 python cs_debug_bp.py -n 16 -p 1 --seed 0 --noise ideal --opt ADAM --lr 0.001 --maxiter 10000 --init_pt 0.1 -0.1
+
+
+# ========== second optimization =========
+
+
+
+# ============= two local problem ============
+
+python cs_evaluate.py --aim final -p 0 --ns 6 --ansatz twolocal --problem maxcut --noise ideal --n_seeds 1 --error NRMSE
+
+# ============= fix k-2 ==============
+
+python cs_high_dim_vary_2d.py --p 0 --n 6 --ansatz twolocal --problem maxcut --noise ideal --seed 0 --error NRMSE
+
+# ============= recon ibm landscape ==========
+
+python cs_ibm_landscape.py --mid 1 --seed 0
