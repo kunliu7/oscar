@@ -140,7 +140,7 @@ from QAOAKit.interpolate import (
 
 # from qiskit_optimization import QuadraticProgram
 from qiskit.algorithms.minimum_eigen_solvers.qaoa import QAOAAnsatz
-from data_loader import load_grid_search_data
+from data_loader import load_grid_search_data, load_ibm_data
 from sklearn.linear_model import LinearRegression
 
 
@@ -502,16 +502,19 @@ def reconstruct_by_distributed_landscapes_two_noisy_simulations_top(
         # noise1 = 'depolar-0.001-0.005'
         # noise2 = 'depolar-0.003-0.007'
         # noise2 = 'depolar-0.001-0.02'
+        if noise1 == 'ibm':
+            noisy_data1 = load_ibm_data(mid=1, seed=1)
+            noisy_data2 = load_ibm_data(mid=2, seed=1)
+        else:
+            noisy_data1, _, _ = load_grid_search_data(
+                n_qubits=n_qubits, p=p, problem=problem, method=method,
+                noise=noise1, beta_step=50, gamma_step=100, seed=0,
+            )
 
-        noisy_data1, _, _ = load_grid_search_data(
-            n_qubits=n_qubits, p=p, problem=problem, method=method,
-            noise=noise1, beta_step=50, gamma_step=100, seed=0,
-        )
-
-        noisy_data2, _, _ = load_grid_search_data(
-            n_qubits=n_qubits, p=p, problem=problem, method=method,
-            noise=noise2, beta_step=50, gamma_step=100, seed=0,
-        )
+            noisy_data2, _, _ = load_grid_search_data(
+                n_qubits=n_qubits, p=p, problem=problem, method=method,
+                noise=noise2, beta_step=50, gamma_step=100, seed=0,
+            )
 
         full_range = noisy_data1['full_range']
 
