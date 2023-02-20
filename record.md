@@ -274,9 +274,9 @@ python cs_high_dim_vary_2d.py --p 1 --n 4 --ansatz twolocal --problem maxcut --n
 
 ### QAOA
 
-python cs_high_dim_vary_2d.py --p 3 --n 6 --ansatz twolocal --problem partition --noise ideal --seed 0 --error NRMSE --repeat 100 --bs 14 --gs 14
+python cs_high_dim_vary_2d.py --p 3 --n 6 --ansatz qaoa --problem partition --noise ideal --seed 0 --error NRMSE --repeat 100 --bs 14 --gs 14
 
-python cs_high_dim_vary_2d.py --p 4 --n 4 --ansatz twolocal --problem partition --noise ideal --seed 0 --error NRMSE --repeat 100 --bs 7 --gs 7
+python cs_high_dim_vary_2d.py --p 4 --n 4 --ansatz qaoa --problem partition --noise ideal --seed 0 --error NRMSE --repeat 100 --bs 7 --gs 7
 
 ### twolocal
 
@@ -288,9 +288,9 @@ python cs_high_dim_vary_2d.py --p 1 --n 4 --ansatz twolocal --problem partition 
 
 #### QAOA
 
-python cs_high_dim_vary_2d.py --p 3 --n 6 --ansatz twolocal --problem skmodel --noise ideal --seed 0 --error NRMSE --repeat 100 --bs 14 --gs 14
+python cs_high_dim_vary_2d.py --p 3 --n 6 --ansatz qaoa --problem skmodel --noise ideal --seed 0 --error NRMSE --repeat 100 --bs 14 --gs 14
 
-python cs_high_dim_vary_2d.py --p 4 --n 4 --ansatz twolocal --problem skmodel --noise ideal --seed 0 --error NRMSE --repeat 100 --bs 7 --gs 7
+python cs_high_dim_vary_2d.py --p 4 --n 4 --ansatz qaoa --problem skmodel --noise ideal --seed 0 --error NRMSE --repeat 100 --bs 7 --gs 7
 
 ### twolocal
 
