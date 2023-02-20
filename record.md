@@ -95,14 +95,70 @@ elif method == 'linear':
 
 NCM:
 
-python cs_distributed.py --ns 6 -p 1 --noise1 ibm --noise2 ibm \
+python cs_distributed.py --ns 6 -p 1 --sf 0.2 --noise1 ibm --noise2 ibm \
     --normalize linear --norm_frac 0.1 --error NRMSE
 
 baseline:
 
-python cs_distributed.py --ns 6 -p 1 --noise1 ibm --noise2 ibm \
+python cs_distributed.py --ns 6 -p 1 --sf 0.2 --noise1 ibm --noise2 ibm \
     --norm_frac 0.1 --error NRMSE
 
+---
+
+NCM:
+
+python cs_distributed.py --ns 6 -p 1 --sf 0.2 --noise1 ibm --noise2 ibm \
+    --normalize linear --norm_frac 0.2 --error NRMSE
+
+baseline:
+
+python cs_distributed.py --ns 6 -p 1 --sf 0.2 --noise1 ibm --noise2 ibm --error NRMSE
+
+### Enhance simulation of real quantum devices
+
+"""
+For Qaoa P=1, we have two landscapes —(1) generated with noisy simulation (2) captured on ibm hardware
+
+Let’s use (2) as a reference, we want to understand if we can get close to (2) by using fraction of samples from (1) by using NCM
+
+We can use NCM for using cheap/noise hardware to imitate more reliable hardware and vice versa. Similarly we can use simulations with simple noise models to imitate a hardware that is not easy to access, and exhibit complex noise
+"""
+
+#### With ideal simulation
+
+NCM:
+
+python cs_distributed.py --ns 6 -p 1 --sf 0.2 --seed 1 --noise1 ibm-1 \
+    --noise2 figs/grid_search/ibm/maxcut/sv-ideal-p=1/maxcut-sv-ideal-n=6-p=1-seed=1-50-100-IBM1-transpiled-H.npz \
+    --normalize linear --norm_frac 0.2 \
+    --error NRMSE \
+    --recon_dir "figs/recon_distributed_landscape/2023-02-19_15:48:23"
+
+baseline:
+
+python cs_distributed.py --ns 6 -p 1 --sf 0.2 --seed 1 --noise1 ibm-1 \
+    --noise2 figs/grid_search/ibm/maxcut/sv-ideal-p=1/maxcut-sv-ideal-n=6-p=1-seed=1-50-100-IBM1-transpiled-H.npz \
+    --norm_frac 0.2 \
+    --error NRMSE \
+    --recon_dir "figs/recon_distributed_landscape/2023-02-19_16:08:18"
+
+#### With device noise simulation
+
+NCM:
+
+python cs_distributed.py --ns 6 -p 1 --sf 0.2 --seed 1 --noise1 ibm-1 \
+    --noise2 figs/grid_search/ibm/maxcut/sv-ibm_perth-p=1/maxcut-sv-ibm_perth-n=6-p=1-seed=1-50-100-IBM1-transpiled-H.npz \
+    --normalize linear --norm_frac 0.2 \
+    --error NRMSE \
+    --recon_dir figs/recon_distributed_landscape/2023-02-19_19:10:48
+
+baseline:
+
+python cs_distributed.py --ns 6 -p 1 --sf 0.2 --seed 1 --noise1 ibm-1 \
+    --noise2 figs/grid_search/ibm/maxcut/sv-ibm_perth-p=1/maxcut-sv-ibm_perth-n=6-p=1-seed=1-50-100-IBM1-transpiled-H.npz \
+    --norm_frac 0.2 \
+    --error NRMSE \
+    --recon_dir figs/recon_distributed_landscape/2023-02-19_19:12:18
 
 # ============== Use case, debug barren plateaus =========
 
@@ -180,10 +236,46 @@ python cs_debug_bp.py -n 16 -p 1 --seed 0 --noise ideal --opt ADAM --lr 0.001 --
 
 python cs_evaluate.py --aim final -p 0 --ns 6 --ansatz twolocal --problem maxcut --noise ideal --n_seeds 1 --error NRMSE
 
-# ============= fix k-2 ==============
+# ============= fix k-2 for twolocal ==============
 
-python cs_high_dim_vary_2d.py --p 0 --n 6 --ansatz twolocal --problem maxcut --noise ideal --seed 0 --error NRMSE
+The table:
+
+|      Problem           | QAOA Ansatz| VQE Ansatz | 
+|------------------------|------------|------------|
+| 3-reg Maxcut (n=6)     | 0.969      | 0.753      | 
+| 3-reg Maxcut (n=4)     | 0.968      | 0.734      | 
+| SK Problem (n=4)       | 0.968      | 0.738      | 
+| SK Problem (n=6)       | 0.969      | 0.740      | 
+| Partition Problem (n=6)| 0.981      | 0.752      | 
+| Partition Problem (n=4)| 0.985      | 0.754      |
+
+## maxcut
+
+python cs_high_dim_vary_2d.py --p 0 --n 6 --ansatz twolocal --problem maxcut --noise ideal --seed 0 --error NRMSE --repeat 100
+
+python cs_high_dim_vary_2d.py --p 1 --n 4 --ansatz twolocal --problem maxcut --noise ideal --seed 0 --error NRMSE --repeat 100
+
+## partition
+
+python cs_high_dim_vary_2d.py --p 0 --n 6 --ansatz twolocal --problem partition --noise ideal --seed 0 --error NRMSE --repeat 100
+
+python cs_high_dim_vary_2d.py --p 1 --n 4 --ansatz twolocal --problem partition --noise ideal --seed 0 --error NRMSE --repeat 100
+
+## skmodel
+
+python cs_high_dim_vary_2d.py --p 0 --n 6 --ansatz twolocal --problem skmodel --noise ideal --seed 0 --error NRMSE --repeat 100
+
+python cs_high_dim_vary_2d.py --p 1 --n 4 --ansatz twolocal --problem skmodel --noise ideal --seed 0 --error NRMSE --repeat 100
 
 # ============= recon ibm landscape ==========
 
-python cs_ibm_landscape.py --mid 1 --seed 0
+python cs_ibm_landscape.py --mid 1 --seed 0 --shots 2048
+
+
+# ============= measure sparsity of all the data we have ==========
+
+python cs_measure_sparsity.py --p 2 --ns 16 20 24 --ansatz qaoa --problem maxcut --noise ideal --n_seeds 16
+
+python cs_measure_sparsity.py --p 1 --ns 16 20 24 30 --ansatz qaoa --problem maxcut --noise ideal --n_seeds 16
+
+python cs_measure_sparsity.py --p 2 --ns 12 16 20 24 --ansatz qaoa --problem skmodel --noise ideal --n_seeds 16
