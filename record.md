@@ -249,7 +249,22 @@ The table:
 | Partition Problem (n=6)| 0.981      | 0.752      | 
 | Partition Problem (n=4)| 0.985      | 0.754      |
 
+One to one correspondence. Same # parameters.
+
+For QAOA: # params = 2 * p
+For VQE:  # params = (p+1) * n
+
+
+
 ## maxcut
+
+### QAOA
+
+python cs_high_dim_vary_2d.py --p 3 --n 6 --ansatz qaoa --problem maxcut --noise ideal --seed 0 --error NRMSE --repeat 100 --bs 14 --gs 14
+
+python cs_high_dim_vary_2d.py --p 4 --n 4 --ansatz qaoa --problem maxcut --noise ideal --seed 0 --error NRMSE --repeat 100 --bs 7 --gs 7
+
+### twolocal
 
 python cs_high_dim_vary_2d.py --p 0 --n 6 --ansatz twolocal --problem maxcut --noise ideal --seed 0 --error NRMSE --repeat 100
 
@@ -257,11 +272,27 @@ python cs_high_dim_vary_2d.py --p 1 --n 4 --ansatz twolocal --problem maxcut --n
 
 ## partition
 
+### QAOA
+
+python cs_high_dim_vary_2d.py --p 3 --n 6 --ansatz twolocal --problem partition --noise ideal --seed 0 --error NRMSE --repeat 100 --bs 14 --gs 14
+
+python cs_high_dim_vary_2d.py --p 4 --n 4 --ansatz twolocal --problem partition --noise ideal --seed 0 --error NRMSE --repeat 100 --bs 7 --gs 7
+
+### twolocal
+
 python cs_high_dim_vary_2d.py --p 0 --n 6 --ansatz twolocal --problem partition --noise ideal --seed 0 --error NRMSE --repeat 100
 
 python cs_high_dim_vary_2d.py --p 1 --n 4 --ansatz twolocal --problem partition --noise ideal --seed 0 --error NRMSE --repeat 100
 
 ## skmodel
+
+#### QAOA
+
+python cs_high_dim_vary_2d.py --p 3 --n 6 --ansatz twolocal --problem skmodel --noise ideal --seed 0 --error NRMSE --repeat 100 --bs 14 --gs 14
+
+python cs_high_dim_vary_2d.py --p 4 --n 4 --ansatz twolocal --problem skmodel --noise ideal --seed 0 --error NRMSE --repeat 100 --bs 7 --gs 7
+
+### twolocal
 
 python cs_high_dim_vary_2d.py --p 0 --n 6 --ansatz twolocal --problem skmodel --noise ideal --seed 0 --error NRMSE --repeat 100
 
