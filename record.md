@@ -124,41 +124,127 @@ Let’s use (2) as a reference, we want to understand if we can get close to (2)
 We can use NCM for using cheap/noise hardware to imitate more reliable hardware and vice versa. Similarly we can use simulations with simple noise models to imitate a hardware that is not easy to access, and exhibit complex noise
 """
 
-#### With ideal simulation
+#### Noisy sim, cfg-1 & Ideal 
+
+NCM:
+
+python cs_distributed.py --ns 20 -p 1 --sf 0.2 --seed 0 \
+    --noise1 depolar-0.001-0.005 \
+    --noise2 ideal \
+    --normalize linear --norm_frac 0.2 \
+    --error NRMSE
+
+base:
+
+python cs_distributed.py --ns 20 -p 1 --sf 0.2 --seed 0 \
+    --noise1 depolar-0.001-0.005 \
+    --noise2 ideal \
+    --norm_frac 0.2 \
+    --error NRMSE
+
+
+
+#### Noisy sim, cfg-2 & Ideal
+
+P.S. Exchange the noise
+
+NCM:
+
+python cs_distributed.py --ns 20 -p 1 --sf 0.2 --seed 0 \
+    --noise1 depolar-0.003-0.007 \
+    --noise2 ideal \
+    --normalize linear --norm_frac 0.2 \
+    --error NRMSE
+
+base
+
+python cs_distributed.py --ns 20 -p 1 --sf 0.2 --seed 0 \
+    --noise1 depolar-0.003-0.007 \
+    --noise2 ideal \
+    --norm_frac 0.2 \
+    --error NRMSE
+
+#### IBM Perth & Ideal Simulation
 
 NCM:
 
 python cs_distributed.py --ns 6 -p 1 --sf 0.2 --seed 1 --noise1 ibm-1 \
     --noise2 figs/grid_search/ibm/maxcut/sv-ideal-p=1/maxcut-sv-ideal-n=6-p=1-seed=1-50-100-IBM1-transpiled-H.npz \
     --normalize linear --norm_frac 0.2 \
-    --error NRMSE \
-    --recon_dir "figs/recon_distributed_landscape/2023-02-19_15:48:23"
+    --error NRMSE
 
 baseline:
 
 python cs_distributed.py --ns 6 -p 1 --sf 0.2 --seed 1 --noise1 ibm-1 \
     --noise2 figs/grid_search/ibm/maxcut/sv-ideal-p=1/maxcut-sv-ideal-n=6-p=1-seed=1-50-100-IBM1-transpiled-H.npz \
     --norm_frac 0.2 \
-    --error NRMSE \
-    --recon_dir "figs/recon_distributed_landscape/2023-02-19_16:08:18"
+    --error NRMSE
 
-#### With device noise simulation
+#### IBM Perth & Noisy Simulation (IBM Perth)
 
 NCM:
 
 python cs_distributed.py --ns 6 -p 1 --sf 0.2 --seed 1 --noise1 ibm-1 \
     --noise2 figs/grid_search/ibm/maxcut/sv-ibm_perth-p=1/maxcut-sv-ibm_perth-n=6-p=1-seed=1-50-100-IBM1-transpiled-H.npz \
     --normalize linear --norm_frac 0.2 \
-    --error NRMSE \
-    --recon_dir figs/recon_distributed_landscape/2023-02-19_19:10:48
+    --error NRMSE
 
 baseline:
 
 python cs_distributed.py --ns 6 -p 1 --sf 0.2 --seed 1 --noise1 ibm-1 \
     --noise2 figs/grid_search/ibm/maxcut/sv-ibm_perth-p=1/maxcut-sv-ibm_perth-n=6-p=1-seed=1-50-100-IBM1-transpiled-H.npz \
     --norm_frac 0.2 \
-    --error NRMSE \
-    --recon_dir figs/recon_distributed_landscape/2023-02-19_19:12:18
+    --error NRMSE
+
+#### IBM Perth & IBM Lagos
+
+NCM:
+
+python cs_distributed.py --ns 6 -p 1 --sf 0.2 --seed 1 --noise1 ibm-1 \
+    --noise2 ibm-2 \
+    --normalize linear --norm_frac 0.2 \
+    --error NRMSE
+
+base
+
+python cs_distributed.py --ns 6 -p 1 --sf 0.2 --seed 1 --noise1 ibm-1 \
+    --noise2 ibm-2 \
+    --norm_frac 0.2 \
+    --error NRMSE
+
+#### IBM Lagos (IBM-2) & IBM Perth (IBM-1)
+
+NCM:
+
+python cs_distributed.py --ns 6 -p 1 --sf 0.2 --seed 1 --noise1 ibm-2 \
+    --noise2 ibm-1 \
+    --normalize linear --norm_frac 0.2 \
+    --error NRMSE
+
+base
+
+python cs_distributed.py --ns 6 -p 1 --sf 0.2 --seed 1 --noise1 ibm-2 \
+    --noise2 ibm-1 \
+    --norm_frac 0.2 \
+    --error NRMSE
+
+#### Ideal Simulation & IBM Perth
+
+NCM:
+
+python cs_distributed.py --ns 6 -p 1 --sf 0.2 --seed 1 \
+    --noise1 figs/grid_search/ibm/maxcut/sv-ideal-p=1/maxcut-sv-ideal-n=6-p=1-seed=1-50-100-IBM1-transpiled-H.npz \
+    --noise2 ibm-1 \
+    --normalize linear --norm_frac 0.2 \
+    --error NRMSE
+
+baseline:
+
+python cs_distributed.py --ns 6 -p 1 --sf 0.2 --seed 1 \
+    --noise1 figs/grid_search/ibm/maxcut/sv-ideal-p=1/maxcut-sv-ideal-n=6-p=1-seed=1-50-100-IBM1-transpiled-H.npz \
+    --noise2 ibm-1 \
+    --norm_frac 0.2 \
+    --error NRMSE
 
 # ============== Use case, debug barren plateaus =========
 
@@ -228,9 +314,6 @@ python cs_opt_on_recon_ls.py -n 20 --noise depolar-0.001-0.02 --seed_range 8 --o
 python cs_debug_bp.py -n 16 -p 1 --seed 0 --noise ideal --opt ADAM --lr 0.001 --maxiter 10000 --init_pt 0.1 -0.1
 
 
-# ========== second optimization =========
-
-
 
 # ============= two local problem ============
 
@@ -298,11 +381,6 @@ python cs_high_dim_vary_2d.py --p 0 --n 6 --ansatz twolocal --problem skmodel --
 
 python cs_high_dim_vary_2d.py --p 1 --n 4 --ansatz twolocal --problem skmodel --noise ideal --seed 0 --error NRMSE --repeat 100
 
-# ============= recon ibm landscape ==========
-
-python cs_ibm_landscape.py --mid 1 --seed 0 --shots 2048
-
-
 # ============= measure sparsity of all the data we have ==========
 
 python cs_measure_sparsity.py --p 2 --ns 16 20 24 --ansatz qaoa --problem maxcut --noise ideal --n_seeds 16
@@ -310,3 +388,69 @@ python cs_measure_sparsity.py --p 2 --ns 16 20 24 --ansatz qaoa --problem maxcut
 python cs_measure_sparsity.py --p 1 --ns 16 20 24 30 --ansatz qaoa --problem maxcut --noise ideal --n_seeds 16
 
 python cs_measure_sparsity.py --p 2 --ns 12 16 20 24 --ansatz qaoa --problem skmodel --noise ideal --n_seeds 16
+
+# Quantum Chemistry
+
+UCCSD, twolocal, QAOA
+
+H2, LiH
+
+## qaoa
+
+**Do not do**
+
+<!-- python cs_evaluate.py --ansatz qaoa --ns 2 --p 1 --problem h2 --bs 50 --gs 50 \
+    --noise ideal --seeds 1 --error NRMSE
+
+python cs_evaluate.py --ansatz qaoa --ns 2 --p 2 --problem h2 --bs 14 --gs 14 \
+    --noise ideal --seeds 1 --error NRMSE -->
+
+## twolocal
+
+### H2
+
+python cs_high_dim_vary_2d.py --ansatz twolocal --n 2 --p 1 --problem h2 --bs 14 \
+    --noise ideal --seed 0 --error NRMSE --repeat 100 --force_recon
+
+### LiH
+
+python cs_high_dim_vary_2d.py --ansatz twolocal --n 4 --p 1 --problem lih --bs 7 \
+    --noise ideal --seed 0 --error NRMSE --repeat 100 --force_recon
+
+## uccsd
+
+### H2
+
+python cs_high_dim_vary_2d.py --ansatz uccsd --n 2 --p 3 --problem h2 --bs 14 \
+    --noise ideal --seed 0 --error NRMSE --repeat 100 --force_recon
+
+python cs_high_dim_vary_2d.py --ansatz uccsd --n 2 --p 3 --problem h2 --bs 50 \
+    --noise ideal --seed 0 --error NRMSE --repeat 100 --force_recon
+
+### LiH
+
+python cs_high_dim_vary_2d.py --ansatz uccsd --n 4 --p 8 --problem lih --bs 7 \
+    --noise ideal --seed 0 --error NRMSE --repeat 100 --force_recon
+
+# Revision table
+
+| **QPU1 (Target)** | **QPU2 (Source)** | **OSCAR (20-80)** | **OSCAR+NCM (20-80)** | **OSCAR (50-50)** | **OSCAR+NCM (50-50)** | **OSCAR (80-20)** | **OSCAR+NCM (80-20)** | **OSCAR (100)** |
+|:-----------------:|:-----------------:|:-----------------:|:---------------------:|:-----------------:|:---------------------:|:-----------------:|:---------------------:|:---------------:|
+| Noisy Sim-I | Noisy Sim-II|       0.076       |         0.003         |       0.061       |         0.002         |       0.039       |         0.002         |      0.001      |
+| Noisy Sim-II| Noisy Sim-I |       0.075       |         0.002         |       0.059       |         0.002         |       0.037       |         0.002         |      0.001      |
+|     IBM Perth     |     Ideal Sim     |       1.362       |         0.299         |        0.97       |         0.265         |       0.597       |         0.223         |      0.184      |
+|     IBM Perth     |     Noisy Sim (Perth Noise Model)     |       0.767       |         0.272         |       0.564       |         0.247         |       0.379       |         0.213         |      0.184      |
+|     IBM Perth     |     IBM Lagos     |        0.5        |         0.424         |       0.419       |          0.36         |       0.284       |         0.262         |      0.184      |
+| IBM Lagos | IBM Perth | 0.403 | 0.337 | 0.341| 0.286 | 0.266 | 0.247 | 0.222 |
+| Ideal Sim | IBM Perth | 0.478 | 0.226 | 0.363 | 0.18 | 0.215 | 0.109 | 0.042 |
+
+
+
+|      Problem           | QAOA Ansatz| TwoLocal Ansatz | UCCSD Ansatz |
+|------------------------|------------|------------|-----|
+| 3-reg Maxcut (n=4)     | 0.847      | 0.645      |  |
+| 3-reg Maxcut (n=6)     | 0.372      | 0.0000001      |  |
+| SK Problem (n=4)       | 0.847   | 0.765     |  |
+| SK Problem (n=6)       | 0.372      | 0.057      |  |
+| H2 (n=2)|       | 0.171     | 0.345    |
+| LiH (n=4)|      | 0.678      | 0.856   |
