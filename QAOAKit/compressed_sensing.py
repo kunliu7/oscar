@@ -1026,11 +1026,15 @@ def recon_2D_landscape(
 
     # extract small sample of signal
     k = round(nx * ny * sampling_frac)
+    assert k > 0, "k should be positive, check sampling_frac"
     if not isinstance(random_indices, np.ndarray):
         ri = np.random.choice(nx * ny, k, replace=False) # random sample of indices
     else:
+        print("use inputted random indices")
         assert len(random_indices.shape) == 1 and random_indices.shape[0] == k
         ri = random_indices # for short 
+
+    # print(f"nx: {nx}, ny: {ny}, k: {k}")
 
     # create dct matrix operator using kron (memory errors for large ny*nx)
     A = np.kron(
