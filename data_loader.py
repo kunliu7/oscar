@@ -15,15 +15,15 @@ recon = get_recon_landscape(p, origin, sf, False, recon_path, cs_seed)
 """
 
 def get_recon_landscape(ansatz: str, p: int, origin: np.ndarray, sampling_frac: float,
-    is_reconstructed: bool, recon_save_path: str, cs_seed: int
+    force_recon: bool, recon_save_path: str, cs_seed: int, is_save: bool=True
 ) -> np.ndarray:
     d = len(origin.shape)
     save_dir = os.path.dirname(recon_save_path)
-    is_recon = os.path.exists(recon_save_path)
+    is_recon = force_recon or os.path.exists(recon_save_path)
 
-    if not is_recon:
+    if is_recon:
         np.random.seed(cs_seed)
-        if ansatz == 'twolocal':
+        if d == 2:
             recon = recon_2D_landscape(
                 origin=origin,
                 sampling_frac=sampling_frac
@@ -31,23 +31,14 @@ def get_recon_landscape(ansatz: str, p: int, origin: np.ndarray, sampling_frac: 
             if not os.path.exists(save_dir):
                 os.makedirs(save_dir)
             np.savez_compressed(recon_save_path, recon=recon, sampling_frac=sampling_frac) 
-        elif ansatz == 'qaoa':
-            if d == 2:
-                recon = recon_2D_landscape(
-                    origin=origin,
-                    sampling_frac=sampling_frac
-                )
-                if not os.path.exists(save_dir):
-                    os.makedirs(save_dir)
-                np.savez_compressed(recon_save_path, recon=recon, sampling_frac=sampling_frac) 
-            elif d == 4:
-                recon = recon_4D_landscape_by_2D(
-                    origin=origin,
-                    sampling_frac=sampling_frac
-                )
-                if not os.path.exists(save_dir):
-                    os.makedirs(save_dir)
-                np.savez_compressed(recon_save_path, recon=recon, sampling_frac=sampling_frac)
+        elif d == 4:
+            recon = recon_4D_landscape_by_2D(
+                origin=origin,
+                sampling_frac=sampling_frac
+            )
+            if not os.path.exists(save_dir):
+                os.makedirs(save_dir)
+            np.savez_compressed(recon_save_path, recon=recon, sampling_frac=sampling_frac)
         print("not exists, save to", save_dir)
     else:
         recon = np.load(recon_save_path, allow_pickle=True)['recon']
@@ -59,8 +50,15 @@ def get_recon_landscape(ansatz: str, p: int, origin: np.ndarray, sampling_frac: 
 def load_ibm_data(
     mid: int,
     seed: int,
+    shots: int=2048
 ) -> dict:
-    save_dir = f"figs/ibm/ls-M-{mid}-seed-{seed}.npz"
+    if shots == 2048:
+        save_dir = f"figs/ibm/IBM_Exp_2048/ls-M-{mid}-seed-{seed}.npz"
+    elif shots == 1024:
+        save_dir = f"figs/ibm/Experiments/ls-M-{mid}-seed-{seed}.npz"
+    else:
+        raise ValueError("shots must be 1024 or 2048")
+
     data = np.load(
         save_dir,
         allow_pickle=True
@@ -78,7 +76,7 @@ def load_ibm_data(
         }
 
     landscapes = dict(data)
-
+    print("ibm data read from", save_dir)
     new_data = {
         'data': landscapes['ibm_H_ls'],
         'full_range': full_range
@@ -109,21 +107,12 @@ def load_grid_search_data(
     gs = gamma_step
 
     data_dir = f"figs/grid_search/{ansatz}/{problem}/{method}-{noise}-p={p}"
-    if ansatz == 'twolocal':
-        fname = "maxcut-sv-ideal-n=6-p=0-seed=0-14-100-100.npz"
-    elif ansatz == 'qaoa' and problem == 'maxcut' and noise in ['depolar-0.001-0.02', 'depolar-0.1-0.1']:
-        if miti_method:
-            fname = f"{problem}-{method}-{noise}-n={nq}-p={p}-seed={seed}-{bs}-{gs}-{miti_method}.npz"
-        else:
-            fname = f"{problem}-{method}-{noise}-n={nq}-p={p}-seed={seed}-{bs}-{gs}.npz"
-    elif nq != 8 and p == 1 and problem == 'maxcut' and noise == 'ideal' and seed in [0, 1, 2]:
-        fname = f"{method}-{noise}-n={nq}-p={p}-seed={seed}-{bs}-{gs}.npz"
-    elif nq != 8 and p == 1 and problem == 'maxcut' and noise == 'depolar-0.003-0.007' and seed in [0, 1]:
-        fname = f"{method}-{noise}-n={nq}-p={p}-seed={seed}-{bs}-{gs}.npz"
-    elif nq != 8 and p == 2 and problem == 'maxcut' and noise == 'ideal' and seed in [0, 1]:
-        fname = f"{method}-{noise}-n={nq}-p={p}-seed={seed}-{bs}-{gs}.npz"
-    else:
+    if ansatz == 'twolocal' or ansatz == 'uccsd':
+        fname = f"{problem}-{method}-{noise}-n={nq}-p={p}-seed={seed}-{bs}.npz"
+    elif ansatz == 'qaoa':
         fname = f"{problem}-{method}-{noise}-n={nq}-p={p}-seed={seed}-{bs}-{gs}.npz"
+    else:
+        raise ValueError(f"not support {ansatz} {problem} {noise}")
 
     data_path = f"{data_dir}/{fname}"
     print(f"\nread grid search data from {data_path}\n")
@@ -152,6 +141,7 @@ def load_grid_search_data(
 
         data['full_ranges'] = full_ranges
         data['full_range'] = full_range
+        data['plot_range'] = data['full_range'].copy()
 
     elif ansatz == 'twolocal':
         # assert n_qubits % 2 == 0
@@ -167,14 +157,12 @@ def load_grid_search_data(
             'beta': list(range(shape0)),
             'gamma': list(range(shape0))
         }
-
-    if p == 2:
-        data['plot_range'] = { 
-            'beta': list(range(full_range['beta'].shape[0] ** 2)),
-            'gamma': list(range(full_range['gamma'].shape[0] ** 2))
+    elif ansatz == 'uccsd':
+        data['full_range'] = {
+            'beta': np.linspace(-beta_bound, beta_bound, bs),
+            # 'gamma': np.linspace(-gamma_bound, gamma_bound, gs)
         }
-    elif p == 1:
-        data['plot_range'] = full_range.copy()
+        data['plot_range'] = None
 
     """
     np.savez_compressed(
