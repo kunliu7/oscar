@@ -754,8 +754,9 @@ def recon_4D_by_cvxpy(shape, A, b):
 def recon_4D_landscape_by_2D(
     origin: np.ndarray,
     sampling_frac: float,
+    random_indices: np.ndarray=None,
     method: str="BP"
-):
+) -> np.ndarray:
     """Reconstruct landscapes by sampling on given landscapes.
 
     """
@@ -772,7 +773,12 @@ def recon_4D_landscape_by_2D(
 
     # extract small sample of signal
     k = round(n_pts * sampling_frac)
-    ri = np.random.choice(n_pts, k, replace=False) # random sample of indices
+    if not isinstance(random_indices, np.ndarray):
+        ri = np.random.choice(n_pts, k, replace=False) # random sample of indices
+    else:
+        print("use inputted random indices")
+        assert len(random_indices.shape) == 1 and random_indices.shape[0] == k
+        ri = random_indices # for short 
 
     # create dct matrix operator using kron (memory errors for large ny*nx)
     # idct_list = [idct(np.identity(dim), norm='ortho', axis=0) for dim in shape]
@@ -797,17 +803,6 @@ def recon_4D_landscape_by_2D(
         assert False, "Invalid CS method"
 
     recon = recon.reshape(*shape_4d)
-
-    # if figdir:
-    #     _vis_one_D_p1_recon(
-    #         origin_dict=origin,
-    #         recon_dict=recon,
-    #         full_range=full_range,
-    #         bounds=None,
-    #         true_optima=None,
-    #         title='test',
-    #         save_path=f'{figdir}/origin_and_2D_recon_sf{sampling_frac:.3f}.png'
-    #     )
 
     print('end: solve l1 norm')
     return recon
