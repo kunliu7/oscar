@@ -418,6 +418,8 @@ def normalize_by_linear_regression(ls1, ls2, n_pts, ri):
 
     rng = np.random.default_rng(7)
 
+    # pick n_pts random points from ri to train NCM
+    # note that ri is fixed for normalization and parallel reconstruction
     ids = rng.choice(ri, n_pts, replace=False)
     print(ids.shape)
 
@@ -448,41 +450,9 @@ def normalize_by_linear_regression(ls1, ls2, n_pts, ri):
 
 
 def reconstruct_by_distributed_landscapes_two_noisy_simulations_top(
-    n_qubits_list: List[int], p: int, noise1: str, noise2: str,
+    n_qubits_list: List[int], p: int, sf: float, noise1: str, noise2: str, seed: int,
     normalize: str, norm_frac: float, error_type: str, recon_dir: str
 ):
-    """Reconstructed with two noisy simulations
-    """
-    # if n_qubits == 8:
-    #     # noise1 = 'depolar-0.001-0.005'
-    #     # noise2 = 'depolar-0.003-0.007'
-    #     method = 'shots'
-    #     problem = 'maxcut'
-
-    #     is_existing_recon = False
-
-    #     noisy_data_dir1 = "figs/cnt_opt_miti/2022-08-08_19:48:31"
-    #     noisy_data1 = np.load(f"{noisy_data_dir1}/data.npz", allow_pickle=True)
-    #     ideal = noisy_data1['origin'].tolist()['ideals']
-    #     full_range = noisy_data1['full_range'].tolist()
-
-    #     # depolarizing 0.001 and 0.005, one-qubit gate error and two-qubit gate error
-    #     noisy1 = noisy_data1['origin'].tolist()['unmitis']
-
-    #     noisy_data_dir2 = "figs/gen_p1_landscape/2022-09-29_00:31:54/G40_nQ8_p1_depolar0.003_0.007"
-    #     noisy_data2 = np.load(
-    #         f"{noisy_data_dir2}/data.npz",
-    #         allow_pickle=True)
-
-    #     # depolarizing 0.003 and 0.007, one-qubit gate error and two-qubit gate error
-    #     noisy2 = noisy_data2['origin'].tolist()['unmitis']
-
-    #     datas = [
-    #         # ideal,
-    #         noisy1.transpose(), # to compatible with n>=16 landscapes
-    #         noisy2.transpose()
-    #     ]
-    # elif n_qubits >= 12:
     is_existing_recon = True if isinstance(recon_dir, str) else False
     if not is_existing_recon:
         signature = get_curr_formatted_timestamp()
@@ -494,7 +464,34 @@ def reconstruct_by_distributed_landscapes_two_noisy_simulations_top(
 
     errors1 = []
     errors2 = []
-    sf = 0.1
+    def get_data(noise: str):
+        r"""
+        Deal with the data from IBM and grid search together.
+        """
+        if noise == 'ibm-1':
+            assert seed == 1, "seed should be 1 for ibm-1"
+            noisy_data = load_ibm_data(mid=1, seed=seed)
+        elif noise == 'ibm-2':
+            assert seed == 1, "seed should be 1 for ibm-2"
+            noisy_data = load_ibm_data(mid=2, seed=seed)
+        elif os.path.exists(noise): # ! special case
+            assert seed == 1 and p == 1, "seed should be 1 and p should be 1 for local data"
+            path = noise
+            # path = "figs/grid_search/ibm/maxcut/sv-ideal-p=1/maxcut-sv-ideal-n=6-p=1-seed=1-50-100-IBM1-transpiled-H.npz"
+            noisy_data = np.load(path, allow_pickle=True)
+            noisy_data = dict(noisy_data)
+            noisy_data['full_range'] = None # ! special case, only for visualization
+        else:
+            ansatz = 'qaoa'
+            noisy_data, _, _ = load_grid_search_data(
+                n_qubits=n_qubits, p=p, ansatz=ansatz,
+                problem=problem, method=method,
+                noise=noise, beta_step=50, gamma_step=100, seed=0,
+            )
+
+        return noisy_data
+
+
     for n_qubits in n_qubits_list:
         
         method = 'sv'
@@ -502,21 +499,26 @@ def reconstruct_by_distributed_landscapes_two_noisy_simulations_top(
         # noise1 = 'depolar-0.001-0.005'
         # noise2 = 'depolar-0.003-0.007'
         # noise2 = 'depolar-0.001-0.02'
-        if noise1 == 'ibm':
-            noisy_data1 = load_ibm_data(mid=1, seed=1)
-            noisy_data2 = load_ibm_data(mid=2, seed=1)
+        # if noise1 == 'ibm':
+        #     noisy_data1 = load_ibm_data(mid=1, seed=seed)
+        #     noisy_data2 = load_ibm_data(mid=2, seed=seed)
+        # else:
+        #     noisy_data1, _, _ = load_grid_search_data(
+        #         n_qubits=n_qubits, p=p, problem=problem, method=method,
+        #         noise=noise1, beta_step=50, gamma_step=100, seed=0,
+        #     )
+
+        #     noisy_data2, _, _ = load_grid_search_data(
+        #         n_qubits=n_qubits, p=p, problem=problem, method=method,
+        #         noise=noise2, beta_step=50, gamma_step=100, seed=0,
+        #     )
+        noisy_data1 = get_data(noise1)
+        noisy_data2 = get_data(noise2)
+
+        if noisy_data1['full_range'] is not None:
+            full_range = noisy_data1['full_range']
         else:
-            noisy_data1, _, _ = load_grid_search_data(
-                n_qubits=n_qubits, p=p, problem=problem, method=method,
-                noise=noise1, beta_step=50, gamma_step=100, seed=0,
-            )
-
-            noisy_data2, _, _ = load_grid_search_data(
-                n_qubits=n_qubits, p=p, problem=problem, method=method,
-                noise=noise2, beta_step=50, gamma_step=100, seed=0,
-            )
-
-        full_range = noisy_data1['full_range']
+            full_range = noisy_data2['full_range']
 
         # depolarizing 0.001 and 0.005, one-qubit gate error and two-qubit gate error
         noisy1 = noisy_data1['data']
@@ -555,7 +557,10 @@ def reconstruct_by_distributed_landscapes_two_noisy_simulations_top(
         else:
             raise NotImplementedError()
 
-        ratios_cfg1 = [0.0, 0.25, 0.5, 0.75, 1.0]
+        # ratios_cfg1 = [0.0, 0.25, 0.5, 0.75, 1.0]
+        # ratios_cfg1 = np.linspace(norm_frac, 1.0, 5)
+        ratios_cfg1 = [0.2, 0.5, 0.8, 1.0]
+        print(ratios_cfg1)
         
         for ratio in ratios_cfg1:
             ratios = [ratio, 1-ratio]
@@ -608,7 +613,11 @@ def reconstruct_by_distributed_landscapes_two_noisy_simulations_top(
     errors2 = np.array(errors2).reshape(len(n_qubits_list), len(ratios_cfg1))
     
     print('')
-    save_path = f"{recon_dir}/dist_LS_errors-ns={n_qubits_list}-p={p}-r={ratios_cfg1}-n1={noise1}-n2={noise2}-norm={normalize}-nf={norm_frac:.3f}-error={error_type}"
+    if os.path.exists(noise2):
+        noise2 = noise2.replace('/', '+')
+    if os.path.exists(noise1):
+        noise1 = noise1.replace('/', '+')
+    save_path = f"{recon_dir}/dist_LS_errors-ns={n_qubits_list}-p={p}-sf={sf:.3f}-r={ratios_cfg1}-n1={noise1}-n2={noise2}-norm={normalize}-nf={norm_frac:.3f}-error={error_type}"
     print(f"recon errors save to {save_path}")
     np.savez_compressed(
         save_path,
@@ -666,6 +675,8 @@ if __name__ == "__main__":
     parser.add_argument('-p', type=int, help="QAOA circuit depth", required=True)
     parser.add_argument('--noise1', type=str)
     parser.add_argument('--noise2', type=str)
+    parser.add_argument('--seed', type=int, required=True)
+    parser.add_argument('--sf', type=float, required=True)
     parser.add_argument('--normalize', type=str, default=None)
     parser.add_argument('--norm_frac', type=float, default=0)
     parser.add_argument('--ns', type=int, nargs='+', help="Your aims, vis, opt", required=True)
@@ -681,7 +692,8 @@ if __name__ == "__main__":
     # for nq in [12, 16, 20]:
     # for n in args.ns:
     reconstruct_by_distributed_landscapes_two_noisy_simulations_top(
-        n_qubits_list=args.ns, p=args.p, noise1=args.noise1, noise2=args.noise2,
+        n_qubits_list=args.ns, p=args.p, sf=args.sf, noise1=args.noise1, noise2=args.noise2,
+        seed=args.seed,
         normalize=args.normalize, norm_frac=args.norm_frac,
         error_type=args.error, recon_dir=args.recon_dir
     )
