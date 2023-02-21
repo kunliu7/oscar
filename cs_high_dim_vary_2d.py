@@ -159,26 +159,38 @@ test_utils_folder = Path(__file__).parent
 
 
 def recon_high_d_landscapes_by_varying_2d(
-    n: int, p: int, ansatz: str, problem: str, noise: str, seed: int, error_type: str
+    n: int, p: int, ansatz: str, problem: str, 
+    bs: int, gs: int,
+    noise: str, seed: int, error_type: str,
+    repeat: int, force_recon: bool = False,
 ):
-    is_recon = False
-
     method = 'sv'
     miti_method = ''
     mses = []
     coss = []
 
-    if p == 1:
-        bs = 50 # beta step
-        gs = 2 * bs
-    elif p == 2:
-        bs = 12
-        gs = 15
-    elif p == 0:
-        bs = 14
-        gs = 100
+    if bs == None and gs == None:
+        if ansatz == 'qaoa':
+            if p == 1:
+                bs = 50 # beta step
+                gs = 2 * bs
+            elif p == 2:
+                bs = 12
+                gs = 15
+        elif ansatz == 'twolocal':
+            if p == 0:
+                bs = 14
+            elif p == 1:
+                bs = 7
+            gs = None
+        else:
+            raise ValueError(f"ansatz {ansatz} not supported")
 
-    sfs = np.arange(0.01, 0.11, 0.02)
+    # sfs = np.arange(0.05, 0.25, 0.04)
+    # sfs = np.linspace(0.05, 0.25, 5)
+    sfs = [0.20]
+
+    print(len(sfs))
 
     print("noise =", noise)
     print("seed =", seed)
@@ -194,63 +206,79 @@ def recon_high_d_landscapes_by_varying_2d(
     plot_range = data['plot_range']
     full_range = data['full_range']
 
-    # 和Tianyi代码使用相同目录结构
-    recon_dir = f"figs/grid_search_recon/{ansatz}/{problem}/{method}-{noise}-p={p}"
+    is_vis = False
 
-    d = n
+    # 和Tianyi代码使用相同目录结构
+    recon_dir = f"figs/grid_search_recon/{ansatz}/{problem}/{method}-{noise}-p={p}/seed={seed}"
+
+    if ansatz == 'qaoa':
+        d = 2 * p
+    elif ansatz == 'twolocal':
+        d = n * (p + 1)
+    elif ansatz == 'uccsd':
+        d = p # ! check
+    else:
+        raise ValueError(f"ansatz {ansatz} not supported")
+        
+    print("dimension: ", d)
     rng = default_rng(seed=42)
 
-    # for sf in sfs:
-    n_repeat = 1
-    sf = 0.16
-    fixed_dims = rng.choice(d, size=d-2, replace=False)
+    recon_d = 2
+
+    fixed_dims = rng.choice(d, size=d-recon_d, replace=False)
     print("fixed dims =", fixed_dims)
-    for i in range(n_repeat): 
-        # random.choice(range(len(full_range['beta'])))
 
-        recon_fname = f"recon-cs_seed={cs_seed}-sf={sf:.3f}-{data_fname}"
-        recon_path = f"{recon_dir}/{recon_fname}"
+    for sf in sfs:
+        for i in range(repeat): 
+            # random.choice(range(len(full_range['beta'])))
 
-        origin = data['data']
+            recon_fname = f"recon-{cs_seed=}-repeat_i={i}-sf={sf:.3f}-{data_fname}"
+            recon_path = f"{recon_dir}/{recon_fname}"
 
-        random_id_on_each_dim_list = rng.choice(a=len(full_range['beta']), size=d, replace=True)
-        tmp: np.ndarray = origin.copy()
-        next_axis = 0
-        for j in range(d):
-            print(tmp.shape)
-            if j in fixed_dims:
-                tmp = tmp.take(indices=random_id_on_each_dim_list[j], axis=next_axis)
-            else:
-                next_axis += 1
+            origin = data['data']
 
-        origin = tmp
-        print("after np.take = ", origin.shape)
-        recon = get_recon_landscape(ansatz, p, origin, sf, is_recon, 
-            recon_path, cs_seed)
+            random_id_on_each_dim_list = rng.choice(a=len(full_range['beta']), size=d, replace=True)
+            tmp: np.ndarray = origin.copy()
+            next_axis = 0
+            for j in range(d):
+                # print(tmp.shape)
+                if j in fixed_dims:
+                    tmp = tmp.take(indices=random_id_on_each_dim_list[j], axis=next_axis)
+                else:
+                    next_axis += 1
 
-        mse = cal_recon_error(origin.reshape(-1), recon.reshape(-1), error_type)
-        # ncc = cal_recon_error(landscape.reshape(-1), recon.reshape(-1), "CROSS_CORRELATION")
-        cos = cosine(origin.reshape(-1), recon.reshape(-1))
-        mses.append(mse)
-        coss.append(cos)
+            origin = tmp
+            print("after np.take = ", origin.shape)
+            # if problem == 'partition':
+            #     origin = origin / (origin.max() - origin.min())
 
-        # ncc = cal_recon_error()
-        print("RMSE: ", mse)
-        print("Cosine: ", cos)
-        
-        base_recon_fname = os.path.splitext(recon_fname)[0]
-        vis_landscapes(
-            landscapes=[origin, recon],
-            labels=["origin", "recon"],
-            full_range={
-                "beta": plot_range['beta'],
-                "gamma": plot_range['gamma'] 
-            },
-            true_optima=None,
-            title="Origin and recon",
-            save_path=f'{recon_dir}/vis/vis-{base_recon_fname}.png',
-            params_paths=[None, None]
-        )
+            recon = get_recon_landscape(ansatz, p, origin, sf, force_recon, 
+                recon_path, cs_seed)
+
+            mse = cal_recon_error(origin.reshape(-1), recon.reshape(-1), error_type)
+            cos = cosine(origin.reshape(-1), recon.reshape(-1))
+            mses.append(mse)
+            coss.append(cos)
+
+            # ncc = cal_recon_error()
+            print("RMSE: ", mse)
+            print("Cosine: ", cos)
+            
+            base_recon_fname = os.path.splitext(recon_fname)[0]
+            if is_vis:
+                vis_landscapes(
+                    landscapes=[origin, recon],
+                    labels=["origin", "recon"],
+                    full_range={
+                        "beta": plot_range['beta'],
+                        "gamma": plot_range['gamma'] 
+                    },
+                    true_optima=None,
+                    title="Origin and recon",
+                    save_path=f'{recon_dir}/vis/vis-{base_recon_fname}.png',
+                    params_paths=[None, None]
+                )
+            time.sleep(1)
 
     print("noise =", noise)
     print("n qubits =", n)
@@ -259,13 +287,13 @@ def recon_high_d_landscapes_by_varying_2d(
 
     print("mse =", mses)
     print("cos =", coss)
-    mses = np.array(mses)
-    coss = np.array(coss)
+    mses = np.array(mses).reshape(len(sfs), repeat)
+    coss = np.array(coss).reshape(len(sfs), repeat)
 
     print("mse's shape =", mses.shape)
     print("cos's shape =", coss.shape)
     # timestamp = get_curr_formatted_timestamp()
-    recon_error_save_dir = f"{recon_dir}/recon_error_n={n}-seed={seed}-sfs={sfs}-error={error_type}"
+    recon_error_save_dir = f"{recon_dir}/recon_error-{cs_seed=}-{repeat=}-sfs={sfs}-{data_fname}"
     print(f"recon error data save to {recon_error_save_dir}")
     np.savez_compressed(
         recon_error_save_dir,
@@ -283,14 +311,21 @@ if __name__ == "__main__":
     # parser.add_argument('--ns', type=int, nargs='+', help="Your aims, vis, opt", required=True)
     parser.add_argument('--n', type=int, help="Your aims, vis, opt", required=True)
     parser.add_argument('--p', type=int, help="Your aims, vis, opt", required=True)
+    parser.add_argument('--repeat', type=int, help="Your aims, vis, opt", required=True)
     # parser.add_argument('--method', type=str, help="Your aims, vis, opt", required=True)
     parser.add_argument('--ansatz', type=str, help="Your aims, vis, opt", required=True)
     parser.add_argument('--noise', type=str, help="Your aims, vis, opt", required=True)
     parser.add_argument('--problem', type=str, help="Your aims, vis, opt", required=True)
     parser.add_argument('--seed', type=int, help="Your aims, vis, opt", required=True)
     parser.add_argument('--error', type=str, help="Your aims, vis, opt", required=True)
+    parser.add_argument("--bs", help="Beta steps.", type=int, default=None)
+    parser.add_argument("--gs", help="Gamma steps.", type=int, default=None)
+    parser.add_argument("--force_recon", help="Force recon.", action="store_true")
+
     # parser.add_argument('--ansatz', type=str, help="Your aims, vis, opt", required=True)
     args = parser.parse_args()
     
     recon_high_d_landscapes_by_varying_2d(n=args.n, p=args.p, ansatz=args.ansatz, problem=args.problem,
-            noise=args.noise, seed=args.seed, error_type=args.error)
+            bs=args.bs, gs=args.gs,
+            noise=args.noise, seed=args.seed, error_type=args.error, repeat=args.repeat,
+            force_recon=args.force_recon)
