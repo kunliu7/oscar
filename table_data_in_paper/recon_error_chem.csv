@@ -1,0 +1,6 @@
+molecule,ansatz,n,p,# samples,NRMSE
+H$_2$,TwoLocal,2,1,14,0.171
+LiH,TwoLocal,4,1,7,0.678
+H$_2$,UCCSD,2,3,14,0.345
+H$_2$,UCCSD,2,3,50,0.005
+LiH,UCCSD,4,8,7,0.856

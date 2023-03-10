@@ -1,0 +1,7 @@
+,qaoa,twolocal
+maxcut n=4,0.847,0.645
+maxcut n=6,0.372,0.0
+partition n=4,1615983151937.352,0.684
+partition n=6,0.628,0.014
+skmodel n=4,0.847,0.765
+skmodel n=6,0.372,0.057

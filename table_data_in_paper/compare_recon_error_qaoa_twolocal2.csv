@@ -1,0 +1,9 @@
+problem,ansatz,n,p,# samples,NRMSE
+maxcut,qaoa,4,4,7,0.887
+maxcut,qaoa,6,3,14,0.365
+skmodel,qaoa,4,4,7,0.887
+skmodel,qaoa,6,3,14,0.375
+maxcut,twolocal,4,1,7,0.669
+maxcut,twolocal,6,0,14,0.0
+skmodel,twolocal,4,1,7,0.773
+skmodel,twolocal,6,0,14,0.057
