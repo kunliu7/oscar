@@ -134,80 +134,37 @@ python cs_distributed.py --ns 6 -p 1 --sf 0.2 --seed 1 \
     --method2 ibm_perth --noise2 real \
     --error NRMSE
 
-# ============== Use case, debug barren plateaus =========
-
-![vis_figs_bp.ipynb](vis_figs_bp.ipynb)
-![cs_eval_barren_plateaus.py](cs_eval_barren_plateaus.py)
-
-<!-- ![vis_figs_init_points.ipynb](vis_figs_init_points.ipynb) -->
-
-
-# ============== Use case, initialization ================
-
-![vis_figs_init_points.ipynb](vis_figs_init_points.ipynb)
-![cs_eval_init_points.py](cs_eval_init_points.py)
-
-## QAOAKit has optimal
-### P = 2, n=16, true optima, ideal,
-
-
-### P = 2, n=16, true optima, noisy-3 (ALREADY HAD DATA)
-
-Violin plot
-
-—----
-
-## Randomized initialization:
-### p=2, n = 20, ideal (ALREADY HAD DATA)
-python cs_eval_init_points.py -n 20 --noise ideal
-figs/find_init_pts_by_recon/2022-11-10_00:51:15_OK/recon-eps=0.600-csSeed=20-sv-ideal-n=20-p=2-seed=0-12-15.npz
-
-### p=2, n = 20, noisy-3 (ALREADY HAD DATA)
-python cs_eval_init_points.py -n 20 --noise depolar --p1 0.001 --p2 0.02
-
-
-### BP initialization
-python cs_eval_init_points.py -n 16 -p 2 --noise ideal --eps 0.5 --check --inst_seed 0 --stride 11
-python cs_eval_init_points.py -n 20 -p 2 --noise ideal --eps 0.6 --check --inst_seed 0 --stride 10
-
-python cs_eval_init_points.py -n 16 -p 2 --noise ideal --eps 0.3 --check --inst_seed 1 --random_seed 42 --stride 10
-python cs_eval_init_points.py -n 20 -p 2 --noise ideal --eps 0.6 --check --inst_seed 1 --random_seed 42 --stride 10
-
-
-# ============== Use case, error mitigation ==============
+# benchmarking error mitigation
 
 ![cs_comp_miti.py](cs_comp_miti.py)
 ![vis_figs_comp_miti.ipynb](vis_figs_comp_miti.ipynb)
 
 
-
-# ============== optimize on recon. landscape =============
+# Optimize on recon. landscape
 
 ## for single path
 python cs_opt_on_recon_ls.py -n 16 -p 1 --seed 0 --noise ideal --opt ADAM --lr 0.001 --maxiter 10000 --init_pt 0.1 -0.1
 
+python cs_opt_on_recon_landscapes.py -n 16 -p 1 --seed 0 --noise ideal --opt ADAM --lr 0.001 --maxiter 10000 --init_pt 0.1 -0.1 --get_vals
 
 ## for a batch
+
 ### n16
 python cs_opt_on_recon_ls.py -n 16 --noise ideal --seed_range 8 --opts ADAM COBYLA SPSA
+
 python cs_opt_on_recon_ls.py -n 16 --noise depolar-0.001-0.02 --seed_range 8 --opts ADAM COBYLA SPSA
 
-
+### n20
 python cs_opt_on_recon_ls.py -n 20 --noise ideal --seed_range 8 --opts ADAM COBYLA SPSA
+
 python cs_opt_on_recon_ls.py -n 20 --noise depolar-0.001-0.02 --seed_range 8 --opts ADAM COBYLA SPSA
 
 
-# =================== debug barren plateaus ===================
-
-python cs_debug_bp.py -n 16 -p 1 --seed 0 --noise ideal --opt ADAM --lr 0.001 --maxiter 10000 --init_pt 0.1 -0.1
-
-
-
-# ============= two local problem ============
+# Two local problem
 
 python cs_evaluate.py --aim final -p 0 --ns 6 --ansatz twolocal --problem maxcut --noise ideal --n_seeds 1 --error NRMSE
 
-# ============= fix k-2 for twolocal ==============
+# fix k-2 for twolocal
 
 The table:
 
@@ -224,7 +181,6 @@ One to one correspondence. Same # parameters.
 
 For QAOA: # params = 2 * p
 For VQE:  # params = (p+1) * n
-
 
 
 ## MaxCut
@@ -271,7 +227,7 @@ python cs_high_dim_vary_2d.py --n 6 --p 0 --ansatz twolocal --problem skmodel --
 
 python cs_high_dim_vary_2d.py --n 4 --p 1 --ansatz twolocal --problem skmodel --noise ideal --seed 0 --error NRMSE --repeat 100 --bs 7
 
-# ============= measure sparsity of all the data we have ==========
+# Measure sparsity
 
 python cs_measure_sparsity.py --p 2 --ns 16 20 24 --ansatz qaoa --problem maxcut --noise ideal --n_seeds 16
 
@@ -284,16 +240,6 @@ python cs_measure_sparsity.py --p 2 --ns 12 16 20 24 --ansatz qaoa --problem skm
 UCCSD, twolocal, QAOA
 
 H2, LiH
-
-## qaoa
-
-**Do not do**
-
-<!-- python cs_evaluate.py --ansatz qaoa --ns 2 --p 1 --problem h2 --bs 50 --gs 50 \
-    --noise ideal --seeds 1 --error NRMSE
-
-python cs_evaluate.py --ansatz qaoa --ns 2 --p 2 --problem h2 --bs 14 --gs 14 \
-    --noise ideal --seeds 1 --error NRMSE -->
 
 ## twolocal
 
