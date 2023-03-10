@@ -339,21 +339,23 @@ For VQE:  # params = (p+1) * n
 
 
 
-## maxcut
+## MaxCut
 
 ### QAOA
 
-python cs_high_dim_vary_2d.py --p 3 --n 6 --ansatz qaoa --problem maxcut --noise ideal --seed 0 --error NRMSE --repeat 100 --bs 14 --gs 14
+python cs_high_dim_vary_2d.py --n 6 --p 3 --ansatz qaoa --problem maxcut --noise ideal --seed 0 --error NRMSE --repeat 100 --bs 14 --gs 14
 
-python cs_high_dim_vary_2d.py --p 4 --n 4 --ansatz qaoa --problem maxcut --noise ideal --seed 0 --error NRMSE --repeat 100 --bs 7 --gs 7
+python cs_high_dim_vary_2d.py --n 4 --p 4 --ansatz qaoa --problem maxcut --noise ideal --seed 0 --error NRMSE --repeat 100 --bs 7 --gs 7
 
 ### twolocal
 
-python cs_high_dim_vary_2d.py --p 0 --n 6 --ansatz twolocal --problem maxcut --noise ideal --seed 0 --error NRMSE --repeat 100
+python cs_high_dim_vary_2d.py --n 6 --p 0 --ansatz twolocal --problem maxcut --noise ideal --seed 0 --error NRMSE --repeat 100 --bs 14
 
-python cs_high_dim_vary_2d.py --p 1 --n 4 --ansatz twolocal --problem maxcut --noise ideal --seed 0 --error NRMSE --repeat 100
+python cs_high_dim_vary_2d.py --n 4 --p 1 --ansatz twolocal --problem maxcut --noise ideal --seed 0 --error NRMSE --repeat 100 --bs 7
 
 ## partition
+
+**Do not do**
 
 ### QAOA
 
@@ -371,15 +373,15 @@ python cs_high_dim_vary_2d.py --p 1 --n 4 --ansatz twolocal --problem partition 
 
 #### QAOA
 
-python cs_high_dim_vary_2d.py --p 3 --n 6 --ansatz qaoa --problem skmodel --noise ideal --seed 0 --error NRMSE --repeat 100 --bs 14 --gs 14
+python cs_high_dim_vary_2d.py --n 6 --p 3 --ansatz qaoa --problem skmodel --noise ideal --seed 0 --error NRMSE --repeat 100 --bs 14 --gs 14
 
-python cs_high_dim_vary_2d.py --p 4 --n 4 --ansatz qaoa --problem skmodel --noise ideal --seed 0 --error NRMSE --repeat 100 --bs 7 --gs 7
+python cs_high_dim_vary_2d.py --n 4 --p 4 --ansatz qaoa --problem skmodel --noise ideal --seed 0 --error NRMSE --repeat 100 --bs 7 --gs 7
 
 ### twolocal
 
-python cs_high_dim_vary_2d.py --p 0 --n 6 --ansatz twolocal --problem skmodel --noise ideal --seed 0 --error NRMSE --repeat 100
+python cs_high_dim_vary_2d.py --n 6 --p 0 --ansatz twolocal --problem skmodel --noise ideal --seed 0 --error NRMSE --repeat 100 --bs 14
 
-python cs_high_dim_vary_2d.py --p 1 --n 4 --ansatz twolocal --problem skmodel --noise ideal --seed 0 --error NRMSE --repeat 100
+python cs_high_dim_vary_2d.py --n 4 --p 1 --ansatz twolocal --problem skmodel --noise ideal --seed 0 --error NRMSE --repeat 100 --bs 7
 
 # ============= measure sparsity of all the data we have ==========
 
