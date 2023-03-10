@@ -1,4 +1,5 @@
 import numpy as np
+import os
 import matplotlib.pyplot as plt
 
 initial_points = [[[
@@ -73,34 +74,61 @@ initial_points = [[[
 data, labels = [], []
 # optimizer_pool = ["COBYLA"]
 # optimizer_pool = ["ADAM"]
+
 optimizer_pool = ["ADAM", "COBYLA"]
-for init in ["random", "OSCAR"]:
-    for i, noise in enumerate(["ideal", "noisy"]):
+init_types = ["random", "OSCAR"]
+noise_types = ["ideal", "noisy"]
+
+seeds_dict = {
+    "ADAM":   [1, 2, 3, 4, 5, 6, 7, 8,    10, 11, 12, 13, 15], # seed 9 is broken
+    "COBYLA": [1, 2, 3, 4, 5,    7, 8, 9, 10, 11, 12, 13, 15], # seed 6 is broken
+} # seed 14 is missing for both
+
+for j, opt in enumerate(optimizer_pool):
+    for init in init_types:
+        for i, noise in enumerate(noise_types):
         # labels.append(f"{noise} {init}")
-        for j, opt in enumerate(optimizer_pool):
-            for seed in list(range(1, 14)) + [15]:
+            for seed in seeds_dict[opt]:
                 if noise == "noisy":
                     noise = "depolar-0.003-0.007"
-                maxiter = 10000 if opt=="ADAM" else 1000
+                maxiter = 10000 if opt == "ADAM" else 1000
                 # initial_point = initial_points[j+1][i][seed] if init=="OSCAR" else "None"
                 initial_point = initial_points[j][i][seed] if init == "OSCAR" else "None"
                 path = f"figs/optimization/maxcut/sv-{noise}-p=1/maxcut-sv-{noise}-n=16-p=1-{seed=}-{opt}-{maxiter=}-{initial_point}.npz"
-                # print(path)
+
                 try:
-                    opt_data = np.load(
-                        path,
-                        allow_pickle=True,
-                    )
-                except:
+                    opt_data = np.load(path, allow_pickle=True)
+                except Exception as e:
+                    print(e)
                     print(path)
-                    continue
+                    exit(7)
                     
                 # data.append(opt_data["min_eigen_solver_result"].item().optimal_value)
                 data.append(len(opt_data["optimizer_path"]))
                 # if init == "OSCAR":
                 #     data[-1] = data[-1] + 250
 
-data = np.array(data).reshape(2, 2, 14).tolist()
+data = np.array(data)
+print(data.shape)
+
+# keep the order of the optimizers, initializations and noise types
+# since `len(seeds_dict["ADAM"]) == len(seeds_dict["COBYLA"])`, we can reshape the data in this way
+data = data.reshape(len(optimizer_pool), len(init_types), len(noise_types), len(seeds_dict["ADAM"])) 
+
+save_dir = "figs/reduce_QPU_queries"
+if not os.path.exists(save_dir):
+    os.makedirs(save_dir)
+save_fname = f"opt={optimizer_pool}-init={init_types}-noise={noise_types}.npz"
+save_path = os.path.join(save_dir, save_fname)
+print(f"Saving data to {save_path}")
+
+print(data.shape)
+np.savez_compressed(
+    save_path, allow_pickle=True, data=data, optimizer_pool=optimizer_pool,
+    init_types=init_types, noise_types=noise_types, seeds_dict=seeds_dict,
+    OSCAR_additional_queries=250,
+)
+exit(0)
 labels = ["Random initialization", "OSCAR"]
 
 # plt.figure(figsize=(9.6, 4.8))
