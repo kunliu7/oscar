@@ -1,46 +1,45 @@
 
-# ============== Section 4, Recon error
+# Fig. 4, recon error
 
-![vis_figs_section4_recon_error.ipynb](vis_figs_section4_recon_error.ipynb)
-![cs_evaluate.py](cs_evaluate.py)
+[vis_figs_section4_recon_error.ipynb](vis_figs_section4_recon_error.ipynb)
+[cs_evaluate.py](cs_evaluate.py)
 
 ## Maxcut
-
 
 ### p=2 noisy
 
 #### n12
-python cs_evaluate.py --aim final -p 2 --ns 12 --problem maxcut --noise depolar-0.003-0.007 --n_seeds 4 --error NRMSE
-python cs_evaluate.py --aim final -p 2 --ns 12 --problem maxcut --noise depolar-0.003-0.007 --n_seeds 4 8 --error NRMSE
+python cs_evaluate.py --aim final -p 2 --ns 12 --ansatz qaoa --problem maxcut --noise depolar-0.003-0.007 --n_seeds 4 --error NRMSE
+python cs_evaluate.py --aim final -p 2 --ns 12 --ansatz qaoa --problem maxcut --noise depolar-0.003-0.007 --n_seeds 4 8 --error NRMSE
 
 #### n16
-python cs_evaluate.py --aim final -p 2 --ns 16 --problem maxcut --noise depolar-0.003-0.007 --n_seeds 4 --error NRMSE
-python cs_evaluate.py --aim final -p 2 --ns 16 --problem maxcut --noise depolar-0.003-0.007 --n_seeds 4 8 --error NRMSE
+python cs_evaluate.py --aim final -p 2 --ns 16 --ansatz qaoa --problem maxcut --noise depolar-0.003-0.007 --n_seeds 4 --error NRMSE
+python cs_evaluate.py --aim final -p 2 --ns 16 --ansatz qaoa --problem maxcut --noise depolar-0.003-0.007 --n_seeds 4 8 --error NRMSE
 
 #### n20
 
-python cs_evaluate.py --aim final -p 2 --ns 20 --problem maxcut --noise depolar-0.003-0.007 --n_seeds 0 1 --error NRMSE
-python cs_evaluate.py --aim final -p 2 --ns 20 --problem maxcut --noise depolar-0.003-0.007 --n_seeds 1 2 --error NRMSE
-python cs_evaluate.py --aim final -p 2 --ns 20 --problem maxcut --noise depolar-0.003-0.007 --n_seeds 2 3 --error NRMSE
-python cs_evaluate.py --aim final -p 2 --ns 20 --problem maxcut --noise depolar-0.003-0.007 --n_seeds 3 4 --error NRMSE
-python cs_evaluate.py --aim final -p 2 --ns 20 --problem maxcut --noise depolar-0.003-0.007 --n_seeds 4 5 --error NRMSE
-python cs_evaluate.py --aim final -p 2 --ns 20 --problem maxcut --noise depolar-0.003-0.007 --n_seeds 5 6 --error NRMSE
-python cs_evaluate.py --aim final -p 2 --ns 20 --problem maxcut --noise depolar-0.003-0.007 --n_seeds 6 7 --error NRMSE
-python cs_evaluate.py --aim final -p 2 --ns 20 --problem maxcut --noise depolar-0.003-0.007 --n_seeds 7 8 --error NRMSE
+python cs_evaluate.py --aim final -p 2 --ns 20 --ansatz qaoa --problem maxcut --noise depolar-0.003-0.007 --n_seeds 0 1 --error NRMSE
+python cs_evaluate.py --aim final -p 2 --ns 20 --ansatz qaoa --problem maxcut --noise depolar-0.003-0.007 --n_seeds 1 2 --error NRMSE
+python cs_evaluate.py --aim final -p 2 --ns 20 --ansatz qaoa --problem maxcut --noise depolar-0.003-0.007 --n_seeds 2 3 --error NRMSE
+python cs_evaluate.py --aim final -p 2 --ns 20 --ansatz qaoa --problem maxcut --noise depolar-0.003-0.007 --n_seeds 3 4 --error NRMSE
+python cs_evaluate.py --aim final -p 2 --ns 20 --ansatz qaoa --problem maxcut --noise depolar-0.003-0.007 --n_seeds 4 5 --error NRMSE
+python cs_evaluate.py --aim final -p 2 --ns 20 --ansatz qaoa --problem maxcut --noise depolar-0.003-0.007 --n_seeds 5 6 --error NRMSE
+python cs_evaluate.py --aim final -p 2 --ns 20 --ansatz qaoa --problem maxcut --noise depolar-0.003-0.007 --n_seeds 6 7 --error NRMSE
+python cs_evaluate.py --aim final -p 2 --ns 20 --ansatz qaoa --problem maxcut --noise depolar-0.003-0.007 --n_seeds 7 8 --error NRMSE
 
 
 ## Partition
-python cs_evaluate.py --aim final -p 2 --ns 12 16 20 24 --problem partition --noise ideal --n_seeds 1 --error NRMSE
+python cs_evaluate.py --aim final -p 2 --ns 12 16 20 24 --ansatz qaoa --problem partition --noise ideal --n_seeds 1 --error NRMSE
 
 
 ## SK model
-python cs_evaluate.py --aim final -p 2 --ns 12 16 20 24 --problem skmodel --noise ideal --n_seeds 8 --error NRMSE
+python cs_evaluate.py --aim final -p 2 --ns 12 16 20 24 --ansatz qaoa --problem skmodel --noise ideal --n_seeds 8 --error NRMSE
 
 
-# ============= Section 5, distributed landscape
+# Distributed landscape recon.
 
-![vis_figs_section5_distributed_oscar.ipynb](vis_figs_section5_distributed_oscar.ipynb)
-![cs_distributed.py](cs_distributed.py)
+[vis_figs_section5_distributed_oscar.ipynb](vis_figs_section5_distributed_oscar.ipynb)
+[cs_distributed.py](cs_distributed.py)
 
 ## noise-1 and noise-2, n=12,16,20
 
@@ -168,64 +167,68 @@ python cs_distributed.py --ns 20 -p 1 --sf 0.2 --seed 0 \
 
 NCM:
 
-python cs_distributed.py --ns 6 -p 1 --sf 0.2 --seed 1 --noise1 ibm-1 \
-    --noise2 figs/grid_search/ibm/maxcut/sv-ideal-p=1/maxcut-sv-ideal-n=6-p=1-seed=1-50-100-IBM1-transpiled-H.npz \
+python cs_distributed.py --ns 6 -p 1 --sf 0.2 --seed 1 \
+    --method1 ibm_perth --noise1 real \
+    --method2 ibm_perth --noise2 ideal_sim \
     --normalize linear --norm_frac 0.2 \
     --error NRMSE
 
 baseline:
 
-python cs_distributed.py --ns 6 -p 1 --sf 0.2 --seed 1 --noise1 ibm-1 \
-    --noise2 figs/grid_search/ibm/maxcut/sv-ideal-p=1/maxcut-sv-ideal-n=6-p=1-seed=1-50-100-IBM1-transpiled-H.npz \
-    --norm_frac 0.2 \
+python cs_distributed.py --ns 6 -p 1 --sf 0.2 --seed 1 \
+    --method1 ibm_perth --noise1 real \
+    --method2 ibm_perth --noise2 ideal_sim \
     --error NRMSE
 
 #### IBM Perth & Noisy Simulation (IBM Perth)
 
 NCM:
 
-python cs_distributed.py --ns 6 -p 1 --sf 0.2 --seed 1 --noise1 ibm-1 \
-    --noise2 figs/grid_search/ibm/maxcut/sv-ibm_perth-p=1/maxcut-sv-ibm_perth-n=6-p=1-seed=1-50-100-IBM1-transpiled-H.npz \
+python cs_distributed.py --ns 6 -p 1 --sf 0.2 --seed 1 \
+    --method1 ibm_perth --noise1 real \
+    --method2 ibm_perth --noise2 noisy_sim \
     --normalize linear --norm_frac 0.2 \
     --error NRMSE
 
 baseline:
 
-python cs_distributed.py --ns 6 -p 1 --sf 0.2 --seed 1 --noise1 ibm-1 \
-    --noise2 figs/grid_search/ibm/maxcut/sv-ibm_perth-p=1/maxcut-sv-ibm_perth-n=6-p=1-seed=1-50-100-IBM1-transpiled-H.npz \
-    --norm_frac 0.2 \
+python cs_distributed.py --ns 6 -p 1 --sf 0.2 --seed 1 \
+    --method1 ibm_perth --noise1 real \
+    --method2 ibm_perth --noise2 noisy_sim \
     --error NRMSE
 
 #### IBM Perth & IBM Lagos
 
 NCM:
 
-python cs_distributed.py --ns 6 -p 1 --sf 0.2 --seed 1 --noise1 ibm-1 \
-    --noise2 ibm-2 \
+python cs_distributed.py --ns 6 -p 1 --sf 0.2 --seed 1 \
+    --method1 ibm_perth --noise1 real \
+    --method2 ibm_lagos --noise2 real \
     --normalize linear --norm_frac 0.2 \
     --error NRMSE
 
 base
 
-python cs_distributed.py --ns 6 -p 1 --sf 0.2 --seed 1 --noise1 ibm-1 \
-    --noise2 ibm-2 \
-    --norm_frac 0.2 \
+python cs_distributed.py --ns 6 -p 1 --sf 0.2 --seed 1 \
+    --method1 ibm_perth --noise1 real \
+    --method2 ibm_lagos --noise2 real \
     --error NRMSE
 
 #### IBM Lagos (IBM-2) & IBM Perth (IBM-1)
 
 NCM:
 
-python cs_distributed.py --ns 6 -p 1 --sf 0.2 --seed 1 --noise1 ibm-2 \
-    --noise2 ibm-1 \
+python cs_distributed.py --ns 6 -p 1 --sf 0.2 --seed 1 \
+    --method1 ibm_lagos --noise1 real \
+    --method2 ibm_perth --noise2 real \
     --normalize linear --norm_frac 0.2 \
     --error NRMSE
 
 base
 
-python cs_distributed.py --ns 6 -p 1 --sf 0.2 --seed 1 --noise1 ibm-2 \
-    --noise2 ibm-1 \
-    --norm_frac 0.2 \
+python cs_distributed.py --ns 6 -p 1 --sf 0.2 --seed 1 \
+    --method1 ibm_lagos --noise1 real \
+    --method2 ibm_perth --noise2 real \
     --error NRMSE
 
 #### Ideal Simulation & IBM Perth
@@ -233,17 +236,16 @@ python cs_distributed.py --ns 6 -p 1 --sf 0.2 --seed 1 --noise1 ibm-2 \
 NCM:
 
 python cs_distributed.py --ns 6 -p 1 --sf 0.2 --seed 1 \
-    --noise1 figs/grid_search/ibm/maxcut/sv-ideal-p=1/maxcut-sv-ideal-n=6-p=1-seed=1-50-100-IBM1-transpiled-H.npz \
-    --noise2 ibm-1 \
+    --method1 ibm_perth --noise1 ideal_sim \
+    --method2 ibm_perth --noise2 real \
     --normalize linear --norm_frac 0.2 \
     --error NRMSE
 
 baseline:
 
 python cs_distributed.py --ns 6 -p 1 --sf 0.2 --seed 1 \
-    --noise1 figs/grid_search/ibm/maxcut/sv-ideal-p=1/maxcut-sv-ideal-n=6-p=1-seed=1-50-100-IBM1-transpiled-H.npz \
-    --noise2 ibm-1 \
-    --norm_frac 0.2 \
+    --method1 ibm_perth --noise1 ideal_sim \
+    --method2 ibm_perth --noise2 real \
     --error NRMSE
 
 # ============== Use case, debug barren plateaus =========

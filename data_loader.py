@@ -1,17 +1,19 @@
 
 import numpy as np
-from typing import List, Tuple
+from typing import List, Tuple, Union
 import os
 
-from QAOAKit.n_dim_cs import recon_4D_landscape_by_2D
-from QAOAKit.compressed_sensing import (
+from oscar.n_dim_cs import recon_4D_landscape_by_2D
+from oscar.compressed_sensing import (
     recon_2D_landscape,
 )
 
 
-"""    
-recon_path, _, _ = get_recon_pathname(p, problem, method, noise, cs_seed, sf, data_fname)
-recon = get_recon_landscape(p, origin, sf, False, recon_path, cs_seed)
+"""
+Usage:
+
+recon_path, _, _ = get_recon_pathname(ansatz, p, problem, method, noise, cs_seed, sf, data_fname)
+recon = get_recon_landscape(ansatz, p, origin, sf, False, recon_path, cs_seed)
 """
 
 def get_recon_landscape(ansatz: str, p: int, origin: np.ndarray, sampling_frac: float,
@@ -19,32 +21,99 @@ def get_recon_landscape(ansatz: str, p: int, origin: np.ndarray, sampling_frac: 
 ) -> np.ndarray:
     d = len(origin.shape)
     save_dir = os.path.dirname(recon_save_path)
-    is_recon = force_recon or os.path.exists(recon_save_path)
+    is_recon = force_recon or not os.path.exists(recon_save_path)
 
-    if is_recon:
-        np.random.seed(cs_seed)
-        if d == 2:
-            recon = recon_2D_landscape(
-                origin=origin,
-                sampling_frac=sampling_frac
-            )
-            if not os.path.exists(save_dir):
-                os.makedirs(save_dir)
-            np.savez_compressed(recon_save_path, recon=recon, sampling_frac=sampling_frac) 
-        elif d == 4:
-            recon = recon_4D_landscape_by_2D(
-                origin=origin,
-                sampling_frac=sampling_frac
-            )
-            if not os.path.exists(save_dir):
-                os.makedirs(save_dir)
-            np.savez_compressed(recon_save_path, recon=recon, sampling_frac=sampling_frac)
-        print("not exists, save to", save_dir)
-    else:
+    if not is_recon:
         recon = np.load(recon_save_path, allow_pickle=True)['recon']
         print("recon landscape read from", recon_save_path)
+        return recon
+
+    if force_recon:
+        print("force recon...")
+    else:
+        print(f'recon landscape does not exist in {recon_save_path}, start recon...')
+
+    np.random.seed(cs_seed)
+    if d == 2:
+        recon = recon_2D_landscape(
+            origin=origin,
+            sampling_frac=sampling_frac
+        )
+    elif d == 4:
+        recon = recon_4D_landscape_by_2D(
+            origin=origin,
+            sampling_frac=sampling_frac
+        )
+        
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+    np.savez_compressed(recon_save_path, recon=recon, sampling_frac=sampling_frac)
+    print("not exists, save to", save_dir)
     
     return recon
+
+
+def load_IBM_or_sim_grid_search_data(
+    n_qubits: int, p: int, ansatz: str, problem: str, method: str, noise: str,
+    beta_step: int, gamma_step: int, seed: int, miti_method: str=''
+) -> Tuple[dict, str, str]:
+    if 'ibm' in method:
+        data, fname, fdir = load_IBM_grid_search_data(
+            n_qubits, p, ansatz, problem, method, noise, beta_step, gamma_step, seed
+        )
+    else:
+        data, fname, fdir = load_grid_search_data(
+            n_qubits, p, ansatz, problem, method, noise, beta_step, gamma_step, seed, miti_method
+        )
+
+    return data, fname, fdir
+
+
+def load_IBM_grid_search_data(
+    n_qubits: int, p: int, ansatz: str, problem: str, method: str, noise: str,
+    beta_step: int, gamma_step: int, seed: int
+) -> Tuple[dict, str, str]:
+    assert ansatz == 'qaoa'
+    assert problem == 'maxcut'
+    assert n_qubits == 6
+    assert p == 1
+    assert method in ['ibm_lagos', 'ibm_perth']
+    assert noise in ['ideal_sim', 'noisy_sim', 'real']
+    assert seed == 1
+
+    fname = f"{problem}-{method}-{noise}-n={n_qubits}-{p=}-{seed=}-{beta_step}-{gamma_step}"
+    save_dir = f"figs/ibm/IBM_Exp_2048/{fname}.npz"
+    data = np.load(
+        save_dir,
+        allow_pickle=True
+    )
+
+    beta_bound = np.pi / 4 / p
+    gamma_bound = np.pi / 2 / p
+
+    full_range = {
+        'beta': np.linspace(-beta_bound, beta_bound, beta_step),
+        'gamma': np.linspace(-gamma_bound, gamma_bound, gamma_step)
+    } 
+
+    data_dict = dict(data)
+    if 'ibm_H_ls' in data_dict:
+        print("ibm data read from", save_dir)
+        new_data = {
+            'data': data_dict['ibm_H_ls'],
+        }
+    else:
+        new_data = data_dict
+    
+    new_data['full_range'] = full_range
+    return new_data, fname, save_dir
+
+
+# def get_IBM_recon_landscape(
+#     n_qubits: int, p: int, ansatz: str, problem: str, method: str, noise: str,
+#     beta_step: int, gamma_step: int, seed: int, shots: int, cs_seed: int,
+#     sampling_frac: float, force_recon: bool, is_save: bool=True
+# )
 
 
 def load_ibm_data(
@@ -141,7 +210,16 @@ def load_grid_search_data(
 
         data['full_ranges'] = full_ranges
         data['full_range'] = full_range
-        data['plot_range'] = data['full_range'].copy()
+        if p == 1:
+            data['plot_range'] = data['full_range'].copy()
+        elif p == 1:
+            data['plot_range'] = {
+                'beta': list(range(bs ** p)),
+                'gamma': list(range(gs ** p))
+            }
+        else:
+            data['plot_range'] = None
+
 
     elif ansatz == 'twolocal':
         # assert n_qubits % 2 == 0
@@ -181,7 +259,7 @@ def load_grid_search_data(
     return data, fname, data_dir
 
 
-def get_recon_pathname(p:int, problem: str, method: str,
+def get_recon_pathname(ansatz: str, p:int, problem: str, method: str,
     noise: str, cs_seed: str, sampling_frac: float, origin_fname: str
 ) -> Tuple[str, str, str]:
     """
@@ -191,7 +269,7 @@ def get_recon_pathname(p:int, problem: str, method: str,
     """
     sf = sampling_frac
     # 和Tianyi的目录结构保持一致
-    recon_dir = f"figs/grid_search_recon/{problem}/{method}-{noise}-p={p}"
+    recon_dir = f"figs/grid_search_recon/{ansatz}/{problem}/{method}-{noise}-p={p}"
     recon_fname = f"recon-cs_seed={cs_seed}-sf={sf:.3f}-{origin_fname}"
     recon_path = f"{recon_dir}/{recon_fname}"
 
@@ -266,44 +344,3 @@ def load_optimization_path(
 
     return data['optimizer_path']
 
-
-def get_interpolation_path(
-    n_qubits: int,
-    p: int,
-    problem: str,
-    method: str,
-    noise: str,
-    optimizer: str,
-    maxiter: int,
-    initial_point: List[int],
-    seed: int,
-    miti_method: str=""
-) -> np.ndarray:
-    n = n_qubits
-
-    save_dir = os.path.dirname(recon_save_path)
-    is_recon = os.path.exists(recon_save_path)
-    if not is_recon:
-        np.random.seed(cs_seed)
-        if p == 1:
-            recon = recon_2D_landscape(
-                origin=origin,
-                sampling_frac=sampling_frac
-            )
-            if not os.path.exists(save_dir):
-                os.makedirs(save_dir)
-            np.savez_compressed(recon_save_path, recon=recon, sampling_frac=sampling_frac) 
-        elif p == 2:
-            recon = recon_4D_landscape_by_2D(
-                origin=origin,
-                sampling_frac=sampling_frac
-            )
-            if not os.path.exists(save_dir):
-                os.makedirs(save_dir)
-            np.savez_compressed(recon_save_path, recon=recon, sampling_frac=sampling_frac)
-        print("not exists, save to", save_dir)
-    else:
-        recon = np.load(recon_save_path, allow_pickle=True)['recon']
-        print("recon landscape read from", recon_save_path)
-    
-    return recon
