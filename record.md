@@ -36,132 +36,25 @@ python cs_evaluate.py --aim final -p 2 --ns 12 16 20 24 --ansatz qaoa --problem 
 python cs_evaluate.py --aim final -p 2 --ns 12 16 20 24 --ansatz qaoa --problem skmodel --noise ideal --n_seeds 8 --error NRMSE
 
 
-# Distributed landscape recon.
+# Distributed landscape reconstruction
 
-[vis_figs_section5_distributed_oscar.ipynb](vis_figs_section5_distributed_oscar.ipynb)
-[cs_distributed.py](cs_distributed.py)
+Visualization / Table: [vis_figs_section5_distributed_oscar.ipynb](vis_figs_section5_distributed_oscar.ipynb)
 
-## noise-1 and noise-2, n=12,16,20
+Script: [cs_distributed.py](cs_distributed.py)
 
-Done
+## Fig. 8
 
-## noise-2 and noise-3, n=12,16,20
+baseline
 
-### not normalized
-python cs_distributed.py -n 12 -p 1 --noise1 depolar-0.003-0.007 --noise2 depolar-0.001-0.02
-python cs_distributed.py -n 16 -p 1 --noise1 depolar-0.003-0.007 --noise2 depolar-0.001-0.02
-python cs_distributed.py -n 20 -p 1 --noise1 depolar-0.003-0.007 --noise2 depolar-0.001-0.02
-
-### normalized by geometric mean
-python cs_distributed.py -n 12 -p 1 --noise1 depolar-0.003-0.007 --noise2 depolar-0.001-0.02 --normalize geo --norm_frac 0.1
-python cs_distributed.py -n 16 -p 1 --noise1 depolar-0.003-0.007 --noise2 depolar-0.001-0.02
-python cs_distributed.py -n 20 -p 1 --noise1 depolar-0.003-0.007 --noise2 depolar-0.001-0.02
-
-### compare baseline, normalized by geometric mean, normalized by linear regression
-
-python cs_distributed.py --ns 12 16 20 -p 1 --noise1 depolar-0.003-0.007 --noise2 depolar-0.001-0.02
-python cs_distributed.py --ns 12 16 20 -p 1 --noise1 depolar-0.003-0.007 --noise2 depolar-0.001-0.02 --normalize geo --norm_frac 0.1
-python cs_distributed.py --ns 12 16 20 -p 1 --noise1 depolar-0.003-0.007 --noise2 depolar-0.001-0.02 --normalize linear --norm_frac 0.1 --error NRMSE
-
-**For visualize**
-
-baseline:
 python cs_distributed.py --ns 12 16 20 -p 1 --noise1 depolar-0.003-0.007 --noise2 depolar-0.001-0.02 \
-    --error NRMSE \
-    --recon_dir "figs/recon_distributed_landscape/2022-11-13_16:48:42"
-
-Geometric mean:
-python cs_distributed.py --ns 12 16 20 -p 1 --noise1 depolar-0.003-0.007 --noise2 depolar-0.001-0.02 \
-    --normalize geo --norm_frac 0.1 --error NRMSE \
-    --recon_dir "figs/recon_distributed_landscape/2022-11-13_16:49:14"
+    --error NRMSE
 
 Linear regression
+
 python cs_distributed.py --ns 12 16 20 -p 1 --noise1 depolar-0.003-0.007 --noise2 depolar-0.001-0.02 \
-    --normalize linear --norm_frac 0.1 --error NRMSE \
-    --recon_dir "figs/recon_distributed_landscape/2022-11-13_16:48:56"
-
-
-```python
-if method == 'baseline':
-    path = "figs/recon_distributed_landscape/2022-11-13_16:48:42"
-elif method == 'geo':
-    path = "figs/recon_distributed_landscape/2022-11-13_16:49:14"
-elif method == 'linear':
-    path = "figs/recon_distributed_landscape/2022-11-13_16:48:56"
-```
-
-## IBM machine
-
-NCM:
-
-python cs_distributed.py --ns 6 -p 1 --sf 0.2 --noise1 ibm --noise2 ibm \
     --normalize linear --norm_frac 0.1 --error NRMSE
 
-baseline:
-
-python cs_distributed.py --ns 6 -p 1 --sf 0.2 --noise1 ibm --noise2 ibm \
-    --norm_frac 0.1 --error NRMSE
-
----
-
-NCM:
-
-python cs_distributed.py --ns 6 -p 1 --sf 0.2 --noise1 ibm --noise2 ibm \
-    --normalize linear --norm_frac 0.2 --error NRMSE
-
-baseline:
-
-python cs_distributed.py --ns 6 -p 1 --sf 0.2 --noise1 ibm --noise2 ibm --error NRMSE
-
-### Enhance simulation of real quantum devices
-
-"""
-For Qaoa P=1, we have two landscapes —(1) generated with noisy simulation (2) captured on ibm hardware
-
-Let’s use (2) as a reference, we want to understand if we can get close to (2) by using fraction of samples from (1) by using NCM
-
-We can use NCM for using cheap/noise hardware to imitate more reliable hardware and vice versa. Similarly we can use simulations with simple noise models to imitate a hardware that is not easy to access, and exhibit complex noise
-"""
-
-#### Noisy sim, cfg-1 & Ideal 
-
-NCM:
-
-python cs_distributed.py --ns 20 -p 1 --sf 0.2 --seed 0 \
-    --noise1 depolar-0.001-0.005 \
-    --noise2 ideal \
-    --normalize linear --norm_frac 0.2 \
-    --error NRMSE
-
-base:
-
-python cs_distributed.py --ns 20 -p 1 --sf 0.2 --seed 0 \
-    --noise1 depolar-0.001-0.005 \
-    --noise2 ideal \
-    --norm_frac 0.2 \
-    --error NRMSE
-
-
-
-#### Noisy sim, cfg-2 & Ideal
-
-P.S. Exchange the noise
-
-NCM:
-
-python cs_distributed.py --ns 20 -p 1 --sf 0.2 --seed 0 \
-    --noise1 depolar-0.003-0.007 \
-    --noise2 ideal \
-    --normalize linear --norm_frac 0.2 \
-    --error NRMSE
-
-base
-
-python cs_distributed.py --ns 20 -p 1 --sf 0.2 --seed 0 \
-    --noise1 depolar-0.003-0.007 \
-    --noise2 ideal \
-    --norm_frac 0.2 \
-    --error NRMSE
+## Table V
 
 #### IBM Perth & Ideal Simulation
 
