@@ -14,11 +14,13 @@ from scipy.spatial.distance import (
 )
 from data_loader import get_recon_pathname, load_grid_search_data, get_recon_landscape, load_ibm_data
 
+
 def recon_landscapes_varying_qubits_and_instances(
     p: int, ansatz: str, problem: str, noise: str, n_seeds: List[int], n_qubits_list: list,
     bs: int, gs: int, error_type: str
 ):
-    is_vis = True 
+    is_vis = False
+    is_force_recon = False
     method = 'sv'
     miti_method = ''
     mses = []
@@ -65,7 +67,7 @@ def recon_landscapes_varying_qubits_and_instances(
                 recon_path = f"{recon_dir}/{recon_fname}"
 
                 origin = data['data']
-                recon = get_recon_landscape(ansatz, p, origin, sf, False,
+                recon = get_recon_landscape(ansatz, p, origin, sf, is_force_recon,
                                             recon_path, cs_seed)
 
                 mse = cal_recon_error(origin.reshape(-1),
@@ -232,7 +234,8 @@ if __name__ == "__main__":
     parser.add_argument('--noise', type=str, help="Noise type.", required=True)
     parser.add_argument('--problem', type=str, help="Problem.", required=True)
     parser.add_argument('--n_seeds', type=int, nargs='+',
-                        help="Your aims, vis, opt", required=True)
+                        help="Seed of instance. If there is only 1 number, reconstruct the specified instance;"
+                        "if there are two, reconstruct the range between n_seeds[0] and n_seeds[1].", required=True)
     parser.add_argument(
         '--error', type=str, help="Type of error that used to compute reconstruction error.", required=True)
     parser.add_argument('--ansatz', type=str,
