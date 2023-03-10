@@ -8,155 +8,17 @@ import numpy as np
 from numpy.random import default_rng
 import pandas as pd
 import time
-import concurrent.futures
-import timeit
-import orqviz
-from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, execute
-from qiskit.algorithms.optimizers import (
-    ADAM,
-    AQGD,
-    CG,
-    COBYLA,
-    L_BFGS_B,
-    GSLS,
-    GradientDescent,
-    NELDER_MEAD,
-    NFT,
-    P_BFGS,
-    POWELL,
-    SLSQP,
-    SPSA,
-    QNSPSA,
-    TNC,
-    SciPyOptimizer
-)
-from qiskit.algorithms import VQE, NumPyMinimumEigensolver, QAOA
-from qiskit.utils import QuantumInstance, algorithm_globals
-# from qiskit_optimization.algorithms import (
-#     MinimumEigenOptimizer,
-#     RecursiveMinimumEigenOptimizer,
-#     SolutionSample,
-#     OptimizationResultStatus,
-#     WarmStartQAOAOptimizer
-# )
-from qiskit import Aer
-import qiskit
-from qiskit.providers.aer import AerSimulator
-from functools import partial
 from pathlib import Path
-import copy
-from itertools import groupby
-import timeit
 import sys, os
-from scipy.optimize import minimize
 from scipy.spatial.distance import (
     cosine
 )
-from qiskit.quantum_info import Statevector
-from qiskit.opflow import PrimitiveOp, PauliSumOp
-from QAOAKit.n_dim_cs import recon_4D_landscape, recon_4D_landscape_by_2D
-# from cs_comp_miti import _get_recon_landscape
 from data_loader import load_grid_search_data, get_recon_landscape
-# from QAOAKit import vis
+from oscar.compressed_sensing import cal_recon_error
 
-sys.path.append('..')
-from QAOAKit.noisy_params_optim import (
-    get_pauli_error_noise_model,
-    optimize_under_noise,
-    get_depolarizing_error_noise_model,
-    compute_expectation
-)
-
-from QAOAKit.vis import(
-    _vis_recon_distributed_landscape,
-    vis_landscape,
-    vis_landscape_heatmap,
-    vis_landscape_heatmap_multi_p,
-    vis_landscape_multi_p,
-    vis_landscape_multi_p_and_and_count_optima,
-    vis_landscape_multi_p_and_and_count_optima_MP,
+from oscar.vis import(
     vis_landscapes,
-    vis_multi_landscape_and_count_optima_and_mitiq_MP,
-    vis_multi_landscapes_and_count_optima_and_mitiq_MP_and_one_variable,
-    vis_two_BPs_p1_recon
 )
-
-from QAOAKit import (
-    opt_angles_for_graph,
-    get_fixed_angles,
-    get_graph_id,
-    get_graph_from_id,
-    angles_to_qaoa_format,
-    beta_to_qaoa_format,
-    gamma_to_qaoa_format,
-    angles_to_qiskit_format,
-    angles_to_qtensor_format,
-    get_3_reg_dataset_table,
-    get_3_reg_dataset_table_row,
-    get_full_qaoa_dataset_table_row,
-    get_full_qaoa_dataset_table,
-    get_fixed_angle_dataset_table,
-    get_fixed_angle_dataset_table_row,
-    qaoa_maxcut_energy,
-    noisy_qaoa_maxcut_energy,
-    angles_from_qiskit_format,
-
-)
-from QAOAKit.utils import (
-    angles_from_qaoa_format,
-    beta_shift_sector,
-    gamma_shift_sector,
-    get_curr_formatted_timestamp,
-    load_partial_qaoa_dataset_table,
-    obj_from_statevector,
-    precompute_energies,
-    maxcut_obj,
-    isomorphic,
-    load_weights_into_dataframe,
-    load_weighted_results_into_dataframe,
-    get_adjacency_matrix,
-    brute_force,
-    get_pynauty_certificate,
-    get_full_weighted_qaoa_dataset_table,
-    qaoa_format_to_qiskit_format,
-    save_partial_qaoa_dataset_table,
-    shift_parameters
-)
-
-from QAOAKit.classical import thompson_parekh_marwaha
-from QAOAKit.qaoa import get_maxcut_qaoa_circuit
-from QAOAKit.qiskit_interface import (
-    get_maxcut_qaoa_qiskit_circuit,
-    goemans_williamson,
-    get_maxcut_qaoa_qiskit_circuit_unbinded_parameters
-)
-from QAOAKit.examples_utils import get_20_node_erdos_renyi_graphs
-from QAOAKit.parameter_optimization import get_median_pre_trained_kde
-from QAOAKit.compressed_sensing import (
-    _executor_of_qaoa_maxcut_energy,
-    cal_recon_error,
-    gen_p1_landscape,
-    gen_p2_landscape,
-    recon_2D_landscape,
-    two_D_CS_p1_recon_with_distributed_landscapes,
-    two_D_CS_p1_recon_with_given_landscapes,
-)
-from QAOAKit.optimizer_wrapper import (
-    wrap_qiskit_optimizer_to_landscape_optimizer,
-    get_numerical_derivative
-)
-
-from QAOAKit.interpolate import (
-    approximate_fun_value_by_2D_interpolation
-)
-
-# from qiskit_optimization import QuadraticProgram
-from qiskit.algorithms.minimum_eigen_solvers.qaoa import QAOAAnsatz
-
-from scipy import interpolate
-
-test_utils_folder = Path(__file__).parent
-
 
 def recon_high_d_landscapes_by_varying_2d(
     n: int, p: int, ansatz: str, problem: str, 
@@ -309,18 +171,17 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     # parser.add_argument('--aim', type=str, help="Your aims, vis, opt", required=True)
     # parser.add_argument('--ns', type=int, nargs='+', help="Your aims, vis, opt", required=True)
-    parser.add_argument('--n', type=int, help="Your aims, vis, opt", required=True)
-    parser.add_argument('--p', type=int, help="Your aims, vis, opt", required=True)
-    parser.add_argument('--repeat', type=int, help="Your aims, vis, opt", required=True)
-    # parser.add_argument('--method', type=str, help="Your aims, vis, opt", required=True)
-    parser.add_argument('--ansatz', type=str, help="Your aims, vis, opt", required=True)
-    parser.add_argument('--noise', type=str, help="Your aims, vis, opt", required=True)
-    parser.add_argument('--problem', type=str, help="Your aims, vis, opt", required=True)
-    parser.add_argument('--seed', type=int, help="Your aims, vis, opt", required=True)
-    parser.add_argument('--error', type=str, help="Your aims, vis, opt", required=True)
+    parser.add_argument('--n', type=int, help="#Qubits.", required=True)
+    parser.add_argument('--p', type=int, help="Circuit depth.", required=True)
+    parser.add_argument('--repeat', type=int, help="# of random samples.", required=True)
+    parser.add_argument('--ansatz', type=str, help="Type of ansatz.", required=True)
+    parser.add_argument('--noise', type=str, help="Type of noise.", required=True)
+    parser.add_argument('--problem', type=str, help="Type of problem.", required=True)
+    parser.add_argument('--seed', type=int, help="Seed of instance.", required=True)
+    parser.add_argument('--error', type=str, help="Type of error.", required=True)
     parser.add_argument("--bs", help="Beta steps.", type=int, default=None)
     parser.add_argument("--gs", help="Gamma steps.", type=int, default=None)
-    parser.add_argument("--force_recon", help="Force recon.", action="store_true")
+    parser.add_argument("--force_recon", help="Force reconstruction and cover existing landscapes.", action="store_true")
 
     # parser.add_argument('--ansatz', type=str, help="Your aims, vis, opt", required=True)
     args = parser.parse_args()
