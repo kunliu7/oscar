@@ -124,7 +124,7 @@ def recon_landscapes_varying_qubits_and_instances(
         sfs=sfs
     )
 
-
+@DeprecationWarning
 def gen_heapmap_by_varying_sampling_fraction_and_beta_step(
     p: int, problem: str, noise: str, n_seeds: List[int], n_qubits_list: list, error_type: str
 ):
@@ -244,6 +244,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.aim == 'heatmap':
+        raise NotImplementedError("Deprecated.")
         gen_heapmap_by_varying_sampling_fraction_and_beta_step(p=args.p, problem=args.problem,
                                                                noise=args.noise, n_seeds=args.n_seeds, n_qubits_list=args.ns, error_type=args.error)
     elif args.aim == 'final':

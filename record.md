@@ -1,40 +1,33 @@
 
 # Fig. 4, recon error
 
-[vis_figs_section4_recon_error.ipynb](vis_figs_section4_recon_error.ipynb)
-[cs_evaluate.py](cs_evaluate.py)
+Visualization: [vis_figs_section4_recon_error.ipynb](vis_figs_section4_recon_error.ipynb)
+Script: [cs_evaluate.py](cs_evaluate.py)
 
 ## Maxcut
 
+Take p=2, noisy landscapes as example, i.e. Fig. 4(D).
+
 ### p=2 noisy
 
+Split tasks into different commands by splitting `n_seeds` parameters.
+It specify the range of seeds.
+
+E.g. `n_seeds 8` == `n_seeds 4` + `n_seeds 4 8`.
+
 #### n12
-python cs_evaluate.py --aim final -p 2 --ns 12 --ansatz qaoa --problem maxcut --noise depolar-0.003-0.007 --n_seeds 4 --error NRMSE
-python cs_evaluate.py --aim final -p 2 --ns 12 --ansatz qaoa --problem maxcut --noise depolar-0.003-0.007 --n_seeds 4 8 --error NRMSE
+
+python cs_evaluate.py --aim final -p 2 --ns 12 --ansatz qaoa --problem maxcut --noise depolar-0.003-0.007 --n_seeds 16 --error NRMSE
 
 #### n16
-python cs_evaluate.py --aim final -p 2 --ns 16 --ansatz qaoa --problem maxcut --noise depolar-0.003-0.007 --n_seeds 4 --error NRMSE
-python cs_evaluate.py --aim final -p 2 --ns 16 --ansatz qaoa --problem maxcut --noise depolar-0.003-0.007 --n_seeds 4 8 --error NRMSE
+
+python cs_evaluate.py --aim final -p 2 --ns 16 --ansatz qaoa --problem maxcut --noise depolar-0.003-0.007 --n_seeds 16 --error NRMSE
 
 #### n20
 
-python cs_evaluate.py --aim final -p 2 --ns 20 --ansatz qaoa --problem maxcut --noise depolar-0.003-0.007 --n_seeds 0 1 --error NRMSE
-python cs_evaluate.py --aim final -p 2 --ns 20 --ansatz qaoa --problem maxcut --noise depolar-0.003-0.007 --n_seeds 1 2 --error NRMSE
-python cs_evaluate.py --aim final -p 2 --ns 20 --ansatz qaoa --problem maxcut --noise depolar-0.003-0.007 --n_seeds 2 3 --error NRMSE
-python cs_evaluate.py --aim final -p 2 --ns 20 --ansatz qaoa --problem maxcut --noise depolar-0.003-0.007 --n_seeds 3 4 --error NRMSE
-python cs_evaluate.py --aim final -p 2 --ns 20 --ansatz qaoa --problem maxcut --noise depolar-0.003-0.007 --n_seeds 4 5 --error NRMSE
-python cs_evaluate.py --aim final -p 2 --ns 20 --ansatz qaoa --problem maxcut --noise depolar-0.003-0.007 --n_seeds 5 6 --error NRMSE
-python cs_evaluate.py --aim final -p 2 --ns 20 --ansatz qaoa --problem maxcut --noise depolar-0.003-0.007 --n_seeds 6 7 --error NRMSE
-python cs_evaluate.py --aim final -p 2 --ns 20 --ansatz qaoa --problem maxcut --noise depolar-0.003-0.007 --n_seeds 7 8 --error NRMSE
+n20 takes long to simulate. We only generate 8 landscapes.
 
-
-## Partition
-python cs_evaluate.py --aim final -p 2 --ns 12 16 20 24 --ansatz qaoa --problem partition --noise ideal --n_seeds 1 --error NRMSE
-
-
-## SK model
-python cs_evaluate.py --aim final -p 2 --ns 12 16 20 24 --ansatz qaoa --problem skmodel --noise ideal --n_seeds 8 --error NRMSE
-
+python cs_evaluate.py --aim final -p 2 --ns 20 --ansatz qaoa --problem maxcut --noise depolar-0.003-0.007 --n_seeds 8 --error NRMSE
 
 # Distributed landscape reconstruction
 
