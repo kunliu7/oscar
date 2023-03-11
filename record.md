@@ -165,23 +165,6 @@ python cs_evaluate.py --aim final -p 0 --ns 6 --ansatz twolocal --problem maxcut
 
 # fix k-2 for twolocal
 
-The table:
-
-|      Problem           | QAOA Ansatz| VQE Ansatz | 
-|------------------------|------------|------------|
-| 3-reg Maxcut (n=6)     | 0.969      | 0.753      | 
-| 3-reg Maxcut (n=4)     | 0.968      | 0.734      | 
-| SK Problem (n=4)       | 0.968      | 0.738      | 
-| SK Problem (n=6)       | 0.969      | 0.740      | 
-| Partition Problem (n=6)| 0.981      | 0.752      | 
-| Partition Problem (n=4)| 0.985      | 0.754      |
-
-One to one correspondence. Same # parameters.
-
-For QAOA: # params = 2 * p
-For VQE:  # params = (p+1) * n
-
-
 ## MaxCut
 
 ### QAOA
