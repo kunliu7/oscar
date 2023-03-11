@@ -1,4 +1,16 @@
+**/.DS_Store
 .vscode
+
+# Google's landscape
+google_data/Google_Data/
+google_data/Google\ Data.zip
+google_data/Code_Patch.zip
+google_data/Code_Patch/
+
+# Data that I do not want to upload
+figs/opt_on_recon_landscape/
+figs/grid_search_recon/
+figs/grid_search/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
