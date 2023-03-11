@@ -58,7 +58,7 @@ def two_D_CS_p1_recon_with_distributed_landscapes(
     sampling_frac: float,
     ratios: list = None,
     ri: np.ndarray = None,
-) -> nd.ndarray:
+) -> np.ndarray:
     """Reconstruct landscapes by sampling on distributed landscapes.
 
     Args:

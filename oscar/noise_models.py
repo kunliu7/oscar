@@ -1,8 +1,4 @@
 
-from qiskit import Aer
-import networkx as nx
-from scipy.optimize import minimize
-from .qaoa import get_maxcut_qaoa_circuit
 
 from qiskit_aer.noise import NoiseModel
 from qiskit_aer.noise.errors.standard_errors import depolarizing_error, pauli_error
@@ -34,54 +30,3 @@ def get_depolarizing_error_noise_model(p1Q: float, p2Q: float):
         depolarizing_error(2 * p1Q, 1), 'u3')
     noise_model.add_all_qubit_quantum_error(depolarizing_error(p2Q, 2), 'cx')
     return noise_model
-
-
-def maxcut_obj(x, G):
-    """
-    Given a bitstring as a solution, this function returns
-    the number of edges shared between the two partitions
-    of the graph.
-
-    Args:
-        x: str
-           solution bitstring
-
-        G: networkx graph
-
-    Returns:
-        obj: float
-             Objective
-    """
-    obj = 0
-    for i, j in G.edges():
-        if x[i] != x[j]:
-            obj -= 1
-            # obj += 1
-
-    return obj
-
-
-def compute_expectation(counts, G):
-    """
-    Computes expectation value based on measurement results
-
-    Args:
-        counts: dict
-                key as bitstring, val as count
-
-        G: networkx graph
-
-    Returns:
-        avg: float
-             expectation value
-    """
-
-    avg = 0
-    sum_count = 0
-    for bitstring, count in counts.items():
-
-        obj = maxcut_obj(bitstring, G)
-        avg += obj * count
-        sum_count += count
-
-    return avg/sum_count
