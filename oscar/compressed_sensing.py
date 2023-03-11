@@ -1,10 +1,10 @@
 from typing import Callable, List, Optional, Tuple
-import numpy as np
+
 import cvxpy as cvx
+import numpy as np
 from scipy.fftpack import dct, diff, idct
 from scipy.optimize import minimize
 from sklearn import linear_model
-import numpy as np
 
 
 def L1_norm(x):

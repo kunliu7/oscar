@@ -1,73 +1,13 @@
-import imp
-from re import L
-import re
-import time
-from turtle import left, right
 from typing import Callable, List, Optional, Tuple
-import networkx as nx
+
 import numpy as np
-import cvxpy as cvx
-import pandas as pd
-from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, execute
-from qiskit import Aer
-import qiskit
-from qiskit_aer import AerSimulator
-from functools import partial
-from pathlib import Path
-import copy
-import timeit
-import sys
-import os
-from scipy.fftpack import dct, diff, idct
-from scipy.optimize import minimize
-from sklearn import linear_model
-
-from qiskit_aer.noise import NoiseModel
-import concurrent.futures
-from mitiq import zne, Observable, PauliString
-from mitiq.interface.mitiq_qiskit.qiskit_utils import (
-    execute,
-    execute_with_noise,
-    execute_with_shots_and_noise
-)
-
-from mitiq.interface import convert_to_mitiq
-
-from qiskit.quantum_info import Statevector
-from sympy import beta, per
-
-from .qaoa import get_maxcut_qaoa_circuit
-from .utils import (
-    angles_to_qaoa_format,
-    get_curr_formatted_timestamp,
-    noisy_qaoa_maxcut_energy,
-    angles_from_qiskit_format,
-    maxcut_obj,
-    get_adjacency_matrix,
-    obj_from_statevector,
-    qaoa_maxcut_energy,
-    shift_parameters
-)
-from .noisy_params_optim import (
-    compute_expectation,
-    get_depolarizing_error_noise_model
-)
-from .interpolate import (
-    approximate_fun_value_by_2D_interpolation,
-    approximate_fun_value_by_2D_interpolation_qiskit
-)
-
-# vis
-import numpy as np
-import matplotlib.pyplot as plt
-from random import sample
-
-# qiskit Landscape optimizer
-from qiskit.algorithms.optimizers import (
-    Optimizer, OptimizerResult
-)
-
+from qiskit.algorithms.optimizers import Optimizer, OptimizerResult
 from qiskit.algorithms.optimizers.optimizer import POINT
+
+from .interpolate import (approximate_fun_value_by_2D_interpolation,
+                          approximate_fun_value_by_2D_interpolation_qiskit)
+from .utils import (angles_from_qiskit_format, angles_to_qaoa_format,
+                    shift_parameters)
 
 
 def get_numerical_derivative(fun: Optional[Callable[[POINT], POINT]], eps=1e-10):

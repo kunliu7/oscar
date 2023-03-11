@@ -56,9 +56,6 @@ from .noisy_params_optim import (
     compute_expectation,
     get_depolarizing_error_noise_model
 )
-from .vis import (
-    _vis_recon_distributed_landscape
-)
 
 # vis
 import numpy as np
