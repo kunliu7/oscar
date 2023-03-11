@@ -26,7 +26,7 @@ def cal_multi_errors(a, b):
     a = a.reshape(-1)
     b = b.reshape(-1)
     # diff['L2-norm'] = np.linalg.norm(a - b)
-    diff['SqrtMSE'] = cal_recon_error(a, b, 'MSE')
+    diff['SqrtMSE'] = cal_recon_error(a, b, 'RMSE')
     # diff['1-NCC'] = 1 - cal_recon_error(a, b, "CROSS_CORRELATION")
     diff['COS'] = cosine(a, b)
     return diff
