@@ -1,4 +1,10 @@
-# QAOA circuit for MAXCUT
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+"""Generate raw QAOA circuit by Qiskit.
+
+Note that this is different from qiskit_interface.py.
+
+"""
 
 import networkx as nx
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister
