@@ -1,14 +1,7 @@
 import argparse
-import random
-import itertools
-from typing import List
-import networkx as nx
-import matplotlib.pyplot as plt
 import numpy as np
 from numpy.random import default_rng
-import pandas as pd
 import time
-from pathlib import Path
 import sys, os
 from scipy.spatial.distance import (
     cosine
@@ -169,8 +162,6 @@ def recon_high_d_landscapes_by_varying_2d(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    # parser.add_argument('--aim', type=str, help="Your aims, vis, opt", required=True)
-    # parser.add_argument('--ns', type=int, nargs='+', help="Your aims, vis, opt", required=True)
     parser.add_argument('--n', type=int, help="#Qubits.", required=True)
     parser.add_argument('--p', type=int, help="Circuit depth.", required=True)
     parser.add_argument('--repeat', type=int, help="# of random samples.", required=True)
@@ -183,7 +174,6 @@ if __name__ == "__main__":
     parser.add_argument("--gs", help="Gamma steps.", type=int, default=None)
     parser.add_argument("--force_recon", help="Force reconstruction and cover existing landscapes.", action="store_true")
 
-    # parser.add_argument('--ansatz', type=str, help="Your aims, vis, opt", required=True)
     args = parser.parse_args()
     
     recon_high_d_landscapes_by_varying_2d(n=args.n, p=args.p, ansatz=args.ansatz, problem=args.problem,
