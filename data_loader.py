@@ -177,11 +177,16 @@ def load_grid_search_data(
 
     data_dir = f"figs/grid_search/{ansatz}/{problem}/{method}-{noise}-p={p}"
     if ansatz == 'twolocal' or ansatz == 'uccsd':
-        fname = f"{problem}-{method}-{noise}-n={nq}-p={p}-seed={seed}-{bs}.npz"
+        fname = f"{problem}-{method}-{noise}-n={nq}-p={p}-seed={seed}-{bs}"
     elif ansatz == 'qaoa':
-        fname = f"{problem}-{method}-{noise}-n={nq}-p={p}-seed={seed}-{bs}-{gs}.npz"
+        fname = f"{problem}-{method}-{noise}-n={nq}-p={p}-seed={seed}-{bs}-{gs}"
     else:
         raise ValueError(f"not support {ansatz} {problem} {noise}")
+
+    if miti_method != '':
+        fname = f"{fname}-{miti_method}"
+
+    fname += '.npz'
 
     data_path = f"{data_dir}/{fname}"
     print(f"\nread grid search data from {data_path}\n")
