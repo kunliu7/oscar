@@ -1,3 +1,10 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+"""Reconstruct 2D landscapes by compressed sensing.
+
+Reference: http://www.pyrunner.com/weblog/2016/05/26/compressed-sensing-python/
+"""
+
 from typing import List
 
 import cvxpy as cvx
@@ -10,9 +17,6 @@ from sklearn import linear_model
 def L1_norm(x):
     return np.linalg.norm(x, ord=1)
 
-
-# ============================ two D CS ====================
-# reference: http://www.pyrunner.com/weblog/2016/05/26/compressed-sensing-python/
 
 def dct2(x):
     return dct(dct(x.T, norm='ortho', axis=0).T, norm='ortho', axis=0)
@@ -30,23 +34,19 @@ def recon_2D_by_LASSO(nx, ny, A, b, alpha: float):
     result = prob.solve(verbose=False)
     Xat2 = np.array(vx.value).squeeze()
 
-    # reconstruct signal
     Xat = Xat2.reshape(nx, ny).T  # stack columns
     Xa = idct2(Xat)
     return Xa
 
 
 def recon_2D_by_cvxpy(nx, ny, A, b):
-    # do L1 optimization
     vx = cvx.Variable(nx * ny)
     objective = cvx.Minimize(cvx.norm(vx, 1))
-    # b = b.reshape(-1)
     constraints = [A*vx == b]
     prob = cvx.Problem(objective, constraints)
     result = prob.solve(verbose=False)
     Xat2 = np.array(vx.value).squeeze()
 
-    # reconstruct signal
     Xat = Xat2.reshape(nx, ny).T  # stack columns
     Xa = idct2(Xat)
 
@@ -58,8 +58,7 @@ def two_D_CS_p1_recon_with_distributed_landscapes(
     sampling_frac: float,
     ratios: list = None,
     ri: np.ndarray = None,
-) -> None:
-    rng = np.random.default_rng(0)
+) -> nd.ndarray:
     """Reconstruct landscapes by sampling on distributed landscapes.
 
     Args:
@@ -68,58 +67,49 @@ def two_D_CS_p1_recon_with_distributed_landscapes(
         ratios (list, optional): Ratios of samples coming from each original landscapes. Defaults to None.
         ri (np.ndarray, optional): Random indices of original landscapes to do compressed sensing. Defaults to None.
 
+    Returns:
+        nd.ndarray: Reconstructed landscape.
     """
-    # ! Convention: First beta, Last gamma
     if not isinstance(ratios, list):
         ratios = [1.0 / len(origins) for _ in range(len(origins))]
     else:
         assert len(ratios) == len(origins)
     assert np.isclose(sum(ratios), 1.0)
 
-    print('start: solve l1 norm')
+    rng = np.random.default_rng(0)
     ny, nx = origins[0].shape
 
     # extract small sample of signal
-
     k = round(nx * ny * sampling_frac)
     if not isinstance(ri, np.ndarray):
         ri = rng.choice(nx * ny, k, replace=False)  # random sample of indices
     else:
         assert len(ri.shape) == 1 and ri.shape[0] == k
 
-    print(f"ratios: {ratios}, k: {k}")
-    # b = np.expand_dims(b, axis=1)
+    print(f"sampling frac: {ratios}, k: {k}")
 
-    # create dct matrix operator using kron (memory errors for large ny*nx)
+    # create dictionary using kron (memory errors for large ny*nx)
     A = np.kron(
         idct(np.identity(nx), norm='ortho', axis=0),
         idct(np.identity(ny), norm='ortho', axis=0)
     )
     A = A[ri, :]  # same as phi times kron
 
-    # b = X.T.flat[ri]
-
     b = np.zeros(k)
     origins_T = np.array([
         o.T for o in origins
     ])
-    # n_origins = len(origins)
-    # for ik in range(k):
-    #     which_origin = ik % n_origins
-    #     b[ik] = origins_T[which_origin].flat[ri[ik]]
 
+    # randomly choose on which original landscape to sample based on ratios
+    # if there is only one landscape, b = X.T.flat[ri]
     for ik in range(k):
-        # which_origin = ik % n_origins
         which_origin = rng.choice(len(origins), 1, p=ratios)[0]
         b[ik] = origins_T[which_origin].flat[ri[ik]]
 
     recon = recon_2D_by_cvxpy(nx, ny, A, b)
-
-    print('end: solve l1 norm')
     return recon
 
 
-# rename from recon_p1_landscape to recon_2D landscape
 def recon_2D_landscape(
     origin: np.ndarray,
     sampling_frac: float,
@@ -149,13 +139,13 @@ def recon_2D_landscape(
         # random sample of indices
         ri = np.random.choice(nx * ny, k, replace=False)
     else:
-        print("use inputted random indices")
+        print("use predefined random indices")
         assert len(random_indices.shape) == 1 and random_indices.shape[0] == k
         ri = random_indices  # for short
 
     # print(f"nx: {nx}, ny: {ny}, k: {k}")
 
-    # create dct matrix operator using kron (memory errors for large ny*nx)
+    # create dictionary using kron (memory errors for large ny*nx)
     A = np.kron(
         idct(np.identity(nx), norm='ortho', axis=0),
         idct(np.identity(ny), norm='ortho', axis=0)
@@ -168,14 +158,13 @@ def recon_2D_landscape(
     elif method == 'BPDN':
         recon = recon_2D_by_LASSO(nx, ny, A, origin.T.flat[ri], 0.001)
     else:
-        assert False, "Invalid CS method"
+        raise NotImplementedError(f"method {method} not supported")
 
     return recon
 
 
 def cal_recon_error(x, x_recon, residual_type):
     # print(x.shape, x_recon.shape)
-
     assert len(x.shape) == 1 or len(x.shape) == 2 and x.shape[1] == 1
     assert len(x_recon.shape) == 1 or len(
         x_recon.shape) == 2 and x_recon.shape[1] == 1
@@ -191,64 +180,23 @@ def cal_recon_error(x, x_recon, residual_type):
         res = np.sqrt((diff ** 2).mean()) / (x.max() - x.min())
     elif residual_type == 'MEAN':
         res = np.sqrt((diff ** 2).mean()) / x.mean()
-    elif residual_type == 'MSE':  # ! RMSE, Sqrt MSE, just let it be
+    elif residual_type == 'RMSE':  # ! RMSE, Sqrt MSE, just let it be
         res = np.sqrt((diff ** 2).mean())
         # res = (diff ** 2).mean()
     elif residual_type == 'CROSS_CORRELATION':
         res = np.correlate(x_recon, x, mode='valid')
-        # print(res)
-        # assert np.isclose(res[0], np.sum(x_recon * x))
         res = res[0] / np.sqrt(np.sum(x_recon ** 2) * np.sum(x ** 2))
     elif residual_type == 'CONV':
-        # print(x_recon.shape)
-        # print(x_recon.shape, x.shape)
         res = np.convolve(x_recon, x)  # take x as filter
-        # print(res)
         res = res[0]
-        # assert np.isclose(res[0])
-        # return res[0]
     elif residual_type == 'NRMSE':
         res = np.sqrt((diff ** 2).mean())
         quantiles = np.nanquantile(x, q=(0.25, 0.5, 0.75))
         res /= (quantiles[2] - quantiles[0])
     elif residual_type == 'ZNCC':
-        res = 0
-        # res = np.sum((x_recon - x_recon.mean()) * (x - x.mean())) / np.sqrt(x_recon.var() * x.var())
+        res = np.sum((x_recon - x_recon.mean()) * (x - x.mean())
+                     ) / np.sqrt(x_recon.var() * x.var())
     else:
         raise NotImplementedError(f"Invalid residual_type {residual_type}")
 
     return res
-
-
-@DeprecationWarning
-def solve_by_l1_norm(Theta, y):
-    constr = ({'type': 'eq', 'fun': lambda x:  Theta @ x - y})
-    x0 = np.linalg.pinv(Theta) @ y
-    res = minimize(L1_norm, x0, method='SLSQP', constraints=constr)
-    s = res.x
-    return s
-
-
-@DeprecationWarning
-def recon_by_Lasso(Theta, y, alpha):
-    n = Theta.shape[1]
-    # here, we use lasso to minimize the L1 norm
-    lasso = linear_model.Lasso(alpha=alpha)
-    # lasso.fit(Theta, y.reshape((M,)))
-    lasso.fit(Theta, y)
-    # Plotting the reconstructed coefficients and the signal
-    # Creates the fourier transform that will most minimize l1 norm
-    recons = idct(lasso.coef_.reshape((n, 1)), axis=0)
-    return recons + lasso.intercept_
-
-
-@DeprecationWarning
-def recon_1D_by_cvxpy(A, b):
-    vx = cvx.Variable(A.shape[1])
-    objective = cvx.Minimize(cvx.norm(vx, 1))
-    constraints = [A*vx == b]
-    prob = cvx.Problem(objective, constraints)
-    result = prob.solve(verbose=False)
-    Xat = np.array(vx.value).squeeze()
-    Xa = idct(Xat)
-    return Xa
