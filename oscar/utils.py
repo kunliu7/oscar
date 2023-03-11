@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 from functools import partial
-from qiskit.providers.aer import AerSimulator
+from qiskit_aer import AerSimulator
 import json
 import re
 import warnings

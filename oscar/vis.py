@@ -9,7 +9,7 @@ from pyparsing import col
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, execute
 from qiskit import Aer
 import qiskit
-from qiskit.providers.aer import AerSimulator
+from qiskit_aer import AerSimulator
 from functools import partial
 from pathlib import Path
 import copy
@@ -17,7 +17,7 @@ from itertools import groupby
 import timeit
 import sys, os
 from scipy.optimize import minimize
-from qiskit.providers.aer.noise import NoiseModel
+from qiskit_aer.noise import NoiseModel
 import concurrent.futures
 from mitiq import zne, Observable, PauliString
 from mitiq.interface.mitiq_qiskit.qiskit_utils import (

@@ -7,7 +7,7 @@ import pandas as pd
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, execute
 from qiskit import Aer
 import qiskit
-from qiskit.providers.aer import AerSimulator
+from qiskit_aer import AerSimulator
 from functools import partial
 from pathlib import Path
 import copy
@@ -22,8 +22,8 @@ from .utils import (
     obj_from_statevector
 )
 
-from qiskit.providers.aer.noise import NoiseModel
-from qiskit.providers.aer.noise.errors.standard_errors import depolarizing_error, pauli_error 
+from qiskit_aer.noise import NoiseModel
+from qiskit_aer.noise.errors.standard_errors import depolarizing_error, pauli_error 
 
 def get_pauli_error_noise_model(p_error: float):
     noise_model = NoiseModel()

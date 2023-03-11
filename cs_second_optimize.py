@@ -3,7 +3,7 @@ import networkx as nx
 import numpy as np
 from qiskit_optimization.applications import Maxcut, SKModel, NumberPartition
 from oscar.optimizer_wrapper import wrap_qiskit_optimizer_to_landscape_optimizer
-from qiskit.providers.aer.noise import NoiseModel
+from qiskit_aer.noise import NoiseModel
 from qiskit.algorithms.optimizers.optimizer import Optimizer as QiskitOptimizer
 from typing import Callable, List, Optional, Tuple
 from qiskit.algorithms.optimizers import (
@@ -25,7 +25,7 @@ from qiskit.algorithms.optimizers import (
     SciPyOptimizer
 )
 from qiskit.algorithms import VQE, NumPyMinimumEigensolver, QAOA
-from qiskit.providers.aer import AerSimulator
+from qiskit_aer import AerSimulator
 import sys, os
 
 from data_loader import get_interpolation_path_filename, get_recon_landscape, get_recon_pathname, load_grid_search_data, load_optimization_path
