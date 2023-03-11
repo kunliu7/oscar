@@ -1,18 +1,10 @@
-from cmath import isclose
-from locale import normalize
-import pickle
 import copy
 import pynauty
 import networkx as nx
 import numpy as np
-import pandas as pd
-from pathlib import Path
 from functools import partial
 from qiskit_aer import AerSimulator
-import json
 import re
-import warnings
-import os
 import time
 from oscar.qaoa import get_maxcut_qaoa_circuit
 
