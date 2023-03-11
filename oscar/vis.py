@@ -1,110 +1,21 @@
 import os
 
 import matplotlib.pyplot as plt
-import networkx as nx
-# vis
 import numpy as np
-
-from .utils import noisy_qaoa_maxcut_energy
-
-
-def vis_landscape(G: nx.Graph, figpath: str):
-    # print("test")
-    # figpath = 'test'
-    def f(x, y):
-        return noisy_qaoa_maxcut_energy(G, [x], [y])
-
-    # qaoa format, i.e. beta not included
-    betas = np.linspace(-np.pi, np.pi, 30)
-    gammas = np.linspace(-np.pi/2, np.pi/2, 30)
-
-    Z = []
-    for b in betas:
-        z = []
-        for g in gammas:
-            energy = f(b, g)
-            z.append(energy)
-            # print(energy)
-        Z.append(z.copy())
-    X, Y = np.meshgrid(betas, gammas, indexing='ij')
-    Z = np.array(Z)
-    # print(Z.shape)
-    # Z = f(X, Y)
-
-    fig = plt.figure(figsize=[10, 10])
-    ax = plt.axes(projection='3d')
-    # ax.contour3D(X, Y, Z, 50, cmap='binary')
-    ax.plot_surface(X, Y, Z, rstride=1, cstride=1,
-                    cmap='viridis', edgecolor='none')
-    ax.set_xlabel('x')
-    ax.set_ylabel('y')
-    ax.set_zlabel('z')
-    fig.savefig(figpath)
-    # print('fig saved')
-    return
-
-
-def vis_landscape_heatmap(G: nx.Graph, figpath: str, beta_opt, gamma_opt):
-    """
-    heatmap
-    https://stackoverflow.com/questions/33282368/plotting-a-2d-heatmap-with-matplotlib
-    """
-    def f(x, y):
-        return noisy_qaoa_maxcut_energy(G, [x], [y])
-
-    # qaoa format, i.e. beta not included
-    betas = np.linspace(-np.pi, np.pi, 30)
-    gammas = np.linspace(-np.pi/2, np.pi/2, 30)
-
-    Z = []
-    for b in betas:
-        z = []
-        for g in gammas:
-            energy = f(b, g)
-            z.append(energy)
-            # print(energy)
-        Z.append(z.copy())
-    X, Y = np.meshgrid(betas, gammas, indexing='ij')
-    Z = np.array(Z)
-
-    z_min, z_max = Z.min(), Z.max()
-
-    # fig, ax = plt.subplots()
-    fig = plt.figure(figsize=[10, 10])
-    # plt.plot()
-    ax = plt.axes()
-    plt.plot(beta_opt, gamma_opt, "ro")
-
-    c = ax.pcolormesh(X, Y, Z, cmap='viridis', vmin=z_min, vmax=z_max)
-    # ax.axis([X.min(), X.max(), Y.min(), Y.max()])
-
-    # ax.plot(beta_opt, gamma_opt, "ro")
-    fig.colorbar(c, ax=ax)
-    fig.savefig(figpath)
 
 
 def _vis_recon_distributed_landscape(
     landscapes,
     labels,
-    # origin_dict,
-    # recon_dict,
-    # gamma_range,
-    # beta_range,
-    # C_opt, bound, var_opt,
     bounds,
     full_range,
     true_optima,
-    # mitis_recon,
-    # unmitis_recon,
-    # ideal_recon,
-    # xlabel,
     title,
     save_path,
     recon_params_path_dict=None,
     origin_params_path_dict=None
 ):
 
-    # plt.figure
     plt.rc('font', size=28)
     if len(landscapes) == 2:
         fig, axs = plt.subplots(nrows=1, ncols=2, figsize=(30, 22))

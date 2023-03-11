@@ -1,7 +1,7 @@
 from typing import Callable, List, Optional, Tuple
 
 import numpy as np
-from qiskit.algorithms.optimizers import Optimizer, OptimizerResult
+from qiskit.algorithms.optimizers import OptimizerResult
 from qiskit.algorithms.optimizers.optimizer import POINT
 
 from .interpolate import (approximate_fun_value_by_2D_interpolation,
@@ -9,10 +9,6 @@ from .interpolate import (approximate_fun_value_by_2D_interpolation,
 from .utils import (angles_from_qiskit_format, angles_to_qaoa_format,
                     shift_parameters)
 
-
-def get_numerical_derivative(fun: Optional[Callable[[POINT], POINT]], eps=1e-10):
-    jac = Optimizer.wrap_function(Optimizer.gradient_num_diff, (fun, eps))
-    return jac
 
 
 def wrap_qiskit_optimizer_to_landscape_optimizer(QiskitOptimizer):
