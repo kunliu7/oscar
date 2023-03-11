@@ -1,24 +1,10 @@
 import argparse
-import itertools
-from tkinter.messagebox import NO
 import networkx as nx
-import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
-import time
-import concurrent.futures
-import timeit
-from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, execute
-from qiskit.quantum_info.operators import Operator, Pauli
-from qiskit.opflow import PrimitiveOp
 from qiskit_optimization.applications import Maxcut, SKModel, NumberPartition
-from qiskit.algorithms.optimizers.optimizer import POINT
-from mitiq.zne.zne import execute_with_zne
+from oscar.optimizer_wrapper import wrap_qiskit_optimizer_to_landscape_optimizer
 from qiskit.providers.aer.noise import NoiseModel
 from qiskit.algorithms.optimizers.optimizer import Optimizer as QiskitOptimizer
-from mitiq.zne.inference import (
-    LinearFactory
-)
 from typing import Callable, List, Optional, Tuple
 from qiskit.algorithms.optimizers import (
     ADAM,
@@ -39,123 +25,23 @@ from qiskit.algorithms.optimizers import (
     SciPyOptimizer
 )
 from qiskit.algorithms import VQE, NumPyMinimumEigensolver, QAOA
-from qiskit.utils import QuantumInstance, algorithm_globals
-# from qiskit_optimization.algorithms import (
-#     MinimumEigenOptimizer,
-#     RecursiveMinimumEigenOptimizer,
-#     SolutionSample,
-#     OptimizationResultStatus,
-#     WarmStartQAOAOptimizer
-# )
-from qiskit import Aer
-import qiskit
 from qiskit.providers.aer import AerSimulator
-from functools import partial
-from pathlib import Path
-import copy
-from itertools import groupby
-import timeit
 import sys, os
-from scipy.optimize import minimize
-from scipy.spatial.distance import (
-    cosine
-)
-from qiskit.quantum_info import Statevector
 
 from data_loader import get_interpolation_path_filename, get_recon_landscape, get_recon_pathname, load_grid_search_data, load_optimization_path
-# from QAOAKit import vis
 
-sys.path.append('..')
-from QAOAKit.noisy_params_optim import (
-    get_pauli_error_noise_model,
-    optimize_under_noise,
+from oscar.noisy_params_optim import (
     get_depolarizing_error_noise_model,
-    compute_expectation
 )
 
-from QAOAKit.vis import(
-    vis_landscape,
-    vis_landscape_heatmap,
-    vis_landscape_heatmap_multi_p,
-    vis_landscape_multi_p,
-    vis_landscape_multi_p_and_and_count_optima,
-    vis_landscape_multi_p_and_and_count_optima_MP,
-    vis_multi_landscape_and_count_optima_and_mitiq_MP,
-    vis_multi_landscapes_and_count_optima_and_mitiq_MP_and_one_variable,
-    vis_two_BPs_p1_recon,
+from oscar.vis import(
     vis_landscapes
 )
 
-from QAOAKit import (
-    opt_angles_for_graph,
-    get_fixed_angles,
-    get_graph_id,
-    get_graph_from_id,
-    angles_to_qaoa_format,
-    beta_to_qaoa_format,
-    gamma_to_qaoa_format,
-    angles_to_qiskit_format,
-    angles_to_qtensor_format,
-    get_3_reg_dataset_table,
-    get_3_reg_dataset_table_row,
-    get_full_qaoa_dataset_table_row,
-    get_full_qaoa_dataset_table,
-    get_fixed_angle_dataset_table,
-    get_fixed_angle_dataset_table_row,
-    qaoa_maxcut_energy,
-    noisy_qaoa_maxcut_energy,
-    angles_from_qiskit_format,
-
-)
-from QAOAKit.utils import (
-    angles_from_qaoa_format,
+from oscar.utils import (
     arraylike_to_str,
-    beta_shift_sector,
-    gamma_shift_sector,
-    get_curr_formatted_timestamp,
-    load_partial_qaoa_dataset_table,
-    obj_from_statevector,
-    precompute_energies,
-    maxcut_obj,
-    isomorphic,
-    load_weights_into_dataframe,
-    load_weighted_results_into_dataframe,
-    get_adjacency_matrix,
-    brute_force,
-    get_pynauty_certificate,
-    get_full_weighted_qaoa_dataset_table,
-    save_partial_qaoa_dataset_table,
     shift_parameters
 )
-
-from QAOAKit.classical import thompson_parekh_marwaha
-from QAOAKit.qaoa import get_maxcut_qaoa_circuit
-from QAOAKit.qiskit_interface import (
-    get_maxcut_qaoa_qiskit_circuit,
-    goemans_williamson,
-    get_maxcut_qaoa_qiskit_circuit_unbinded_parameters
-)
-from QAOAKit.examples_utils import get_20_node_erdos_renyi_graphs
-from QAOAKit.parameter_optimization import get_median_pre_trained_kde
-from QAOAKit.compressed_sensing import (
-    gen_p1_landscape,
-    two_D_CS_p1_recon_with_given_landscapes,
-    cal_recon_error
-)
-from QAOAKit.optimizer_wrapper import (
-    wrap_qiskit_optimizer_to_landscape_optimizer,
-    get_numerical_derivative
-)
-
-from QAOAKit.interpolate import (
-    approximate_fun_value_by_2D_interpolation
-)
-
-# from qiskit_optimization import QuadraticProgram
-from qiskit.algorithms.minimum_eigen_solvers.qaoa import QAOAAnsatz
-
-test_utils_folder = Path(__file__).parent
-
 
 def get_point_val(G: nx.Graph, p: int, last_pt: np.ndarray, noise_model: NoiseModel):
     maxcut = Maxcut(G)
@@ -319,9 +205,9 @@ def optimize_on_p1_reconstructed_landscape(
         gs = 15
     else:
         raise NotImplementedError()
-    
+    ansatz = 'qaoa'
     data, data_fname, data_dir = load_grid_search_data(
-        n_qubits=n, p=p, problem=problem, method=method,
+        n_qubits=n, p=p, ansatz=ansatz, problem=problem, method=method,
         noise=noise, beta_step=bs, gamma_step=gs, seed=seed, miti_method=miti_method
     )
 
@@ -330,21 +216,15 @@ def optimize_on_p1_reconstructed_landscape(
     plot_range = data['plot_range']
     origin = data['data']
 
-    recon_path, recon_fname, recon_dir = get_recon_pathname(p, problem, method, noise, cs_seed, sf, data_fname)
+    recon_path, recon_fname, recon_dir = get_recon_pathname(ansatz, p, problem, method, noise, cs_seed, sf, data_fname)
     print("tend to save to", recon_path)
-    recon = get_recon_landscape(p, origin, sf, False, recon_path, cs_seed)
+    recon = get_recon_landscape(ansatz, p, origin, sf, False, recon_path, cs_seed)
 
     G = nx.random_regular_graph(3, n, seed)
     maxcut = Maxcut(G)
     # print(maxcut.get_gset_result)
     maxcut_problem = maxcut.to_quadratic_program()
     C, offset = maxcut_problem.to_ising()
-
-    if n <= 16:
-        row = get_3_reg_dataset_table_row(G, p)
-        opt_cut = row["C_opt"]
-    else:
-        opt_cut = None
 
     bounds = np.array([
         [-beta_bound, beta_bound], 
@@ -437,7 +317,7 @@ def optimize_on_p1_reconstructed_landscape(
         )
     result = qaoa.compute_minimum_eigenvalue(C)
     # print(qaoa.optimal_params)
-    print("opt_cut                     :", opt_cut)
+    # print("opt_cut                     :", opt_cut)
     print("recon landscape minimum     :", result.eigenvalue)
     print("QAOA energy + offset        :", - (result.eigenvalue + offset))
 
@@ -463,7 +343,6 @@ def optimize_on_p1_reconstructed_landscape(
         for ipt, pt in enumerate(circ_path):
             print(f"\r{ipt} th / {len(circ_path)}", end="")
             circ_vals.append(get_point_val(G, p, pt, None))
-            # circ_vals = [get_point_val(G, p, pt, None) for pt in circ_path]
     else:
         circ_path = None
         circ_vals = None

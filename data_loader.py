@@ -183,7 +183,7 @@ def load_grid_search_data(
     else:
         raise ValueError(f"not support {ansatz} {problem} {noise}")
 
-    if miti_method != '':
+    if isinstance(miti_method, str) and miti_method != '':
         fname = f"{fname}-{miti_method}"
 
     fname += '.npz'
