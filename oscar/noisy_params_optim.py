@@ -1,26 +1,9 @@
 
-import imp
 from qiskit import Aer
 import networkx as nx
-import numpy as np
-import pandas as pd
-from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, execute
 from qiskit import Aer
-import qiskit
-from qiskit_aer import AerSimulator
-from functools import partial
-from pathlib import Path
-import copy
-from itertools import groupby
-import timeit
-import sys
 from scipy.optimize import minimize
-from sympy import beta, false
 from .qaoa import get_maxcut_qaoa_circuit
-from .utils import (
-    noisy_qaoa_maxcut_energy,
-    obj_from_statevector
-)
 
 from qiskit_aer.noise import NoiseModel
 from qiskit_aer.noise.errors.standard_errors import depolarizing_error, pauli_error 

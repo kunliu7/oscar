@@ -1,73 +1,30 @@
-import imp
 import itertools
-from math import fabs
-from re import L
-import re
 import time
-from turtle import left, right
-from typing import Callable, List, Optional, Tuple
 import networkx as nx
 import numpy as np
-import cvxpy as cvx
-import pandas as pd
-from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, execute
-from qiskit import Aer
-import qiskit
 from qiskit_aer import AerSimulator
 from functools import partial
-from pathlib import Path
 import copy
-import timeit
-import sys, os
-from scipy.fftpack import dct, diff, idct
-from scipy.optimize import minimize
-from sklearn import linear_model
 
 from qiskit_aer.noise import NoiseModel
 import concurrent.futures
-from mitiq import zne, Observable, PauliString
 from mitiq.zne.zne import execute_with_zne
-from mitiq.zne.inference import (
-    LinearFactory
-)
-from mitiq.interface.mitiq_qiskit.qiskit_utils import (
-    execute,
-    execute_with_noise,
-    execute_with_shots_and_noise
-)
 
-from mitiq.interface import convert_to_mitiq
 
-from qiskit.quantum_info import Statevector
-from sympy import beta, per
 
 from .qaoa import get_maxcut_qaoa_circuit
 from .utils import (
-    angles_to_qaoa_format,
-    get_curr_formatted_timestamp,
-    noisy_qaoa_maxcut_energy,
-    angles_from_qiskit_format,
-    maxcut_obj,
-    get_adjacency_matrix,
-    obj_from_statevector,
-    qaoa_maxcut_energy
+    get_curr_formatted_timestamp
 )
 from .noisy_params_optim import (
-    compute_expectation,
-    get_depolarizing_error_noise_model
+    compute_expectation
 )
 
 # vis
 import numpy as np
-import matplotlib.pyplot as plt
-from random import random, sample
 
 # qiskit Landscape optimizer
-from qiskit.algorithms.optimizers import (
-    Optimizer, OptimizerResult
-)
 
-from qiskit.algorithms.optimizers.optimizer import POINT
 
 
 # ================== CS p==1 ==================

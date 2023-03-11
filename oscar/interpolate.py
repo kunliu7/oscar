@@ -1,15 +1,7 @@
 
-import os
-import re
-import sys
 
-import matplotlib.pyplot as plt
 import numpy as np
-from scipy.fftpack import dct, idct
-from scipy.interpolate import RectBivariateSpline, griddata, interp2d, interpn
-from scipy.optimize import minimize
-from scipy.stats import pearsonr, spearmanr
-from sklearn import linear_model
+from scipy.interpolate import RectBivariateSpline
 
 
 def approximate_fun_value_by_2D_interpolation(

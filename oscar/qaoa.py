@@ -1,10 +1,8 @@
 # QAOA circuit for MAXCUT
 
-from math import gamma
 import networkx as nx
-from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, Aer, execute
+from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister
 from qiskit.compiler import transpile
-import numpy as np
 
 
 def append_zz_term(qc, q1, q2, gamma):

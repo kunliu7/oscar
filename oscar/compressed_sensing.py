@@ -1,8 +1,8 @@
-from typing import Callable, List, Optional, Tuple
+from typing import List
 
 import cvxpy as cvx
 import numpy as np
-from scipy.fftpack import dct, diff, idct
+from scipy.fftpack import dct, idct
 from scipy.optimize import minimize
 from sklearn import linear_model
 
