@@ -124,103 +124,6 @@ def recon_landscapes_varying_qubits_and_instances(
         sfs=sfs
     )
 
-@DeprecationWarning
-def gen_heapmap_by_varying_sampling_fraction_and_beta_step(
-    p: int, problem: str, noise: str, n_seeds: List[int], n_qubits_list: list, error_type: str
-):
-    is_recon = False
-
-    method = 'sv'
-    miti_method = ''
-    mses = []
-    coss = []
-
-    sfs = np.arange(0.01, 0.11, 0.02)
-    if len(n_seeds) == 1:
-        seeds = list(range(n_seeds[0]))
-    elif len(n_seeds) == 2:
-        seeds = list(range(n_seeds[0], n_seeds[1]))
-
-    bss = range(25, 76, 5)
-
-    print("noise =", noise)
-    print("n qubits list =", n_qubits_list)
-    print("seeds =", seeds)
-    print("sfs =", sfs)
-    print("bss =", bss)
-
-    # 和Tianyi代码使用相同目录结构
-    recon_dir = f"figs/grid_search_recon/{problem}/{method}-{noise}-p={p}"
-    for n_qubits, seed, sf, bs in itertools.product(n_qubits_list, seeds, sfs, bss):
-        cs_seed = n_qubits  # ! compare horizontally
-        gs = 2 * bs
-
-        data, data_fname, data_dir = load_grid_search_data(
-            n_qubits=n_qubits, p=p, problem=problem, method=method,
-            noise=noise, beta_step=bs, gamma_step=gs, seed=seed, miti_method=miti_method
-        )
-
-        plot_range = data['plot_range']
-
-        recon_fname = f"recon-cs_seed={cs_seed}-sf={sf:.3f}-{data_fname}"
-        recon_path = f"{recon_dir}/{recon_fname}"
-
-        origin = data['data']
-        recon = get_recon_landscape(p, origin, sf, is_recon,
-                                    recon_path, cs_seed)
-
-        mse = cal_recon_error(origin.reshape(-1),
-                              recon.reshape(-1), error_type)
-        # ncc = cal_recon_error(landscape.reshape(-1), recon.reshape(-1), "CROSS_CORRELATION")
-        cos = cosine(origin.reshape(-1), recon.reshape(-1))
-        mses.append(mse)
-        coss.append(cos)
-
-        # ncc = cal_recon_error()
-        print("NRMSE: ", mse)
-        print("Cosine: ", cos)
-
-        base_recon_fname = os.path.splitext(recon_fname)[0]
-        vis_landscapes(
-            landscapes=[origin, recon],
-            labels=["origin", "recon"],
-            full_range={
-                "beta": plot_range['beta'],
-                "gamma": plot_range['gamma']
-            },
-            true_optima=None,
-            title="Origin and recon",
-            save_path=f'{recon_dir}/vis/vis-{base_recon_fname}.png',
-            params_paths=[None, None]
-        )
-
-    print("noise =", noise)
-    print("n qubits list =", n_qubits_list)
-    print("seeds =", seeds)
-    print("sfs =", sfs)
-
-    print("mse =", mses)
-    print("cos =", coss)
-    mses = np.array(mses)
-    coss = np.array(coss)
-
-    mses = mses.reshape(len(n_qubits_list), len(seeds), len(sfs), len(bss))
-    coss = coss.reshape(len(n_qubits_list), len(seeds), len(sfs), len(bss))
-    print("mse's shape =", mses.shape)
-    print("cos's shape =", coss.shape)
-    # timestamp = get_curr_formatted_timestamp()
-    recon_error_save_dir = f"{recon_dir}/recon_error_ns={n_qubits_list}-seeds={seeds}-sfs={sfs}-bss={bss}-error={error_type}"
-    print(f"recon error data save to {recon_error_save_dir}")
-    np.savez_compressed(
-        recon_error_save_dir,
-        mses=mses,
-        coss=coss,
-        n_qubits_list=n_qubits_list,
-        seeds=seeds,
-        sfs=sfs,
-        bss=bss,
-    )
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -243,11 +146,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    if args.aim == 'heatmap':
-        raise NotImplementedError("Deprecated.")
-        gen_heapmap_by_varying_sampling_fraction_and_beta_step(p=args.p, problem=args.problem,
-                                                               noise=args.noise, n_seeds=args.n_seeds, n_qubits_list=args.ns, error_type=args.error)
-    elif args.aim == 'final':
+    if args.aim == 'final':
         recon_landscapes_varying_qubits_and_instances(
             p=args.p, ansatz=args.ansatz, problem=args.problem,
             noise=args.noise, n_seeds=args.n_seeds, n_qubits_list=args.ns,
