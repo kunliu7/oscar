@@ -96,6 +96,9 @@ def get_minimum_by_QAOA(G: nx.Graph, p: int, qiskit_init_pt: np.ndarray,
 
 
 def batch_eval_opt_on_recon_ls(n: int, seed_range: List[int], noise: str, opt: str):
+    r"""Evaluate optimization on reconstructed landscape for different seeds.
+
+    """
     p = 1
     if len(seed_range) == 1:
         seeds = list(range(seed_range[0]))
@@ -154,12 +157,15 @@ def batch_eval_opt_on_recon_ls(n: int, seed_range: List[int], noise: str, opt: s
 def optimize_on_p1_reconstructed_landscape(
     n: int, p: int, seed: int, noise: str, miti_method: str,
     initial_point: List[float], opt_name: str, lr: float, maxiter: int, is_sim: bool
-) -> Tuple[float, float]:
+) -> Tuple[List[np.ndarray], np.ndarray]:
     """Optimize on p=1 reconstructed landscape with interpolation.
 
     Args:
         initial_point (List[float]): [beta, gamma]
 
+    Returns:
+        List[np.ndarray]: list of points on optimization path
+        np.ndarray: initial point
     """
     noise_cfgs = noise.split('-')
     if noise_cfgs[0] == 'ideal':
@@ -233,11 +239,7 @@ def optimize_on_p1_reconstructed_landscape(
     intp_path_path, intp_path_fname, intp_path_dir = get_interpolation_path_filename(
         n, p, problem, method, noise, opt_name, maxiter, initial_point, seed, miti_method)
     is_data_existed = os.path.exists(intp_path_path)
-    # if is_data_existed:
-    #     data = np.load(f"{intp_path_path}", allow_pickle=True)
-    #     return data['intp_path'][-1], data['circ_path'][-1]
 
-    # raw_optimizer = 'SPSA'
     if opt_name == 'ADAM':
         raw_optimizer = ADAM
     elif opt_name == 'SPSA':
@@ -295,6 +297,9 @@ def optimize_on_p1_reconstructed_landscape(
     print("QAOA energy + offset        :", - (result.eigenvalue + offset))
 
     params = optimizer.params_path
+    # ! there is some problem deriving the values directly
+    # e.g. for ADAM, the values are NOT one-to-one corresponding to the params
+    # intp_vals = optimizer.vals
     print("len of params:", len(params))
 
     params = [
@@ -351,7 +356,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
         '-n', type=int, help="Number of qubits.", required=True)
-    parser.add_argument('--seed_range', type=int, nargs="+", required=True)
+    parser.add_argument('--seed_range', type=int, nargs="+", help="1 or 2 parameters;"
+                        "if 1, range(args.seed_range[0]);"
+                        "if 2, range(*args.seed_range)", required=True)
     parser.add_argument('--noise', type=str, required=True)
     parser.add_argument('--opt', type=str, required=True)
     args = parser.parse_args()
