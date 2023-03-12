@@ -1,57 +1,39 @@
-# `QAOAKit`: A Toolkit for Reproducible Application and Verification of QAOA
+# OSCAR: cOmpressed Sensing based Cost lAndscape Reconstruction
 
-[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
-![Tests](https://github.com/QAOAKit/QAOAKit/actions/workflows/python-package-conda.yml/badge.svg)
+Reconstructing landscapes of variational quantum algorithms (VQAs)
+by compressed sensing.
 
-## Figures for papers
+TODO: link our paper.
+
+Use cases and their visualization in our paper
+are generated using `cs_*.py` and `vis_*.ipynb`.
+
+Commands that calling `cs_*.py` to generate those use cases
+are recorded in [record.md](record.md).
 
 
+## Installation
 
+Recommend: create an Anaconda environment
+and install from source.
 
-### RUN THE PROGRAM WITHOUT INSTALLING QAOA, by Kun
-
-Author: Kun Liu
-
-We want to modify and add our own local methods.
-
-DO NOT `pip install QAOAKit`.
-
-`git clone` this repo, and `cd` into the top folder of this repo,
-then
-```
-conda create -n qaoa python=3.9
-conda activate qaoa
-python -m QAOAKit.build_tables
-```
-
-python=3.9 works for my Linux and Mac M1 system.
-
-Then all the `from QAOAKit` in this repo is importing from local folder `QAOAKit/`.
-
-Try:
-```
-python n_optima_and_mitiq.py
+```bash
+conda create -n oscar python=3.9
+conda activate oscar
+TODO: requirement
 ```
 
-It should require a lot of package to install. You could install one by one according to
-error message.
-
-Another easy way out is using my requirements.txt:
-```
-pip install -r Mac_M1_requirements.txt
+```bash
+git clone TODO
+cd TODO
+pip install -e .
 ```
 
-However, it works on Mac M1 and Linux. It might not be working on Windows.
-
-
----
-
-If you still fail, here are some information that might help.
+<!-- If you still fail, here are some information that might help.
 
 `mitiq` does not compatible well with latest Python, NumPy and Qiskit.
 They are still upgrading `mitiq` according to this [issue](https://github.com/unitaryfund/mitiq/issues/1385).
 
-Here are my available version I tried and found (Mac M1)
 
 For Python==3.9,
 ```
@@ -59,92 +41,24 @@ conda install numpy==1.20.3
 pip install qiskit==0.36.2
 ```
 
-Install NumPy by pip does not work.
+Install NumPy by pip does not work on Mac M1. -->
+
+## Data
+
+TODO: link with `QAOA-Simulator`.
+
+## Examples
+
+TODO: explanation of all the `cs_*.py`.
 
 
-### Installation
+## Citation
 
-Recommended: create an Anaconda environment
 
 ```
-conda create -n qaoa python=3
-conda activate qaoa
 ```
 
-Note that current implementation requires significant amounts of RAM (~5GB) as it loads the entire dataset into memory. Linux and macOS are currently supported.
-
-```
-pip install QAOAKit
-python -m QAOAKit.build_tables
-```
-
-### Example
-
-```python
-import networkx as nx
-from qiskit.providers.aer import AerSimulator
-from QAOAKit import opt_angles_for_graph, angles_to_qaoa_format
-from QAOAKit.qaoa import get_maxcut_qaoa_circuit
-
-# build graph
-G = nx.star_graph(5)
-# grab optimal angles
-p = 3
-angles = angles_to_qaoa_format(opt_angles_for_graph(G,p))
-# build circuit
-qc = get_maxcut_qaoa_circuit(G, angles['beta'], angles['gamma'])
-qc.measure_all()
-# run circuit
-backend = AerSimulator()
-print(backend.run(qc).result().get_counts())
-```
-
-Almost all counts you get should correspond to one of the two optimal MaxCut solutions for star graph: `000001` or `111110`.
-
-For graphs where no pre-optimized angles are available, the angles from "The fixed angle conjecture for QAOA on regular MaxCut graphs" ([arXiv:2107.00677](https://scirate.com/arxiv/2107.00677)) will be returned.
-
-### Advanced usage
-
-More advanced examples are available in `examples` folder:
-
-- Using optimal parameters in state-of-the-art tensor network QAOA simulator [QTensor](https://github.com/danlkv/QTensor): [`examples/qtensor_get_energy.py`](https://github.com/QAOAKit/QAOAKit/blob/master/examples/qtensor_get_energy.py)
-- Transferring parameters to large unseen instances: unweighted ([`examples/Transferability_to_unseen_instances.ipynb`](https://github.com/QAOAKit/QAOAKit/blob/master/examples/Transferability_to_unseen_instances.ipynb)) and weighted ([`examples/weighted_transfer.ipynb`](https://github.com/QAOAKit/QAOAKit/blob/master/examples/weighted_transfer.ipynb))
-- Exploring the role of problem structure in QAOA performance [`examples/QAOA_symmetry_and_performance.ipynb`](https://github.com/QAOAKit/QAOAKit/blob/master/examples/QAOA_symmetry_and_performance.ipynb)
-- Exploring the performance of QAOA on small graphs as a function of average degree: [`examples/performance.ipynb`](https://github.com/QAOAKit/QAOAKit/blob/master/examples/performance.ipynb)
-- Running classical algorithms for MaxCut: [`examples/classical_algorithms.py`](https://github.com/QAOAKit/QAOAKit/blob/master/examples/classical_algorithms_vs_qaoa.py)
-- Comparing QAOA with classical algorithms for MaxCut: [`examples/classical_vs_quantum.ipynb`](https://github.com/QAOAKit/QAOAKit/blob/master/examples/classical_vs_quantum.ipynb)
-- Clustering degenerate QAOA angles: [`examples/degenerate_optima_in_angle_space.py`](https://github.com/QAOAKit/QAOAKit/blob/master/examples/degenerate_optima_in_angle_space.py)
-
-### Citation
-
-Please cite the following paper when using QAOAKit:
-
-```
-@article{2110.05555,
-Author = {Ruslan Shaydulin and Kunal Marwaha and Jonathan Wurtz and Phillip C. Lotshaw},
-Title = {QAOAKit: A Toolkit for Reproducible Study, Application, and Verification of the QAOA},
-Year = {2021},
-Eprint = {arXiv:2110.05555},
-Howpublished = {In Proceedings of the Second International Workshop on Quantum
-  Computing Software (in conjunction with SC21), 2021},
-}
-```
-
-Consider citing relevant papers for the particular dataset you use as well.
-
-### Install from source
-
-```
-git clone https://github.com/QAOAKit/QAOAKit.git
-cd QAOAKit
-pip install -e .
-python -m QAOAKit.build_tables
-pytest
-```
-
-If you have an issue like "Illegal Instruction (core dumped)", you may have to force pip to recompile Nauty binaries (`pip install --no-binary pynauty pynauty`) or install Nauty separately: https://pallini.di.uniroma1.it/
-
-#### Contributing
+<!-- #### Contributing
 
 You should set up the linter to run before every commit.
 ```
@@ -153,4 +67,4 @@ pre-commit install
 ```
 Note that linter checks passing is a necessary condition for your contribution to be reviewed.
 
-We are in the process of moving the codebase to numpy-style docstrings. See documentation here: https://numpydoc.readthedocs.io/en/latest/format.html
+We are in the process of moving the codebase to numpy-style docstrings. See documentation here: https://numpydoc.readthedocs.io/en/latest/format.html -->
