@@ -9,16 +9,30 @@ from scipy.spatial.distance import (
 from data_loader import load_grid_search_data, get_recon_landscape
 from oscar.compressed_sensing import cal_recon_error
 
-from oscar.vis import(
+from oscar.vis import (
     vis_landscapes,
 )
 
+
 def recon_high_d_landscapes_by_varying_2d(
-    n: int, p: int, ansatz: str, problem: str, 
+    n: int, p: int, ansatz: str, problem: str,
     bs: int, gs: int,
     noise: str, seed: int, error_type: str,
     repeat: int, force_recon: bool = False,
 ):
+    """Reconstruct high-dim landscapes by varying 2 of the dimensions and fixing the rest.
+
+    Say, we have a 3d landscape, we fix the first dimension and vary the second and third.
+    We then reconstruct the landscape by varying the second and third dimensions for `repeat` times.
+    We compute reconstruction error between the original and reconstructed landscapes.
+
+    Args:
+        bs (int): beta steps 
+        gs (int): gamma steps
+        repeat (int): number of times to repeat the reconstruction 
+        force_recon (bool, optional): if true, reconstruct and cover existing landscapes. Defaults to False.
+
+    """
     method = 'sv'
     miti_method = ''
     mses = []
@@ -27,7 +41,7 @@ def recon_high_d_landscapes_by_varying_2d(
     if bs == None and gs == None:
         if ansatz == 'qaoa':
             if p == 1:
-                bs = 50 # beta step
+                bs = 50  # beta step
                 gs = 2 * bs
             elif p == 2:
                 bs = 12
@@ -51,7 +65,7 @@ def recon_high_d_landscapes_by_varying_2d(
     print("seed =", seed)
     print("sfs =", sfs)
 
-    cs_seed = n # ! compare horizontally
+    cs_seed = n  # ! compare horizontally
 
     data, data_fname, data_dir = load_grid_search_data(
         n_qubits=n, p=p, ansatz=ansatz, problem=problem, method=method,
@@ -63,7 +77,6 @@ def recon_high_d_landscapes_by_varying_2d(
 
     is_vis = False
 
-    # 和Tianyi代码使用相同目录结构
     recon_dir = f"figs/grid_search_recon/{ansatz}/{problem}/{method}-{noise}-p={p}/seed={seed}"
 
     if ansatz == 'qaoa':
@@ -71,20 +84,20 @@ def recon_high_d_landscapes_by_varying_2d(
     elif ansatz == 'twolocal':
         d = n * (p + 1)
     elif ansatz == 'uccsd':
-        d = p # ! check
+        d = p  # ! check
     else:
         raise ValueError(f"ansatz {ansatz} not supported")
-        
+
     print("dimension: ", d)
     rng = default_rng(seed=42)
 
+    # randomly choose the dimensions to fix
     recon_d = 2
-
     fixed_dims = rng.choice(d, size=d-recon_d, replace=False)
     print("fixed dims =", fixed_dims)
 
     for sf in sfs:
-        for i in range(repeat): 
+        for i in range(repeat):
             # random.choice(range(len(full_range['beta'])))
 
             recon_fname = f"recon-{cs_seed=}-repeat_i={i}-sf={sf:.3f}-{data_fname}"
@@ -92,33 +105,39 @@ def recon_high_d_landscapes_by_varying_2d(
 
             origin = data['data']
 
-            random_id_on_each_dim_list = rng.choice(a=len(full_range['beta']), size=d, replace=True)
+            # for each dimension, randomly choose an index
+            random_id_on_each_dim_list = rng.choice(
+                a=len(full_range['beta']), size=d, replace=True)
             tmp: np.ndarray = origin.copy()
-            next_axis = 0
+
+            # choose the slice of the landscape to reconstruct
+            # e.g. if random_id_on_each_dim_list = [1, 3, 7, 5],
+            # and we fix 0-th and 3-th dimensions, we will reconstruct the landscape
+            # of origin[1, :, :, 5], which is a 2D landscape
+            next_axis = 0  # specify which is the next axis to take / index
             for j in range(d):
                 # print(tmp.shape)
                 if j in fixed_dims:
-                    tmp = tmp.take(indices=random_id_on_each_dim_list[j], axis=next_axis)
+                    tmp = tmp.take(
+                        indices=random_id_on_each_dim_list[j], axis=next_axis)
                 else:
                     next_axis += 1
 
             origin = tmp
             print("after np.take = ", origin.shape)
-            # if problem == 'partition':
-            #     origin = origin / (origin.max() - origin.min())
 
-            recon = get_recon_landscape(ansatz, p, origin, sf, force_recon, 
-                recon_path, cs_seed)
+            recon = get_recon_landscape(ansatz, p, origin, sf, force_recon,
+                                        recon_path, cs_seed)
 
-            mse = cal_recon_error(origin.reshape(-1), recon.reshape(-1), error_type)
+            mse = cal_recon_error(origin.reshape(-1),
+                                  recon.reshape(-1), error_type)
             cos = cosine(origin.reshape(-1), recon.reshape(-1))
             mses.append(mse)
             coss.append(cos)
 
-            # ncc = cal_recon_error()
-            print("RMSE: ", mse)
+            print(f"{error_type}: ", mse)
             print("Cosine: ", cos)
-            
+
             base_recon_fname = os.path.splitext(recon_fname)[0]
             if is_vis:
                 vis_landscapes(
@@ -126,13 +145,15 @@ def recon_high_d_landscapes_by_varying_2d(
                     labels=["origin", "recon"],
                     full_range={
                         "beta": plot_range['beta'],
-                        "gamma": plot_range['gamma'] 
+                        "gamma": plot_range['gamma']
                     },
                     true_optima=None,
                     title="Origin and recon",
                     save_path=f'{recon_dir}/vis/vis-{base_recon_fname}.png',
                     params_paths=[None, None]
                 )
+
+            # slow down to prevent crush VSCode
             time.sleep(1)
 
     print("noise =", noise)
@@ -164,19 +185,26 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--n', type=int, help="#Qubits.", required=True)
     parser.add_argument('--p', type=int, help="Circuit depth.", required=True)
-    parser.add_argument('--repeat', type=int, help="# of random samples.", required=True)
-    parser.add_argument('--ansatz', type=str, help="Type of ansatz.", required=True)
-    parser.add_argument('--noise', type=str, help="Type of noise.", required=True)
-    parser.add_argument('--problem', type=str, help="Type of problem.", required=True)
-    parser.add_argument('--seed', type=int, help="Seed of instance.", required=True)
-    parser.add_argument('--error', type=str, help="Type of error.", required=True)
+    parser.add_argument('--repeat', type=int,
+                        help="# of random samples.", required=True)
+    parser.add_argument('--ansatz', type=str,
+                        help="Type of ansatz.", required=True)
+    parser.add_argument('--noise', type=str,
+                        help="Type of noise.", required=True)
+    parser.add_argument('--problem', type=str,
+                        help="Type of problem.", required=True)
+    parser.add_argument('--seed', type=int,
+                        help="Seed of instance.", required=True)
+    parser.add_argument('--error', type=str,
+                        help="Type of error.", required=True)
     parser.add_argument("--bs", help="Beta steps.", type=int, default=None)
     parser.add_argument("--gs", help="Gamma steps.", type=int, default=None)
-    parser.add_argument("--force_recon", help="Force reconstruction and cover existing landscapes.", action="store_true")
+    parser.add_argument(
+        "--force_recon", help="Force reconstruction and cover existing landscapes.", action="store_true")
 
     args = parser.parse_args()
-    
+
     recon_high_d_landscapes_by_varying_2d(n=args.n, p=args.p, ansatz=args.ansatz, problem=args.problem,
-            bs=args.bs, gs=args.gs,
-            noise=args.noise, seed=args.seed, error_type=args.error, repeat=args.repeat,
-            force_recon=args.force_recon)
+                                          bs=args.bs, gs=args.gs,
+                                          noise=args.noise, seed=args.seed, error_type=args.error, repeat=args.repeat,
+                                          force_recon=args.force_recon)
