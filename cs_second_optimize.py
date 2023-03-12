@@ -22,7 +22,7 @@ from oscar.noise_models import (
     get_depolarizing_error_noise_model,
 )
 
-from oscar.vis import(
+from oscar.vis import (
     vis_landscapes
 )
 
@@ -30,6 +30,7 @@ from oscar.utils import (
     arraylike_to_str,
     shift_parameters
 )
+
 
 def get_point_val(G: nx.Graph, p: int, last_pt: np.ndarray, noise_model: NoiseModel):
     maxcut = Maxcut(G)
@@ -53,7 +54,7 @@ def get_point_val(G: nx.Graph, p: int, last_pt: np.ndarray, noise_model: NoiseMo
 
 
 def get_minimum_by_QAOA(G: nx.Graph, p: int, qiskit_init_pt: np.ndarray,
-    noise_model: NoiseModel, optimizer: QiskitOptimizer):
+                        noise_model: NoiseModel, optimizer: QiskitOptimizer):
     """Get minimum cost value by random initialization.
 
     Returns:
@@ -66,24 +67,14 @@ def get_minimum_by_QAOA(G: nx.Graph, p: int, qiskit_init_pt: np.ndarray,
     counts = []
     values = []
     params = []
+
     def cb_store_intermediate_result(eval_count, parameters, mean, std):
         counts.append(eval_count)
         values.append(mean)
         params.append(parameters)
 
     qinst = AerSimulator(shots=1024, noise_model=noise_model)
-    # qinst = AerSimulator(method='statevector')
-    # shots = 2048
-    # optimizer = SPSA(maxiter=maxiter)
-    # if isinstance(maxiter, int):
-    #     # optimizer = SPSA(maxiter=maxiter)
-    #     optimizer = COBYLA(maxiter=maxiter)
-    #     print("maxiter:", maxiter)
-    # else:
-    #     # optimizer = SPSA()
-    #     optimizer = COBYLA()
-    #     print("no maxiter")
-    
+
     print("noise model", noise_model)
 
     qaoa = QAOA(
@@ -123,7 +114,7 @@ def batch_eval_opt_on_recon_ls(n: int, seed_range: List[int], noise: str, opt: s
         raise ValueError()
 
     miti_method = None
-    
+
     intp_paths = []
     initial_points = []
     # for seed, opt in itertools.product(seeds, opts):
@@ -164,7 +155,7 @@ def optimize_on_p1_reconstructed_landscape(
     n: int, p: int, seed: int, noise: str, miti_method: str,
     initial_point: List[float], opt_name: str, lr: float, maxiter: int, is_sim: bool
 ) -> Tuple[float, float]:
-    """
+    """Optimize on p=1 reconstructed landscape with interpolation.
 
     Args:
         initial_point (List[float]): [beta, gamma]
@@ -174,7 +165,8 @@ def optimize_on_p1_reconstructed_landscape(
     if noise_cfgs[0] == 'ideal':
         noise_model = None
     elif noise_cfgs[0] == 'depolar':
-        noise_model = get_depolarizing_error_noise_model(float(noise_cfgs[1]), float(noise_cfgs[2]))
+        noise_model = get_depolarizing_error_noise_model(
+            float(noise_cfgs[1]), float(noise_cfgs[2]))
         print(noise_cfgs)
     else:
         raise NotImplementedError()
@@ -183,7 +175,7 @@ def optimize_on_p1_reconstructed_landscape(
     method = 'sv'
     cs_seed = n
     assert p == 1
-    # assert len(initial_point) == 2 * p
+
     sf = 0.05
     if p == 1:
         bs = 50
@@ -194,6 +186,7 @@ def optimize_on_p1_reconstructed_landscape(
     else:
         raise NotImplementedError()
     ansatz = 'qaoa'
+    is_vis = False
     data, data_fname, data_dir = load_grid_search_data(
         n_qubits=n, p=p, ansatz=ansatz, problem=problem, method=method,
         noise=noise, beta_step=bs, gamma_step=gs, seed=seed, miti_method=miti_method
@@ -204,9 +197,11 @@ def optimize_on_p1_reconstructed_landscape(
     plot_range = data['plot_range']
     origin = data['data']
 
-    recon_path, recon_fname, recon_dir = get_recon_pathname(ansatz, p, problem, method, noise, cs_seed, sf, data_fname)
+    recon_path, recon_fname, recon_dir = get_recon_pathname(
+        ansatz, p, problem, method, noise, cs_seed, sf, data_fname)
     print("tend to save to", recon_path)
-    recon = get_recon_landscape(ansatz, p, origin, sf, False, recon_path, cs_seed)
+    recon = get_recon_landscape(
+        ansatz, p, origin, sf, False, recon_path, cs_seed)
 
     G = nx.random_regular_graph(3, n, seed)
     maxcut = Maxcut(G)
@@ -215,13 +210,14 @@ def optimize_on_p1_reconstructed_landscape(
     C, offset = maxcut_problem.to_ising()
 
     bounds = np.array([
-        [-beta_bound, beta_bound], 
-        [-gamma_bound, gamma_bound], 
+        [-beta_bound, beta_bound],
+        [-gamma_bound, gamma_bound],
     ])
 
     print("bounds:", bounds)
     print("landscape shape:", recon.shape)
 
+    # if initial_point is not provided, then randomly generate one
     print("initial point:", initial_point)
     if not initial_point:
         rng = np.random.default_rng(seed)
@@ -234,12 +230,12 @@ def optimize_on_p1_reconstructed_landscape(
 
     # ---------------- data prepare -------------------
 
-    intp_path_path, intp_path_fname, intp_path_dir = get_interpolation_path_filename(n, p, problem, method, noise, opt_name, maxiter, initial_point, seed, miti_method)
+    intp_path_path, intp_path_fname, intp_path_dir = get_interpolation_path_filename(
+        n, p, problem, method, noise, opt_name, maxiter, initial_point, seed, miti_method)
     is_data_existed = os.path.exists(intp_path_path)
     # if is_data_existed:
     #     data = np.load(f"{intp_path_path}", allow_pickle=True)
     #     return data['intp_path'][-1], data['circ_path'][-1]
-
 
     # raw_optimizer = 'SPSA'
     if opt_name == 'ADAM':
@@ -262,15 +258,12 @@ def optimize_on_p1_reconstructed_landscape(
     optimizer = wrap_qiskit_optimizer_to_landscape_optimizer(
         raw_optimizer
     )(
-        bounds=bounds, 
+        bounds=bounds,
         landscape=recon,
         fun_type='INTERPOLATE_QISKIT',
-        # fun_type='FUN',
-        # fun=None
-        # fun_type='None'
         **opt_params
     )
-    
+
     # opts = [ADAM,
     # AQGD,
     # CG,
@@ -288,44 +281,34 @@ def optimize_on_p1_reconstructed_landscape(
     # TNC,
     # SciPyOptimizer]
 
-    # initial_point = np.hstack([[1.0 for _ in range(p)], [-1.0 for _ in range(p)]])
-        
-    # initial_point = np.array([0.1, -0.1])
-    qinst = AerSimulator() # meaningless, do not actually activate
+    qinst = AerSimulator()  # meaningless, do not actually activate
     qaoa = QAOA(
         optimizer=optimizer,
         reps=p,
-        # initial_point=angles_to_qiskit_format(
-        #     {"gamma": row["gamma"],
-        #     "beta": row["beta"]}
-        # ),
         initial_point=initial_point,
         quantum_instance=qinst,
         # callback=cb_store_intermediate_result
-        )
+    )
     result = qaoa.compute_minimum_eigenvalue(C)
     # print(qaoa.optimal_params)
-    # print("opt_cut                     :", opt_cut)
     print("recon landscape minimum     :", result.eigenvalue)
     print("QAOA energy + offset        :", - (result.eigenvalue + offset))
 
     params = optimizer.params_path
-    # vals = optimizer
-    # print(params)
     print("len of params:", len(params))
-    
+
     params = [
-        # _params
         shift_parameters(_params, bounds)
-        # angles_to_qaoa_format(angles_from_qiskit_format(_params))
         for _params in params
     ]
-    
-    
+
+    # for some reason we forget to save the point corresponding to the initial point
+    # when generating the data, so we need to compute it manually
+    # but it takes time, so we only do it if needed
     if is_sim:
-        # 做不动
         # _, _, circ_path, _ = get_minimum_by_QAOA(G, p, initial_point, None, raw_optimizer(lr=lr, maxiter=maxiter))
-        circ_path = load_optimization_path(n, p, problem, method, noise, opt_name, lr, maxiter, initial_point, seed, miti_method)
+        circ_path = load_optimization_path(
+            n, p, problem, method, noise, opt_name, lr, maxiter, initial_point, seed, miti_method)
         print("len of circuit simulation path:", len(circ_path))
         circ_vals = []
         for ipt, pt in enumerate(circ_path):
@@ -336,14 +319,7 @@ def optimize_on_p1_reconstructed_landscape(
         circ_vals = None
 
     print(initial_point)
-    # ts = get_curr_formatted_timestamp()
 
-    # save_dir = f"figs/opt_on_recon_landscape/{ts}"
-    # if not os.path.exists(save_dir):
-    #     os.makedirs(save_dir)
-    # print(params)
-    # print(circ_path)
-    # save_path = f"{save_dir}/opt_on_recon-opt={opt_name}-init={list(initial_point)}-{base_recon_fname}"
     save_path = intp_path_path
     intp_path_fname_base = os.path.splitext(intp_path_fname)[0]
     print("params save to =", save_path)
@@ -351,46 +327,30 @@ def optimize_on_p1_reconstructed_landscape(
         save_path,
         opt_name=opt_name,
         initial_point=initial_point,
-        intp_path=params, # interpolation
-        # intp_vals=
+        intp_path=params,  # interpolation
+        # intp_vals=intp_vals,
         circ_path=circ_path,
         circ_vals=circ_vals
     )
 
-    vis_landscapes(
-        landscapes=[recon, origin],
-        labels=["Interpolate", "Circuit Sim."],
-        full_range=plot_range,
-        true_optima=None,
-        title="Origin and recon",
-        save_path=f'{intp_path_dir}/vis-{intp_path_fname_base}.png',
-        params_paths=[params, circ_path]
-    )
-    
-    # save_dir = f"figs/second_optimize/{get_curr_formatted_timestamp()}"
-    # if not os.path.exists(save_dir):
-    #     os.makedirs(save_dir)
-
-    # save_path = f"{save_dir}/second-optimize-{intp_path_fname_base}"
-    # print("\nsecond optimize data save to", save_path)
-    # np.savez_compressed(
-    #     save_path,
-    #     opt_name=opt_name,
-    #     initial_point=initial_point,
-    #     intp_path=params, # interpolation
-    #     intp_path_last_pt=
-    #     # intp_vals=
-    #     # circ_path=circ_path,
-    #     # circ_vals=circ_vals,
-    #     **opt_params
-    # )
+    if is_vis:
+        vis_landscapes(
+            landscapes=[recon, origin],
+            labels=["Interpolate", "Circuit Sim."],
+            full_range=plot_range,
+            true_optima=None,
+            title="Origin and recon",
+            save_path=f'{intp_path_dir}/vis-{intp_path_fname_base}.png',
+            params_paths=[params, circ_path]
+        )
 
     return params, initial_point
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('-n', type=int, help="Number of qubits.", required=True)
+    parser.add_argument(
+        '-n', type=int, help="Number of qubits.", required=True)
     parser.add_argument('--seed_range', type=int, nargs="+", required=True)
     parser.add_argument('--noise', type=str, required=True)
     parser.add_argument('--opt', type=str, required=True)
