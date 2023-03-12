@@ -10,8 +10,6 @@ from typing import List
 import cvxpy as cvx
 import numpy as np
 from scipy.fftpack import dct, idct
-from scipy.optimize import minimize
-from sklearn import linear_model
 
 
 def L1_norm(x):

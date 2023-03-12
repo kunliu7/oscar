@@ -2,13 +2,10 @@ from typing import Callable, List, Optional, Tuple
 
 import numpy as np
 from qiskit.algorithms.optimizers import OptimizerResult
-import qiskit.algorithms.optimizers.optimizer as qiskit_optimizer
 from qiskit.algorithms.optimizers.optimizer import POINT, Optimizer
 
-from .interpolate import (approximate_fun_value_by_2D_interpolation,
-                          approximate_fun_value_by_2D_interpolation_qiskit)
-from .utils import (angles_from_qiskit_format, angles_to_qaoa_format,
-                    shift_parameters)
+from .interpolate import approximate_fun_value_by_2D_interpolation_qiskit
+from .utils import shift_parameters
 
 
 def wrap_qiskit_optimizer_to_landscape_optimizer(QiskitOptimizer) -> Optimizer:

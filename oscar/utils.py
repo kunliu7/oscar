@@ -6,13 +6,8 @@ Most of them are copied from [QAOAKit](https://github.com/QAOAKit/QAOAKit).
 Some of them are not used in the current version of OSCAR.
 """
 
-import copy
-import pynauty
 import networkx as nx
 import numpy as np
-from functools import partial
-from qiskit_aer import AerSimulator
-import re
 import time
 
 
