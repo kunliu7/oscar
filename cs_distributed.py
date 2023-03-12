@@ -1,7 +1,8 @@
 import argparse
 import os
 import numpy as np
-from typing import List
+from numpy import ndarray
+from typing import List, Tuple
 
 from oscar.vis import (
     _vis_recon_distributed_landscape,
@@ -16,69 +17,9 @@ from oscar.compressed_sensing import (
     two_D_CS_p1_recon_with_distributed_landscapes,
 )
 
+from oscar.distributed_recon import normalize_by_linear_regression
+
 from data_loader import load_IBM_or_sim_grid_search_data
-from sklearn.linear_model import LinearRegression
-
-
-def ndarray2D_to_set_of_tuples(a):
-    ids = []
-
-    for idx in a:
-        ids.append(tuple(idx))
-
-    ids = set(ids)
-    print("ndarray to set:", len(ids))
-    return ids
-
-
-def T_flatten(a: np.ndarray):
-    assert len(a.shape) == 2
-    return a.copy().T.flat[:]
-
-
-def inv_T_flatten(a: np.ndarray, shape: tuple):
-    assert len(a.shape) == 1 and len(shape) == 2
-    return a.reshape(shape[::-1]).T
-
-
-def normalize_by_linear_regression(ls1, ls2, n_pts, ri):
-    shape = ls1.shape
-    print("shape =", shape)
-    assert (ls1 == inv_T_flatten(T_flatten(ls1), ls1.shape)).all()
-    fls1 = T_flatten(ls1)
-    fls2 = T_flatten(ls2)
-
-    rng = np.random.default_rng(7)
-
-    # pick n_pts random points from ri to train NCM
-    # note that ri is fixed for normalization and parallel reconstruction
-    ids = rng.choice(ri, n_pts, replace=False)
-    print(ids.shape)
-
-    y = fls1[ids]
-    x = fls2[ids]
-    print(x.shape)
-    print(y.shape)
-
-    x = x.reshape(-1, 1)
-    y = y.reshape(-1, 1)
-    model = LinearRegression()
-    model = model.fit(x, y)
-
-    r_sq = model.score(x, y)
-    print('coefficient of determination(𝑅²) :', r_sq)
-    # coefficient of determination(𝑅²) : 0.715875613747954
-    print('intercept:', model.intercept_)
-    # （标量） 系数b0 intercept: 5.633333333333329 -------this will be an array when y is also 2-dimensional
-    print('slope:', model.coef_)
-
-    # ls2_flat = ls2.reshape(-1)
-    ls2_flat = ls2.flatten().reshape(-1, 1)
-    y_pred = model.predict(ls2_flat)
-    print(y_pred.shape)
-    ls2_normalized = y_pred.reshape(shape)
-
-    return ls1, ls2_normalized
 
 
 def reconstruct_by_distributed_landscapes_two_noisy_simulations_top(
@@ -99,31 +40,6 @@ def reconstruct_by_distributed_landscapes_two_noisy_simulations_top(
 
     errors1 = []
     errors2 = []
-    # def get_data(noise: str):
-    #     r"""
-    #     Deal with the data from IBM and grid search together.
-    #     """
-    #     if noise == 'ibm-1':
-    #         assert seed == 1, "seed should be 1 for ibm-1"
-    #         noisy_data = load_ibm_data(mid=1, seed=seed)
-    #     elif noise == 'ibm-2':
-    #         assert seed == 1, "seed should be 1 for ibm-2"
-    #         noisy_data = load_ibm_data(mid=2, seed=seed)
-    #     elif os.path.exists(noise): # ! special case
-    #         assert seed == 1 and p == 1, "seed should be 1 and p should be 1 for local data"
-    #         path = noise
-    #         noisy_data = np.load(path, allow_pickle=True)
-    #         noisy_data = dict(noisy_data)
-    #         noisy_data['full_range'] = None # ! special case, only for visualization
-    #     else:
-    #         ansatz = 'qaoa'
-    #         noisy_data, _, _ = load_grid_search_data(
-    #             n_qubits=n_qubits, p=p, ansatz=ansatz,
-    #             problem=problem, method=method,
-    #             noise=noise, beta_step=50, gamma_step=100, seed=seed,
-    #         )
-
-    #     return noisy_data
 
     problem = 'maxcut'
     ansatz = 'qaoa'
