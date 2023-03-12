@@ -127,7 +127,7 @@ def load_IBM_grid_search_data(
     assert seed == 1
 
     fname = f"{problem}-{method}-{noise}-n={n_qubits}-{p=}-{seed=}-{beta_step}-{gamma_step}"
-    save_dir = f"figs/ibm/IBM_Exp_2048/{fname}.npz"
+    save_dir = f"figs/ibm/{ansatz}/{problem}/{method}-{noise}-{p=}/{fname}.npz"
     data = np.load(
         save_dir,
         allow_pickle=True
@@ -143,6 +143,9 @@ def load_IBM_grid_search_data(
 
     data_dict = dict(data)
     if 'ibm_H_ls' in data_dict:
+        # historical reason
+        # previous `process_ibm_data.ipynb` saves the data as `ibm_H_ls
+        # now it does not
         print("ibm data read from", save_dir)
         new_data = {
             'data': data_dict['ibm_H_ls'],
