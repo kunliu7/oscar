@@ -140,10 +140,12 @@ python cs_distributed.py --ns 6 -p 1 --sf 0.2 --seed 1 \
 ![vis_figs_comp_miti.ipynb](vis_figs_comp_miti.ipynb)
 
 
+python cs_comp_miti.py
+
+
 # Optimize on recon. landscape
 
 ## for single path
-python cs_opt_on_recon_ls.py -n 16 -p 1 --seed 0 --noise ideal --opt ADAM --lr 0.001 --maxiter 10000 --init_pt 0.1 -0.1
 
 python cs_opt_on_recon_landscapes.py -n 16 -p 1 --seed 0 --noise ideal --opt ADAM --maxiter 10000 --init_pt 0.1 -0.1 --get_vals
 
