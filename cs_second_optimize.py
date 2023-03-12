@@ -1,36 +1,24 @@
 import argparse
 import networkx as nx
 import numpy as np
-from qiskit_optimization.applications import Maxcut, SKModel, NumberPartition
+from qiskit_optimization.applications import Maxcut
 from oscar.optimizer_wrapper import wrap_qiskit_optimizer_to_landscape_optimizer
 from qiskit_aer.noise import NoiseModel
 from qiskit.algorithms.optimizers.optimizer import Optimizer as QiskitOptimizer
-from typing import Callable, List, Optional, Tuple
+from typing import List, Tuple
 from qiskit.algorithms.optimizers import (
     ADAM,
-    AQGD,
-    CG,
     COBYLA,
     L_BFGS_B,
-    GSLS,
-    GradientDescent,
-    NELDER_MEAD,
-    NFT,
-    P_BFGS,
-    POWELL,
-    SLSQP,
-    SPSA,
-    QNSPSA,
-    TNC,
-    SciPyOptimizer
+    SPSA
 )
-from qiskit.algorithms import VQE, NumPyMinimumEigensolver, QAOA
+from qiskit.algorithms import QAOA
 from qiskit_aer import AerSimulator
-import sys, os
+import os
 
 from data_loader import get_interpolation_path_filename, get_recon_landscape, get_recon_pathname, load_grid_search_data, load_optimization_path
 
-from oscar.noisy_params_optim import (
+from oscar.noise_models import (
     get_depolarizing_error_noise_model,
 )
 

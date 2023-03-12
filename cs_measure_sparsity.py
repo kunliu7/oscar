@@ -1,9 +1,8 @@
 import argparse
 from typing import List
 import numpy as np
-from scipy.fftpack import dctn, idctn, fftn
+from scipy.fftpack import dctn, fftn
 from scipy.ndimage import fourier_shift
-import scipy as sp
 import os
 
 from data_loader import load_grid_search_data

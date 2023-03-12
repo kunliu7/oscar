@@ -2,7 +2,7 @@ import argparse
 import numpy as np
 from numpy.random import default_rng
 import time
-import sys, os
+import os
 from scipy.spatial.distance import (
     cosine
 )

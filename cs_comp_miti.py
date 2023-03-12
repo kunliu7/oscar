@@ -1,7 +1,6 @@
 import argparse
 import numpy as np
 from scipy.ndimage import laplace
-from typing import Callable, List, Optional, Tuple
 from scipy.spatial.distance import (
     cosine
 )

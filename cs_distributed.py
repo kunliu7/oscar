@@ -16,7 +16,7 @@ from oscar.compressed_sensing import (
     two_D_CS_p1_recon_with_distributed_landscapes,
 )
 
-from data_loader import load_IBM_grid_search_data, load_IBM_or_sim_grid_search_data, load_grid_search_data, load_ibm_data
+from data_loader import load_IBM_or_sim_grid_search_data
 from sklearn.linear_model import LinearRegression
 
 

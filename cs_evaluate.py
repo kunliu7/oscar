@@ -12,7 +12,7 @@ import os
 from scipy.spatial.distance import (
     cosine
 )
-from data_loader import get_recon_pathname, load_grid_search_data, get_recon_landscape, load_ibm_data
+from data_loader import load_grid_search_data, get_recon_landscape
 
 
 def recon_landscapes_varying_qubits_and_instances(
