@@ -11,6 +11,14 @@ are generated using `cs_*.py` and `vis_*.ipynb`.
 Commands that calling `cs_*.py` to generate those use cases
 are recorded in [record.md](record.md).
 
+## TODO for release
+
+- [ ] pack up Google and IBM data, and tutorial to unzip
+- [ ] pack up recon. and grid_search landscapes, and tutorial to unzip
+- [ ] sparsity data (Table IV)
+- [ ] data for Fig. 12, n=20
+- [ ] LICENSE
+
 
 ## Installation
 
@@ -23,11 +31,19 @@ conda activate oscar
 TODO: requirement
 ```
 
+Download data:
 ```bash
-git clone TODO
-cd TODO
-pip install -e .
+sh ./download_data.sh
 ```
+
+```bash
+git clone https://github.com/kunliu7/oscar
+cd oscar
+pip install -e .
+pytest
+```
+
+P.S. `pytest` might takes several minutes.
 
 <!-- If you still fail, here are some information that might help.
 
@@ -49,8 +65,14 @@ TODO: link with `QAOA-Simulator`.
 
 ## Examples
 
-TODO: explanation of all the `cs_*.py`.
+- cs_comp_miti.py: compare mitigated landscapes
+- cs_distributed.py: recon. distributed landscapes
+- cs_evaluate.py: compute recon. error for p=1 and p=2
+- cs_high_dim_vary_2d.py: compute recon. error for high-dim landscapes
+- cs_opt_on_recon_landscapes.py: optimize on recon. landscapes by interpolation
+- cs_second_optimize.py: second optimization proposed in paper
 
+- vis_OSCAR_save_queries.py: visualize #Queries saved by OSCAR
 
 ## Citation
 
