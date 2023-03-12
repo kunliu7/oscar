@@ -13,8 +13,9 @@ are recorded in [record.md](record.md).
 
 ## TODO for release
 
-- [ ] pack up Google and IBM data, and tutorial to unzip
-- [ ] pack up recon. and grid_search landscapes, and tutorial to unzip
+- [ ] whether to pack up Google and IBM data, and tutorial to unzip
+- [ ] pack up `figs/grid_search` and `figs/optimization` by linking Tianyi's repo
+- [ ] zip `figs/grid_search_recon` (too big) and put somewhere; add tutorial to unzip
 - [ ] sparsity data (Table IV)
 - [ ] data for Fig. 12, n=20
 - [ ] LICENSE
