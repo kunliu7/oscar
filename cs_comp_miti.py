@@ -5,7 +5,7 @@ from scipy.spatial.distance import (
     cosine
 )
 
-from oscar.vis import(
+from oscar.vis import (
     vis_landscapes
 )
 
@@ -36,7 +36,8 @@ def cal_gap(C_opt, full, recon):
     min_recon = np.max(recon)
     print("C_opt: ", C_opt)
     print(f"min_full: {min_full}, C_opt - min_full: {C_opt - min_full}")
-    print(f"min_miti_recon: {min_recon}, C_opt - min_recon: {C_opt - min_recon}")
+    print(
+        f"min_miti_recon: {min_recon}, C_opt - min_recon: {C_opt - min_recon}")
 
 
 def grad_naive(ls):
@@ -93,7 +94,7 @@ def cal_smoothness(ls: np.ndarray) -> float:
     # print(std_of_grad.shape)
     # print(abs_mean.shape)
 
-    smoothness = std_of_grad / (abs_mean) # + 0.01)
+    smoothness = std_of_grad / (abs_mean)  # + 0.01)
     return smoothness.mean()
 
 
@@ -118,7 +119,7 @@ def compare_by_matrics(ls1, ls2, metrics):
         met1 = met(ls1)
         met2 = met(ls2)
         rst = [met1, met2, met1 - met2]
-        
+
     rsts.append(rst)
     return rsts
 
@@ -137,12 +138,13 @@ def compare_with_ideal_landscapes(ideal, ls1, ls2):
     diff1 = ideal - ls1
     diff2 = ideal - ls2
 
-    ids = np.abs(diff1) < np.abs(diff2)     # indices that Richardson is closer to ideal than linear
+    # indices that Richardson is closer to ideal than linear
+    ids = np.abs(diff1) < np.abs(diff2)
 
     # print("n_pts =", np.sum(ids))
     print("abs(diff1) <  abs(diff2), num of such points =", np.sum(ids == True))
     print("abs(diff1) >= abs(diff2), num of such points =", np.sum(ids == False))
-    
+
     print("var diff1 =", np.var(diff1))
     print("var diff2 =", np.var(diff2))
 
@@ -150,8 +152,18 @@ def compare_with_ideal_landscapes(ideal, ls1, ls2):
     print("var abs(diff2) =", np.var(np.abs(diff2)))
 
 
-def vis_case_compare_mitigation_method(check: bool=False):
-    is_reconstructed = False 
+def compare_mitigation_method(check: bool = False):
+    """Compare mitigation methods by computing quality metrics on the reconstructed landscapes.
+
+    The use case is fixed for n=16 qubits, depolarizing noise, and p=1 QAOA.
+
+    Args:
+        check (bool, optional): print more logs. Defaults to False.
+
+    Raises:
+        ValueError: Invalid depth of QAOA.
+    """
+    is_reconstructed = False
     is_test = check
 
     method = 'sv'
@@ -182,11 +194,11 @@ def vis_case_compare_mitigation_method(check: bool=False):
     ansatz = 'qaoa'
 
     if is_test:
-        ideal_data1, ideal_data_fname, _ = load_grid_search_data(
+        ideal_data1, _, _ = load_grid_search_data(
             n_qubits=n_qubits, p=p, ansatz=ansatz, problem=problem, method=method,
             noise=noise, beta_step=bs, gamma_step=gs, seed=seed, miti_method=miti_method1
         )
-        ideal_data2, ideal_data_fname, _ = load_grid_search_data(
+        ideal_data2, _, _ = load_grid_search_data(
             n_qubits=n_qubits, p=p, ansatz=ansatz, problem=problem, method=method,
             noise=noise, beta_step=bs, gamma_step=gs, seed=seed, miti_method=miti_method2
         )
@@ -209,20 +221,17 @@ def vis_case_compare_mitigation_method(check: bool=False):
         )
         full_range = ideal_data['full_range']
         ideal = ideal_data['data']
-        
+
         noisy_data, noisy_data_fname, _ = load_grid_search_data(
             n_qubits=n_qubits, p=p, ansatz=ansatz, problem=problem, method=method,
             noise=noise, beta_step=bs, gamma_step=gs, seed=seed
         )
         noisy = noisy_data['data']
-    
-        noisy_recon_path, _, _ = get_recon_pathname(ansatz, p, problem, method, noise, cs_seed, sf, noisy_data_fname)
-        noisy_recon = get_recon_landscape(ansatz, p, noisy, sf, is_reconstructed, noisy_recon_path, cs_seed)
- 
-    if not is_reconstructed:
-        timestamp = get_curr_formatted_timestamp()
-    else:
-        timestamp = "2022-11-07_13:55:52_OK" # TODO
+
+        noisy_recon_path, _, _ = get_recon_pathname(
+            ansatz, p, problem, method, noise, cs_seed, sf, noisy_data_fname)
+        noisy_recon = get_recon_landscape(
+            ansatz, p, noisy, sf, is_reconstructed, noisy_recon_path, cs_seed)
 
     # -------- derive miti1 data
 
@@ -231,15 +240,12 @@ def vis_case_compare_mitigation_method(check: bool=False):
         noise=noise, beta_step=bs, gamma_step=gs, seed=seed, miti_method=miti_method1
     )
     miti1 = miti1_data['data']
-    # mitigation_method1 = miti1_data['mitigation_method']
-    # mitigation
     print(miti1_data['mitigation_method'], miti1_data['mitigation_config'])
-    # print(mitigation_config1)
 
-    # exit()
-    recon1_path, _, _ = get_recon_pathname(ansatz, p, problem, method, noise, cs_seed, sf, miti1_data_fname)
-    # recon1_path = f"figs/recon_p2_landscape/{timestamp}/recon-sf={sf:.3f}-cs_seed={cs_seed}-{miti1_data_fname}"
-    miti1_recon = get_recon_landscape(ansatz, p, miti1, sf, is_reconstructed, recon1_path, cs_seed)
+    recon1_path, _, _ = get_recon_pathname(
+        ansatz, p, problem, method, noise, cs_seed, sf, miti1_data_fname)
+    miti1_recon = get_recon_landscape(
+        ansatz, p, miti1, sf, is_reconstructed, recon1_path, cs_seed)
 
     # -------- derive miti2 data
 
@@ -251,14 +257,16 @@ def vis_case_compare_mitigation_method(check: bool=False):
     )
     miti2 = miti2_data['data']
 
-    recon2_path, _, _ = get_recon_pathname(ansatz, p, problem, method, noise, cs_seed, sf, miti2_data_fname)
-    # recon2_path = f"figs/recon_p2_landscape/{timestamp}/recon-sf={sf:.3f}-cs_seed={cs_seed}-{miti2_data_fname}"
-    miti2_recon = get_recon_landscape(ansatz, p, miti2, sf, is_reconstructed, recon2_path, cs_seed)
-    
+    recon2_path, _, _ = get_recon_pathname(
+        ansatz, p, problem, method, noise, cs_seed, sf, miti2_data_fname)
+    miti2_recon = get_recon_landscape(
+        ansatz, p, miti2, sf, is_reconstructed, recon2_path, cs_seed)
+
     print(miti2_data['mitigation_method'], miti2_data['mitigation_config'])
 
-
-    metrics = [second_derivative, cal_smoothness, cal_barren_plateaus, cal_variance]
+    # compute metrics
+    metrics = [second_derivative, cal_smoothness,
+               cal_barren_plateaus, cal_variance]
     for metric in metrics:
         print("origin: ", end="")
         print_table(noisy, miti1, miti2, metric)
@@ -274,4 +282,4 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--check', action='store_true', default=False)
     args = parser.parse_args()
-    vis_case_compare_mitigation_method(args.check)
+    compare_mitigation_method(args.check)
