@@ -1,12 +1,12 @@
 Preserve:
 
-cs_evaluate.py: Done
+cs_comp_miti.py
 cs_distributed.py: Done
-cs_eval_init_points.py
-cs_opt_on_recon_ls.py
+cs_evaluate.py: Done
 cs_high_dim_vary_2d.py
 cs_measure_sparsity.py
-cs_comp_miti.py
+cs_opt_on_recon_landscapes.py
+cs_second_optimize.py
 
 
 Fig. 2
