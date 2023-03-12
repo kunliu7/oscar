@@ -7,6 +7,7 @@ import os
 
 from data_loader import load_grid_search_data
 
+
 def nonzero_ratio(ls: np.ndarray, metric: str = 'DCT'):
     if metric == 'DCT':
         f = dctn(ls)
@@ -22,7 +23,7 @@ def nonzero_ratio(ls: np.ndarray, metric: str = 'DCT'):
 
     nonzero_ids = np.argwhere(np.abs(f) > 1e-6)
     nonzero_ratio = len(nonzero_ids) * 1.0 / np.prod(ls.shape)
-    
+
     # print("Using DCT:")
     # print("original shape            =", ls.shape)
     # print("original min, max         =", ls.min(), ls.max())
@@ -43,7 +44,7 @@ def measure_sparsity(
     ratios = {label: [] for label in labels}
 
     if p == 1:
-        bs = 50 # beta step
+        bs = 50  # beta step
         gs = 2 * bs
     elif p == 2:
         bs = 12
@@ -65,7 +66,7 @@ def measure_sparsity(
                 n_qubits=n_qubits, p=p, ansatz=ansatz, problem=problem, method=method,
                 noise=noise, beta_step=bs, gamma_step=gs, seed=seed, miti_method=miti_method
             )
-            
+
             for label in labels:
                 ratio = nonzero_ratio(data['data'], metric=label)
                 ratios[label].append(ratio)
@@ -75,7 +76,8 @@ def measure_sparsity(
 
     for label in labels:
         print(f"{label} ratio =", ratios[label])
-        ratios[label] = np.array(ratios[label]).reshape(len(n_qubits_list), len(seeds))
+        ratios[label] = np.array(ratios[label]).reshape(
+            len(n_qubits_list), len(seeds))
 
     save_dir = f"figs/sparsity/"
     if os.path.exists(save_dir) is False:
@@ -95,14 +97,21 @@ def measure_sparsity(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--ns', type=int, nargs='+', help="Your aims, vis, opt", required=True)
-    parser.add_argument('--p', type=int, help="Your aims, vis, opt", required=True)
-    parser.add_argument('--noise', type=str, help="Your aims, vis, opt", required=True)
-    parser.add_argument('--problem', type=str, help="Your aims, vis, opt", required=True)
-    parser.add_argument('--n_seeds', type=int, nargs='+', help="Your aims, vis, opt", required=True)
-    parser.add_argument('--ansatz', type=str, help="Your aims, vis, opt", required=True)
-    parser.add_argument('--device', type=str, help="Your aims, vis, opt", default=None)
+    parser.add_argument('--ns', type=int, nargs='+',
+                        help="Your aims, vis, opt", required=True)
+    parser.add_argument(
+        '--p', type=int, help="Your aims, vis, opt", required=True)
+    parser.add_argument('--noise', type=str,
+                        help="Your aims, vis, opt", required=True)
+    parser.add_argument('--problem', type=str,
+                        help="Your aims, vis, opt", required=True)
+    parser.add_argument('--n_seeds', type=int, nargs='+',
+                        help="Your aims, vis, opt", required=True)
+    parser.add_argument('--ansatz', type=str,
+                        help="Your aims, vis, opt", required=True)
+    parser.add_argument('--device', type=str,
+                        help="Your aims, vis, opt", default=None)
     args = parser.parse_args()
-    
+
     measure_sparsity(p=args.p, ansatz=args.ansatz, problem=args.problem,
-            noise=args.noise, n_seeds=args.n_seeds, n_qubits_list=args.ns, device=args.device)
+                     noise=args.noise, n_seeds=args.n_seeds, n_qubits_list=args.ns, device=args.device)
